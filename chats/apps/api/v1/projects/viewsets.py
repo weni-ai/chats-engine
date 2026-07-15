@@ -12,9 +12,14 @@ from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    IsAuthenticatedOrHasInternalJWT,
+)
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -49,10 +54,6 @@ from chats.apps.projects.models import (
     CustomStatusType,
     Project,
     ProjectPermission,
-)
-from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
@@ -311,20 +312,7 @@ class ProjectViewset(
 
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
-
-        try:
-            result = usecase.execute(flow_uuid)
-        except (FlowTemplateNotFound, FlowTemplateChannelsNotFound) as exc:
-            logger.warning(
-                "Flow templates retrieval failed: project=%s flow=%s error=%s",
-                project.uuid,
-                flow_uuid,
-                exc,
-            )
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        result = usecase.execute(flow_uuid)
 
         templates = [
             {
@@ -683,12 +671,16 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     swagger_tag = "Custom Status"
     queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
-    permission_classes = [
-        IsAuthenticated,
-        ProjectAnyPermission,
-    ]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [IsAuthenticatedOrHasInternalJWT()]
+        return [IsAuthenticated(), ProjectAnyPermission()]
 
     def get_queryset(self):
         return CustomStatusType.objects.filter(

@@ -1,6 +1,6 @@
 import functools
 
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 
 
 def with_project_jwt_token(func=None, *, room_uuid=None):
@@ -26,7 +26,7 @@ def with_project_jwt_token(func=None, *, room_uuid=None):
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
-        self.jwt_generator = JWTTokenGenerator()
+        self.jwt_generator = CSATJWTTokenGenerator()
         room = room_uuid if room_uuid is not None else str(self.room.uuid)
         self.token = self.jwt_generator.generate_token(
             {"project": str(self.project.uuid), "room": room}

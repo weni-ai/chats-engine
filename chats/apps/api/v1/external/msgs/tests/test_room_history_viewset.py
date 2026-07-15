@@ -479,7 +479,10 @@ class TestRoomHistoryCaching(BaseRoomHistoryTest):
         self.auth()
         with mock.patch(
             "chats.apps.api.v1.external.msgs.viewsets.cache.set"
-        ) as mocked_set:
+        ) as mocked_set, mock.patch(
+            "chats.apps.api.v1.external.msgs.viewsets.is_reply_core_fallback_active",
+            return_value=False,
+        ):
             response = self.get({"room": str(self.room.uuid)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

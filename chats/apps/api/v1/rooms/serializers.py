@@ -388,9 +388,10 @@ class ListRoomSerializer(serializers.ModelSerializer):
         }
 
     def get_is_pinned(self, room: Room) -> bool:
-        # The list queryset annotates ``is_pinned`` (see RoomViewset), so the
-        # value is read straight from the instance and the per-room query below
-        # is skipped, avoiding an N+1 during listing.
+        pinned_ids = self.context.get("pinned_ids")
+        if pinned_ids is not None:
+            return room.pk in pinned_ids
+
         annotated = getattr(room, "is_pinned", None)
         if annotated is not None:
             return bool(annotated)
@@ -918,7 +919,7 @@ class BulkTakeSerializer(serializers.Serializer):
         max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
         if len(value) > max_rooms:
             raise serializers.ValidationError(
-                _("Cannot take more than %(max_rooms)s rooms at once")
+                _("Can't take more than %(max_rooms)s rooms at once")
                 % {"max_rooms": max_rooms}
             )
 
@@ -934,7 +935,7 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in queue"))
+            raise serializers.ValidationError(_("No available rooms found in the queue"))
         attrs["rooms"] = rooms
         return super().validate(attrs)
 

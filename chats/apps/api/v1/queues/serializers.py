@@ -14,6 +14,24 @@ User = get_user_model()
 MAX_INT_32 = 2**31 - 1
 
 
+def validate_queue_purpose_feature_flag(request, project, queue_purpose):
+    if queue_purpose in (None, ""):
+        return
+
+    if not request or not getattr(request, "user", None):
+        return
+
+    if not is_feature_active(
+        settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
+        request.user.email,
+        str(project.uuid),
+    ):
+        raise serializers.ValidationError(
+            {"detail": _("Queue purpose feature is not active.")},
+            code="queue_purpose_feature_flag_is_off",
+        )
+
+
 class QueueLimitSerializer(serializers.Serializer):
     limit = serializers.IntegerField(
         required=False, allow_null=True, min_value=0, max_value=MAX_INT_32
@@ -48,36 +66,53 @@ class QueueSerializer(AuditableModelSerializer):
             "is_deleted",
             "config",
             "name",
+            "queue_purpose",
             "sector",
         ]
 
-    def _get_audit_project(self):
+    def _get_audit_project(self, data=None):
         if self.instance is not None:
             return self.instance.sector.project
-        sector = (self.validated_data or {}).get("sector")
+        source = data if data is not None else getattr(self, "_validated_data", None)
+        if not source:
+            return None
+        sector = source.get("sector")
         return sector.project if sector else None
+
+    def _validate_queue_purpose(self, data):
+        if "queue_purpose" not in (self.initial_data or {}):
+            return
+
+        queue_purpose = data.get("queue_purpose", self.initial_data.get("queue_purpose"))
+        project = self._get_audit_project(data=data)
+        request = self.context.get("request")
+
+        if project:
+            validate_queue_purpose_feature_flag(request, project, queue_purpose)
 
     def validate(self, data):
         """
         Check if queue already exist in sector.
         """
+        self._validate_queue_purpose(data)
+
         name = data.get("name")
         if name:
             if name == "":
                 raise serializers.ValidationError(
-                    {"detail": _("The name field can't be blank.")}
+                    {"detail": _("Enter a name")}
                 )
             if self.instance:
                 if Queue.objects.filter(
                     sector=self.instance.sector, name=name
                 ).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
             else:
                 if Queue.objects.filter(sector=data["sector"], name=name).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
 
         queue_limit = data.pop("queue_limit_info", None)
@@ -105,6 +140,19 @@ class QueueUpdateSerializer(AuditableModelSerializer):
 
         extra_kwargs = {field: {"required": False} for field in fields}
 
+    def validate(self, data):
+        if "queue_purpose" in (self.initial_data or {}) and self.instance:
+            queue_purpose = data.get(
+                "queue_purpose", self.initial_data.get("queue_purpose")
+            )
+            validate_queue_purpose_feature_flag(
+                self.context.get("request"),
+                self.instance.sector.project,
+                queue_purpose,
+            )
+
+        return data
+
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
@@ -117,6 +165,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "name",
+            "queue_purpose",
             "agents",
             "created_on",
             "sector_name",
@@ -151,7 +200,7 @@ class QueueAuthorizationSerializer(AuditableModelSerializer):
         )
         if queue_user:
             raise serializers.ValidationError(
-                {"detail": _("you cant add a user two times in same queue.")}
+                {"detail": _("You can't add a user twice to the same queue")}
             )
         return data
 
@@ -245,6 +294,7 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
+    queue_purpose = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(
@@ -317,6 +367,11 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                 request.user.email,
                 str(sector.project.uuid),
             )
+            is_queue_purpose_feature_active = is_feature_active(
+                settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
+                request.user.email,
+                str(sector.project.uuid),
+            )
             for queue_data in queues:
                 queue_limit = queue_data.get("queue_limit")
                 if (
@@ -327,6 +382,13 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                     raise serializers.ValidationError(
                         {"detail": _("Queue limit feature is not active.")},
                         code="queue_limit_feature_flag_is_off",
+                    )
+
+                queue_purpose = queue_data.get("queue_purpose")
+                if queue_purpose and not is_queue_purpose_feature_active:
+                    raise serializers.ValidationError(
+                        {"detail": _("Queue purpose feature is not active.")},
+                        code="queue_purpose_feature_flag_is_off",
                     )
 
         return data

@@ -1,0 +1,38 @@
+{% extends 'rooms/emails/base.html' %}
+{% load i18n %}
+
+{% block main-content %}
+<section style="width: 574px; margin: 50px auto;">
+  <div
+    style="
+      font-family: 'Lato', sans-serif;
+      font-weight: bold;
+      font-size: 20px;
+      line-height: 28px;
+      color: #262626;
+      margin-top: 24px;
+    "
+  >
+    {% trans 'Hi, here is your chat export' %}
+  </div>
+
+  <div
+    style="
+      font-family: 'Lato', sans-serif;
+      font-style: normal;
+      font-weight: normal;
+      font-size: 16px;
+      line-height: 24px;
+      color: #808080;
+      margin-top: 24px;
+    "
+  >
+    <p style="margin-top: 24px; margin-bottom: 0;">
+      {% blocktrans with project_name=project_name %}Unable to generate chat export for the {{ project_name }} project.{% endblocktrans %}
+    </p>
+    <p style="margin-top: 24px; margin-bottom: 0;">
+      {% trans 'Use the following information to report to support:' %} {{ error_message }}.
+    </p>
+  </div>
+</section>
+{% endblock %}

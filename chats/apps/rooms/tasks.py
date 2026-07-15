@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone as dj_timezone
+from django.utils import translation
 from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
@@ -95,24 +96,63 @@ def check_inactivity_rooms():
     Runs `warn_inactive_rooms` and `close_inactive_rooms` every tick. Each
     step is wrapped in its own try/except so that a failure in the warning
     pass does not prevent the closure pass from executing on this tick.
+
+    Guarded by a Redis lock so two beats can never process the same eligible
+    rooms in parallel — if a previous tick still holds the lock, the new
+    tick exits early and waits for the next schedule slot. The lock has a
+    safety TTL so a crashed worker cannot keep the lock forever.
     """
+    from django_redis import get_redis_connection
+
     from chats.apps.rooms.usecases.inactivity import InactivityService
 
-    service = InactivityService()
+    redis_conn = get_redis_connection("default")
+    lock = redis_conn.lock(
+        settings.INACTIVITY_TASK_LOCK_NAME,
+        timeout=settings.INACTIVITY_TASK_LOCK_TIMEOUT,
+    )
+
+    acquired = lock.acquire(blocking=False)
+    if not acquired:
+        logger.info(
+            "[INACTIVITY TASK] another execution is in progress (lock %s held), "
+            "skipping this tick",
+            settings.INACTIVITY_TASK_LOCK_NAME,
+        )
+        return
 
     try:
-        warned = service.warn_inactive_rooms()
-        logger.info("[INACTIVITY TASK] warn_inactive_rooms processed %s rooms", warned)
-    except Exception as exc:
-        logger.exception("[INACTIVITY TASK] warn_inactive_rooms failed: %s", exc)
-        capture_exception(exc)
+        service = InactivityService()
 
-    try:
-        closed = service.close_inactive_rooms()
-        logger.info("[INACTIVITY TASK] close_inactive_rooms processed %s rooms", closed)
-    except Exception as exc:
-        logger.exception("[INACTIVITY TASK] close_inactive_rooms failed: %s", exc)
-        capture_exception(exc)
+        try:
+            warned = service.warn_inactive_rooms()
+            logger.info(
+                "[INACTIVITY TASK] warn_inactive_rooms processed %s rooms", warned
+            )
+        except Exception as exc:
+            logger.exception("[INACTIVITY TASK] warn_inactive_rooms failed: %s", exc)
+            capture_exception(exc)
+
+        try:
+            closed = service.close_inactive_rooms()
+            logger.info(
+                "[INACTIVITY TASK] close_inactive_rooms processed %s rooms", closed
+            )
+        except Exception as exc:
+            logger.exception("[INACTIVITY TASK] close_inactive_rooms failed: %s", exc)
+            capture_exception(exc)
+    finally:
+        try:
+            lock.release()
+        except Exception as exc:
+            # Release can fail if the lock TTL already expired and another
+            # worker re-acquired it; that is a benign race we should log but
+            # not treat as fatal — the next tick will run normally.
+            logger.warning(
+                "[INACTIVITY TASK] failed to release lock %s: %s",
+                settings.INACTIVITY_TASK_LOCK_NAME,
+                exc,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -166,20 +206,25 @@ def _process_room_export(report: ReportStatus) -> None:
             f"ReportStatus {report.uuid} has no export types in fields_config"
         )
 
-    data = BuildRoomExportData().execute(report.room, generated_by=report.user.email)
-    files = RenderRoomExport().execute(data, types)
+    language = report.user.language or settings.LANGUAGE_CODE
 
-    if getattr(settings, "REPORTS_SEND_EMAILS", False):
-        SendRoomExportEmail().execute(
-            room=report.room,
-            files=files,
-            recipient_email=report.user.email,
+    with translation.override(language):
+        data = BuildRoomExportData().execute(
+            report.room, generated_by=report.user.email
         )
-    else:
-        logger.info(
-            "REPORTS_SEND_EMAILS disabled; skipping email for room export %s",
-            report.uuid,
-        )
+        files = RenderRoomExport().execute(data, types)
+
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            SendRoomExportEmail().execute(
+                room=report.room,
+                files=files,
+                recipient_email=report.user.email,
+            )
+        else:
+            logger.info(
+                "REPORTS_SEND_EMAILS disabled; skipping email for room export %s",
+                report.uuid,
+            )
 
 
 def _handle_room_export_error(report: ReportStatus, error: Exception) -> None:
@@ -211,11 +256,13 @@ def _handle_room_export_error(report: ReportStatus, error: Exception) -> None:
         settings, "REPORTS_SEND_EMAILS", False
     ):
         try:
-            SendRoomExportEmail().send_failure_notification(
-                room=report.room,
-                recipient_email=report.user.email,
-                error_message=str(error),
-            )
+            language = report.user.language or settings.LANGUAGE_CODE
+            with translation.override(language):
+                SendRoomExportEmail().send_failure_notification(
+                    room=report.room,
+                    recipient_email=report.user.email,
+                    error_message=str(error),
+                )
         except Exception as email_error:
             logger.exception(
                 "Error sending room export failure notification: %s", email_error

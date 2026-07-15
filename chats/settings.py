@@ -472,6 +472,9 @@ if USE_SENTRY:
         environment=env.str("ENVIRONMENT", default="develop"),
     )
 
+# JWT
+JWT_SECRET_KEY = env.str("JWT_SECRET_KEY", default="").replace("\\n", "\n")
+JWT_PUBLIC_KEY = env.str("JWT_PUBLIC_KEY", default="").replace("\\n", "\n")
 
 # Query Limiters
 
@@ -512,6 +515,26 @@ DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
 DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
 
+# Inactivity task safety caps: hard ceiling on how many rooms each periodic
+# execution may warn or close. Anything above the cap is processed by the
+# next run (the task runs every minute). Prevents one execution from
+# overflowing past the schedule window even in worst-case spikes.
+INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
+    "INACTIVITY_MAX_WARNINGS_PER_RUN", default=1000
+)
+INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
+    "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
+)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int("INACTIVITY_QUERYSET_CHUNK_SIZE", default=200)
+
+# Distributed lock used by `check_inactivity_rooms` to guarantee only one
+# instance of the task runs at a time, even if a previous run overlaps the
+# 1-minute schedule.
+INACTIVITY_TASK_LOCK_NAME = env.str(
+    "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
+)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int("INACTIVITY_TASK_LOCK_TIMEOUT", default=120)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
@@ -524,6 +547,25 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# Dedicated Celery queue for the inactivity feature so a backlog on the
+# default queue (reports, exports, archives, etc.) cannot delay the
+# `check_inactivity_rooms` beat tick, and vice versa. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
+INACTIVITY_CELERY_QUEUE = env.str("INACTIVITY_CELERY_QUEUE", default="celery")
+
+# Dedicated Celery queue for the risk alert feature, following the same
+# pattern as the inactivity queue. The feature itself lives in another
+# branch; this variable is exposed up-front so the infra side can be
+# provisioned independently. Routing/beat entries should be added when
+# the feature is merged.
+RISK_ALERT_CELERY_QUEUE = env.str("RISK_ALERT_CELERY_QUEUE", default="celery")
+
+CELERY_TASK_ROUTES = {
+    "check_inactivity_rooms": {"queue": INACTIVITY_CELERY_QUEUE},
+}
+ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
+ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
+
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
@@ -535,11 +577,15 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(
+            hour=ARCHIVE_CHATS_SCHEDULE_HOUR,
+            minute=ARCHIVE_CHATS_SCHEDULE_MINUTE,
+        ),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
         "schedule": crontab(minute="*"),
+        "options": {"queue": INACTIVITY_CELERY_QUEUE},
     },
     "check-metric-goal-violations": {
         "task": "check_metric_goal_violations",
@@ -776,6 +822,15 @@ CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
     default="weniChatsChangeTicketerOnTransfer",
 )
 
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
+)
+
 
 # REPORT STATUS CACHE
 REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
@@ -815,6 +870,11 @@ ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
 )
+# Page size for keyset-paginated message iteration during archive.
+# Keeps peak memory bounded to one page of messages + their medias.
+ARCHIVE_CHATS_MESSAGE_PAGE_SIZE = env.int(
+    "ARCHIVE_CHATS_MESSAGE_PAGE_SIZE", default=500
+)
 # Soft-lock threshold used by ArchiveChatsService to decide whether an
 # in-progress RoomArchivedConversation is still being processed by another
 # worker or stale enough to be reclaimed.
@@ -838,6 +898,9 @@ VTEX_INTERNAL_DOMAINS = env.list(
 QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
     "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
 )
+QUEUE_PURPOSE_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_PURPOSE_FEATURE_FLAG_KEY", default="weniChatsQueuePurpose"
+)
 
 # Bulk Queue Create Settings
 QUEUE_BULK_CREATE_MAX_ITEMS = env.int("QUEUE_BULK_CREATE_MAX_ITEMS", default=50)
@@ -854,6 +917,10 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
 USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
     "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
     default="weniChatsUseFlowsMediaUrl",
+)
+NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY = env.str(
+    "NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY",
+    default="weniChatsNinthDigitSearch",
 )
 
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")

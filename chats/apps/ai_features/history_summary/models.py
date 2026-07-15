@@ -36,8 +36,8 @@ class HistorySummary(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("History Summary")
-        verbose_name_plural = _("History Summaries")
+        verbose_name = _("History summary")
+        verbose_name_plural = _("History summaries")
 
     def __str__(self):
         return f"{self.room.pk} - {self.status}"
@@ -54,7 +54,7 @@ class HistorySummaryFeedback(BaseModel):
 
     history_summary = models.ForeignKey(
         HistorySummary,
-        verbose_name=_("History Summary"),
+        verbose_name=_("History summary"),
         on_delete=models.CASCADE,
         related_name="feedbacks",
     )
@@ -69,8 +69,8 @@ class HistorySummaryFeedback(BaseModel):
     tags = ArrayField(models.CharField(max_length=100), blank=True, null=True)
 
     class Meta:
-        verbose_name = _("History Summary Feedback")
-        verbose_name_plural = _("History Summary Feedbacks")
+        verbose_name = _("History summary feedback")
+        verbose_name_plural = _("History summary feedback")
         constraints = [
             models.UniqueConstraint(
                 fields=["history_summary", "user"],

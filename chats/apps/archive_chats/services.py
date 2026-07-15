@@ -15,6 +15,7 @@ from django.core.files.base import File
 from sentry_sdk import capture_exception
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from weni.feature_flags.services import FeatureFlagsService
 
 
@@ -368,27 +369,46 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return self._iter_messages(room)
 
     def _iter_messages(self, room: Room) -> Iterable[dict]:
-        messages = (
-            Message.objects.filter(room=room)
-            .select_related("automatic_message")
-            .order_by("created_on")
-        )
+        page_size = settings.ARCHIVE_CHATS_MESSAGE_PAGE_SIZE
+        last_created_on = None
+        last_pk = None
 
-        for message in messages.iterator():
-            message_context = {"media": []}
-            if message.medias.exists():
-                for media in message.medias.all():  # noqa
+        while True:
+            qs = (
+                Message.objects.filter(room=room)
+                .select_related(
+                    "user", "contact", "automatic_message", "internal_note"
+                )
+                .prefetch_related("medias", "internal_note__medias")
+                .order_by("created_on", "pk")
+            )
+            if last_pk is not None:
+                qs = qs.filter(
+                    Q(created_on__gt=last_created_on)
+                    | Q(created_on=last_created_on, pk__gt=last_pk)
+                )
+
+            page = list(qs[:page_size])
+            if not page:
+                break
+
+            for message in page:
+                message_context = {"media": []}
+                for media in message.medias.all():
                     url = self.process_media(media)
-                    media_data = {
-                        "url": url,
-                        "content_type": media.content_type,
-                        "created_on": media.created_on.isoformat(),
-                    }
-
                     if url:
-                        message_context["media"].append(media_data)
+                        message_context["media"].append(
+                            {
+                                "url": url,
+                                "content_type": media.content_type,
+                                "created_on": media.created_on.isoformat(),
+                            }
+                        )
 
-            yield ArchiveMessageSerializer(message, context=message_context).data
+                yield ArchiveMessageSerializer(message, context=message_context).data
+
+            last_created_on = page[-1].created_on
+            last_pk = page[-1].pk
 
     def upload_messages_file(
         self,
@@ -489,32 +509,31 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
         )
 
-        messages_count = Message.objects.filter(room=room).count()
-        batches_count = messages_count // batch_size + 1
-
-        logger.info(
-            f"[ArchiveChatsService] Deleting {messages_count} messages "
-            f"for room {room.uuid} in {batches_count} batches"
-        )
-
-        with transaction.atomic():
-            for _ in range(batches_count):
-                messages_pks = Message.objects.filter(room=room).values_list(
-                    "pk", flat=True
-                )[:batch_size]
-
-                if len(messages_pks) == 0:
+        deleted = 0
+        while True:
+            with transaction.atomic():
+                messages_pks = list(
+                    Message.objects.filter(room=room).values_list("pk", flat=True)[
+                        :batch_size
+                    ]
+                )
+                if not messages_pks:
                     break
 
                 Message.objects.filter(pk__in=messages_pks).delete()
+                deleted += len(messages_pks)
 
-            room_archived_conversation.status = (
-                ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
-            )
-            room_archived_conversation.messages_deleted_at = timezone.now()
-            room_archived_conversation.save(
-                update_fields=["status", "messages_deleted_at"]
-            )
+        logger.info(
+            f"[ArchiveChatsService] Deleted {deleted} messages for room {room.uuid}"
+        )
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+        )
+        room_archived_conversation.messages_deleted_at = timezone.now()
+        room_archived_conversation.save(
+            update_fields=["status", "messages_deleted_at"]
+        )
 
         logger.info(
             f"[ArchiveChatsService] Room archived conversation status updated to "

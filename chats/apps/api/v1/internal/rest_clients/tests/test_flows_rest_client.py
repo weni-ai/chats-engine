@@ -3,14 +3,11 @@ from unittest.mock import MagicMock, patch
 import requests
 from django.test import TestCase, override_settings
 
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
-    FlowRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.rooms.exceptions import (
     FlowsChangeTicketerError,
     FlowsTicketerNotFoundError,
 )
-
 
 CLIENT_PATH = "chats.apps.api.v1.internal.rest_clients.flows_rest_client"
 
@@ -62,9 +59,7 @@ class GetTicketerBySectorTests(TestCase):
             "https://flows.test/api/v2/ticketers.json",
         )
         self.assertEqual(call_kwargs["params"], {"sector_uuid": "sector-uuid"})
-        self.assertEqual(
-            call_kwargs["headers"]["Authorization"], "Token project-token"
-        )
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Token project-token")
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_when_results_are_empty(self, mock_retry):
@@ -104,9 +99,7 @@ class GetTicketerBySectorTests(TestCase):
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_when_first_result_has_no_uuid(self, mock_retry):
-        mock_retry.return_value = _build_response(
-            200, {"results": [{"name": "T1"}]}
-        )
+        mock_retry.return_value = _build_response(200, {"results": [{"name": "T1"}]})
 
         client = FlowRESTClient()
 
@@ -146,9 +139,7 @@ class ChangeTicketerTests(TestCase):
                 "ticketer": "ticketer-1",
             },
         )
-        self.assertEqual(
-            call_kwargs["headers"]["Authorization"], "Token project-token"
-        )
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Token project-token")
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_on_non_2xx_response(self, mock_retry):

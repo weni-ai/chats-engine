@@ -13,9 +13,9 @@ from rest_framework import status
 
 from chats.apps.api.authentication.classes import (
     InternalAPITokenAuthentication,
-    JWTAuthentication,
+    CSATJWTAuthentication,
 )
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 
 
 from chats.apps.api.authentication.permissions import (
@@ -24,15 +24,15 @@ from chats.apps.api.authentication.permissions import (
 )
 
 
-class JWTAuthenticationTests(TestCase):
+class CSATJWTAuthenticationTests(TestCase):
     def setUp(self):
-        self.token_generator = JWTTokenGenerator()
+        self.token_generator = CSATJWTTokenGenerator()
         self.valid_token = self.token_generator.generate_token(
             {"user_id": 1, "username": "testuser"}
         )
 
     def test_authenticate(self):
-        authentication = JWTAuthentication()
+        authentication = CSATJWTAuthentication()
         request = HttpRequest()
         request.META["HTTP_AUTHORIZATION"] = f"Token {self.valid_token}"
         result = authentication.authenticate(request)
@@ -42,7 +42,7 @@ class JWTAuthenticationTests(TestCase):
         self.assertIsNotNone(result[1])
 
     def test_authenticate_credentials(self):
-        authentication = JWTAuthentication()
+        authentication = CSATJWTAuthentication()
         result = authentication.authenticate_credentials(self.valid_token)
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 2)
@@ -50,8 +50,8 @@ class JWTAuthenticationTests(TestCase):
         self.assertIsNotNone(result[1])
 
 
-class JWTAuthenticationView(APIView):
-    authentication_classes = [JWTAuthentication]
+class CSATJWTAuthenticationView(APIView):
+    authentication_classes = [CSATJWTAuthentication]
     permission_classes = [JWTRequiredPermission]
 
     def get(self, request):
@@ -66,12 +66,12 @@ class JWTAuthenticationView(APIView):
 
 
 @override_settings(ROOT_URLCONF="chats.apps.api.authentication.tests.test_urls")
-class JWTAuthenticationViewAPITestCase(APITestCase):
-    """Test cases for JWTAuthenticationView using JWTAuthentication."""
+class CSATJWTAuthenticationViewAPITestCase(APITestCase):
+    """Test cases for CSATJWTAuthenticationView using CSATJWTAuthentication."""
 
     def setUp(self):
         self.client = APIClient()
-        self.token_generator = JWTTokenGenerator()
+        self.token_generator = CSATJWTTokenGenerator()
         self.test_payload = {
             "room": str(uuid.uuid4()),
         }

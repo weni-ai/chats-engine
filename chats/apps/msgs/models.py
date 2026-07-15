@@ -81,10 +81,10 @@ class Message(BaseModelWithManualCreatedOn):
         null=True,
     )
     is_read = models.CharField(
-        _("message is read"), max_length=50, blank=True, null=True
+        _("message was read"), max_length=50, blank=True, null=True
     )
     is_delivered = models.CharField(
-        _("message is delivered"), max_length=50, blank=True, null=True
+        _("message was delivered"), max_length=50, blank=True, null=True
     )
 
     class Meta:
@@ -94,12 +94,12 @@ class Message(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         if self.room.is_24h_valid is False and self.user is not None:
             raise ValidationError(
                 {
                     "detail": _(
-                        "You cannot send messages after 24h from the last contact message"
+                        "You can't send messages after 24h from the last contact message"
                     )
                 }
             )
@@ -224,22 +224,22 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
         Message,
         related_name="medias",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.CASCADE,
     )
-    content_type = models.CharField(_("Content Type"), max_length=300)
+    content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"),
+        _("Media file"),
         null=True,
         blank=True,
         max_length=300,
         upload_to=message_media_upload_to,
     )
-    media_url = models.TextField(_("Media url"), null=True, blank=True)
+    media_url = models.TextField(_("Media URL"), null=True, blank=True)
 
     class Meta:
-        verbose_name = _("MessageMedia")
-        verbose_name_plural = _("MessageMedias")
+        verbose_name = _("Message media")
+        verbose_name_plural = _("Message media")
         indexes = [
             models.Index(
                 fields=["content_type"],
@@ -252,7 +252,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.message.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         return super().save(*args, **kwargs)
 
     @property
@@ -411,6 +411,27 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=255, unique=True, db_index=True
     )
+    # Stable hex "core" of the WAMID payload (see ``extract_wamid_core``).
+    # Stored alongside ``external_id`` so replies can be resolved even when
+    # Meta sends a different WAMID envelope inside ``context.id`` (HBgM vs
+    # HBgT). Nullable because legacy rows and non-WAMID identifiers may not
+    # have one; not unique because two distinct WAMIDs can resolve to the same
+    # core during the rollout window.
+    #
+    # ``TextField`` (no length cap) on purpose: a ``CharField(max_length=64)``
+    # caused a production ``DataError`` because the LID-based envelope
+    # (``HBgT<LID>...``, e.g. when a contact replies to their own message)
+    # wraps a longer internal id whose hex core is consistently 66 chars —
+    # not a rare outlier. Rather than guess a "safe" max for every current
+    # and future Meta envelope, store this as unbounded text; Postgres
+    # indexes ``text`` columns the same way as ``varchar`` and our values are
+    # always tiny (well under 1KB), so there's no practical cost.
+    external_id_core = models.TextField(
+        _("External ID core"),
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     message = models.ForeignKey(
         "Message", on_delete=models.CASCADE, related_name="reply_indexes"
     )
@@ -418,6 +439,16 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = "Chat Message Reply Index"
         verbose_name_plural = "Chat Message Reply Indexes"
+        indexes = [
+            # Serves the fallback query in ``_resolve_reply_index``:
+            # ``WHERE external_id_core = ? ORDER BY created_on DESC LIMIT 1``.
+            # Additive on top of the standalone ``external_id_core`` index so
+            # the migration carries no risk of dropping anything existing.
+            models.Index(
+                fields=["external_id_core", "-created_on"],
+                name="cmri_core_created_desc_idx",
+            ),
+        ]
 
 
 class AutomaticMessage(BaseModel):

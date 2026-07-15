@@ -102,25 +102,25 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     is_active = models.BooleanField(_("is active?"), default=True)
-    is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
+    is_waiting = models.BooleanField(_("is waiting for an answer?"), default=False)
 
     # Legacy, only stores the last transfer
-    transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    transfer_history = models.JSONField(_("Transfer history"), null=True, blank=True)
     # New, stores the full transfer history
     full_transfer_history = models.JSONField(
-        _("Full Transfer History"), null=True, blank=True, default=list
+        _("Full transfer history"), null=True, blank=True, default=list
     )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
         related_name="rooms",
-        verbose_name=_("tags"),
+        verbose_name=_("Tags"),
         blank=True,
     )
-    protocol = models.TextField(_("protocol"), null=True, blank=True, default="")
+    protocol = models.TextField(_("Protocol"), null=True, blank=True, default="")
 
     service_chat = models.TextField(
-        _("service chat"), null=True, blank=True, default=""
+        _("Service chat"), null=True, blank=True, default=""
     )
 
     first_user_assigned_at = models.DateTimeField(
@@ -309,6 +309,20 @@ class Room(BaseModel, BaseConfigurableModel):
                     is_active=True,
                     user__isnull=False,
                     first_user_assigned_at__isnull=False,
+            # Partial index used by `InactivityService.warn_inactive_rooms`.
+            # Pre-filters rows that match every `rooms_room`-local predicate
+            # of the warn queryset so the planner picks this index directly
+            # instead of doing a BitmapAnd with `rooms_room_last_message_user_id_*`,
+            # which scans hundreds of thousands of historical rows.
+            models.Index(
+                fields=["last_interaction"],
+                name="rooms_inactivity_warn_idx",
+                condition=models.Q(
+                    is_active=True,
+                    is_inactive=False,
+                    is_waiting=False,
+                    user__isnull=False,
+                    last_message_user__isnull=False,
                 ),
             ),
         ]
@@ -319,7 +333,7 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
         if self._state.adding is False and current_is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
+            raise ValidationError({"detail": _("Closed rooms can't receive updates")})
 
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
@@ -763,10 +777,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
+        project = self.queue.sector.project
+
         if (
             RoomPin.objects.filter(
                 user=user,
-                room__queue__sector__project=self.queue.sector.project,
+                project=project,
                 room__is_active=True,
             ).count()
             >= settings.MAX_ROOM_PINS_LIMIT
@@ -779,7 +795,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if not self.is_active:
             raise RoomIsNotActiveError
 
-        return RoomPin.objects.create(room=self, user=user)
+        return RoomPin.objects.create(room=self, user=user, project=project)
 
     def unpin(self, user: User):
         """
@@ -828,22 +844,29 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message, user=None):
+    def update_last_message(self, message, user=None, update_last_interaction=True):
         """
         Updates last message fields. Used for agent/system messages.
+
+        When ``update_last_interaction`` is False the interaction timestamp
+        is preserved — useful for automatic messages (e.g. inactivity
+        warnings) that must not reset timers.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-            last_message_media=media_data,
-        )
+        fields = {
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+            "last_message_media": media_data,
+        }
+        if update_last_interaction:
+            fields["last_interaction"] = message.created_on
+
+        Room.objects.filter(pk=self.pk).update(**fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
@@ -930,11 +953,17 @@ class RoomPin(BaseModel):
         verbose_name=_("user"),
         on_delete=models.CASCADE,
     )
-    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
+    created_on = models.DateTimeField(_("Created on"), auto_now_add=True)
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="room_pins",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
 
     class Meta:
-        verbose_name = _("Room Pin")
-        verbose_name_plural = _("Room Pins")
+        verbose_name = _("Room pin")
+        verbose_name_plural = _("Room pins")
         constraints = [
             models.UniqueConstraint(
                 fields=["room", "user"],
@@ -965,15 +994,15 @@ class RoomNote(BaseModel):
     message = models.OneToOneField(
         "msgs.Message",
         related_name="internal_note",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
 
     class Meta:
-        verbose_name = _("Room Note")
-        verbose_name_plural = _("Room Notes")
+        verbose_name = _("Room note")
+        verbose_name_plural = _("Room notes")
         ordering = ["-created_on"]
 
     @property

@@ -8,11 +8,9 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
-    IntegerField,
     OuterRef,
     Q,
     Subquery,
-    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
@@ -22,7 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from pydub.exceptions import CouldntDecodeError
-from rest_framework import filters, mixins, parsers, permissions, status
+from rest_framework import mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -109,6 +107,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.filters import PhoneAwareSearchFilter
 from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
@@ -125,7 +124,7 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,
-        filters.SearchFilter,
+        PhoneAwareSearchFilter,
         OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
@@ -158,11 +157,12 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project__permissions__user=self.request.user)
-        )
+
+        user_projects = ProjectPermission.objects.filter(
+            user=self.request.user
+        ).values_list("project", flat=True)
+
+        qs = super().get_queryset().filter(queue__sector__project__in=user_projects)
 
         qs = qs.select_related(
             "user", "contact", "queue", "queue__sector", "queue__sector__project"
@@ -185,6 +185,9 @@ class RoomViewset(
         context["inactivity_feature_active"] = getattr(
             self, "inactivity_feature_active", None
         )
+        pinned_ids = getattr(self, "_pinned_ids_context", None)
+        if pinned_ids is not None:
+            context["pinned_ids"] = pinned_ids
         return context
 
     def list(self, request, *args, **kwargs):
@@ -243,7 +246,7 @@ class RoomViewset(
 
     def _list_with_legacy_pin_order(self, qs, request, project):
         pins_query = {
-            "room__queue__sector__project": project,
+            "project": project,
         }
 
         if user_email := request.query_params.get("email"):
@@ -268,7 +271,7 @@ class RoomViewset(
             RoomPin.objects.filter(
                 user=request.user,
                 room=OuterRef("pk"),
-                room__queue__sector__project=project,
+                project=project,
             )
             .order_by("-created_on")
             .values("created_on")[:1]
@@ -295,57 +298,47 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        # The pin limit is capped at ``MAX_ROOM_PINS_LIMIT`` (3) per user, so the
-        # pinned rooms form a tiny, bounded set. We resolve them with a single
-        # small query and reuse the resulting ids as constant literals, avoiding
-        # the correlated subqueries / full-PK materialization of the other paths.
-        pins_query = {"room__queue__sector__project": project, "room__is_active": True}
+        user = request.user
 
         if user_email := request.query_params.get("email"):
-            pins_query["user__email"] = user_email
-        else:
-            pins_query["user"] = request.user
+            user = User.objects.filter(email=user_email).first()
 
-        # Ordered most-recent-first so the list index doubles as the pin rank.
+            if not user:
+                return self._get_paginated_response(qs)
+
         pinned_ids = list(
-            RoomPin.objects.filter(**pins_query)
+            RoomPin.objects.filter(
+                user=user,
+                project=project,
+                room__is_active=True,
+            )
             .order_by("-created_on")
             .values_list("room_id", flat=True)
         )
 
         filtered_qs = self.filter_queryset(qs)
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
         if not pinned_ids:
             return self._get_paginated_response(filtered_qs)
 
-        # Pinned rooms must always appear at the top, even if other active
-        # filters (queue, sector, search) would otherwise exclude them. The
-        # filtered set is referenced as a subquery (never pulled into Python)
-        # and the pinned ids are a literal list of at most 3 elements.
-        combined_qs = qs.filter(
-            Q(pk__in=Subquery(filtered_qs.values("pk"))) | Q(pk__in=pinned_ids)
-        )
+        main_qs = filtered_qs.exclude(pk__in=pinned_ids)
+        self._pinned_ids_context = set(pinned_ids)
 
-        pin_rank_whens = [
-            When(pk=room_id, then=Value(index))
-            for index, room_id in enumerate(pinned_ids)
-        ]
+        response = self._get_paginated_response(main_qs)
 
-        combined_qs = combined_qs.annotate(
-            is_pinned=Case(
-                When(pk__in=pinned_ids, then=Value(True)),
-                default=Value(False),
-                output_field=BooleanField(),
-            ),
-            pin_rank=Case(
-                *pin_rank_whens,
-                default=Value(len(pinned_ids)),
-                output_field=IntegerField(),
-            ),
-        ).order_by("pin_rank", *secondary_sort)
+        include_pinned = request.query_params.get("include_pinned", "true")
+        if include_pinned.lower() == "true":
+            pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
+            pinned_rooms = sorted(
+                qs.filter(pk__in=pinned_ids),
+                key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
+            )
+            serializer = self.get_serializer(pinned_rooms, many=True)
+            response.data["pinned_rooms"] = serializer.data
+        else:
+            response.data["pinned_rooms"] = []
 
-        return self._get_paginated_response(combined_qs)
+        return response
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
@@ -1528,7 +1521,7 @@ class RoomNoteViewSet(
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
 
-        if not Room.objects.filter(uuid=room_uuid).exists():
+        if not self.queryset.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
 
         return super().list(request, *args, **kwargs)
@@ -1571,7 +1564,7 @@ class RoomNoteMediaViewset(
     swagger_tag = "Rooms"
     queryset = RoomNoteMedia.objects.all()
     serializer_class = RoomNoteMediaSerializer
-    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    filter_backends = [OrderingFilter, DjangoFilterBackend]
     filterset_class = room_filters.RoomNoteMediaFilter
     parser_classes = [parsers.MultiPartParser]
     permission_classes = [IsAuthenticated, RoomNoteMediaPermission]

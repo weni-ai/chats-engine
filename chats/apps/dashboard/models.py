@@ -10,12 +10,12 @@ class RoomMetrics(BaseModel):
     room = models.OneToOneField(
         "rooms.Room",
         related_name="metric",
-        verbose_name=_("Room Metric"),
+        verbose_name=_("Room metric"),
         on_delete=models.CASCADE,
     )
-    waiting_time = models.IntegerField(_("Room Waiting time"), default=0)
+    waiting_time = models.IntegerField(_("Room waiting time"), default=0)
     queued_count = models.IntegerField(_("Queued count"), default=0)
-    message_response_time = models.IntegerField(_("Messages response time"), default=0)
+    message_response_time = models.IntegerField(_("Message response time"), default=0)
     first_response_time = models.IntegerField(
         _("First response time"), null=True, blank=True, default=None
     )
@@ -23,8 +23,8 @@ class RoomMetrics(BaseModel):
     transfer_count = models.IntegerField(_("Room transfer count"), default=0)
 
     class Meta:
-        verbose_name = _("Room Metric")
-        verbose_name_plural = _("Rooms Metrics")
+        verbose_name = _("Room metric")
+        verbose_name_plural = _("Room metrics")
 
     def __str__(self):
         return self.room.queue.name

@@ -384,8 +384,8 @@ class BulkCloseServiceTest(TestCase):
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
 
-        RoomPin.objects.create(room=room1, user=self.user)
-        RoomPin.objects.create(room=room2, user=self.user)
+        RoomPin.objects.create(room=room1, user=self.user, project=self.project)
+        RoomPin.objects.create(room=room2, user=self.user, project=self.project)
 
         rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
         self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 2)
