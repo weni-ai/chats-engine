@@ -309,6 +309,8 @@ class Room(BaseModel, BaseConfigurableModel):
                     is_active=True,
                     user__isnull=False,
                     first_user_assigned_at__isnull=False,
+                ),
+            ),
             # Partial index used by `InactivityService.warn_inactive_rooms`.
             # Pre-filters rows that match every `rooms_room`-local predicate
             # of the warn queryset so the planner picks this index directly

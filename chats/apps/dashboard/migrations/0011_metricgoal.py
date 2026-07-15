@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("dashboard", "0009_reportstatus_report_type_reportstatus_room"),
+        ("dashboard", "0010_alter_roommetrics_options_and_more"),
         ("projects", "0035_project_is_chats_summary_enabled"),
     ]
 

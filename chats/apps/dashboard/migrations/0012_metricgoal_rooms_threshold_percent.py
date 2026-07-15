@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("dashboard", "0010_metricgoal"),
+        ("dashboard", "0011_metricgoal"),
     ]
 
     operations = [

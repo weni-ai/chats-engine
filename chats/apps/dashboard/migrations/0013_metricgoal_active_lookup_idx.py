@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("dashboard", "0011_metricgoal_rooms_threshold_percent"),
+        ("dashboard", "0012_metricgoal_rooms_threshold_percent"),
     ]
 
     operations = [
