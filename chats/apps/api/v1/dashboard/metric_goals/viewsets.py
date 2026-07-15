@@ -10,6 +10,9 @@ from chats.apps.api.v1.dashboard.metric_goals.serializers import (
     _can_configure_metric_goals,
 )
 from chats.apps.dashboard.models import MetricGoal
+from chats.apps.dashboard.services.metric_goal_alerts import (
+    is_metric_goal_alerts_enabled,
+)
 from chats.apps.projects.models import ProjectPermission
 
 
@@ -20,13 +23,21 @@ class MetricGoalActionsMixin:
         except ProjectPermission.DoesNotExist:
             raise PermissionDenied("Você não tem permissão neste projeto")
 
+    def _ensure_feature_enabled(self, project):
+        if not is_metric_goal_alerts_enabled(str(project.uuid)):
+            raise PermissionDenied(
+                "A feature de alertas de meta não está disponível para este projeto"
+            )
+
     def _ensure_can_configure(self, project):
+        self._ensure_feature_enabled(project)
         permission = self._get_project_permission(project)
         if not _can_configure_metric_goals(permission):
             raise PermissionDenied("Apenas moderadores podem configurar metas")
         return permission
 
     def _ensure_can_view(self, project):
+        self._ensure_feature_enabled(project)
         permission = self._get_project_permission(project)
         if not (permission.is_admin or permission.sector_authorizations.exists()):
             raise PermissionDenied("Você não tem acesso ao dashboard deste projeto")
@@ -94,6 +105,9 @@ class MetricGoalActionsMixin:
                 "rooms_threshold_count": validated_data.get(
                     "rooms_threshold_count",
                     MetricGoal.DEFAULT_ROOMS_THRESHOLD_COUNT,
+                ),
+                "rooms_threshold_percent": validated_data.get(
+                    "rooms_threshold_percent"
                 ),
             },
         )
