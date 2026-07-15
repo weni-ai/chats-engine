@@ -160,11 +160,12 @@ class MetricGoalBreachServiceTests(TestCase):
 
         entry = payload["waiting_time_goal"]
         self.assertEqual(entry["breached_rooms_count"], 2)
-        self.assertFalse(entry["is_breached"])  # 2 < 5
+        # The widget alert is not gated by rooms_threshold_count (that only
+        # gates the email notification) — 2 rooms breaching is enough.
+        self.assertTrue(entry["is_breached"])
 
-    def test_waiting_time_is_breached_when_count_meets_threshold(self):
-        for i in range(5):
-            self._waiting_room(since_seconds=400, suffix=f"over-{i}")
+    def test_waiting_time_is_breached_with_a_single_room_over_threshold(self):
+        self._waiting_room(since_seconds=400, suffix="over-1")
 
         MetricGoal.objects.create(
             project=self.project,
@@ -176,7 +177,7 @@ class MetricGoalBreachServiceTests(TestCase):
 
         entry = self.service.get_goals_payload(self.project)["waiting_time_goal"]
 
-        self.assertEqual(entry["breached_rooms_count"], 5)
+        self.assertEqual(entry["breached_rooms_count"], 1)
         self.assertTrue(entry["is_breached"])
 
     def test_first_response_time_skips_rooms_already_responded(self):

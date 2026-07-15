@@ -33,6 +33,7 @@ class MetricGoalReadSerializer(serializers.ModelSerializer):
             "is_active",
             "email_enabled",
             "rooms_threshold_count",
+            "rooms_threshold_percent",
             "recipients",
         ]
 
@@ -41,7 +42,7 @@ class MetricGoalReadSerializer(serializers.ModelSerializer):
 
 
 class MetricGoalRecipientWriteSerializer(serializers.Serializer):
-    uuid_project_permission = serializers.UUIDField()
+    email = serializers.EmailField()
 
 
 class MetricGoalWriteSerializer(serializers.Serializer):
@@ -54,8 +55,14 @@ class MetricGoalWriteSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(default=True)
     email_enabled = serializers.BooleanField(default=False)
     rooms_threshold_count = serializers.IntegerField(
-        min_value=1,
+        min_value=0,
         default=MetricGoal.DEFAULT_ROOMS_THRESHOLD_COUNT,
+    )
+    rooms_threshold_percent = serializers.IntegerField(
+        min_value=1,
+        max_value=100,
+        required=False,
+        allow_null=True,
     )
     recipients = MetricGoalRecipientWriteSerializer(many=True, required=False)
 
@@ -74,20 +81,37 @@ class MetricGoalWriteSerializer(serializers.Serializer):
         else:
             attrs["threshold_seconds"] = threshold_seconds
 
+        # `rooms_threshold_count` only gates the email notification (the
+        # WS/toast/widget alert fires with a single room in breach). The
+        # front sends `0` when email is disabled, since the field is
+        # meaningless in that case — we accept and store it as-is instead
+        # of silently rewriting the user's input. Whenever `email_enabled`
+        # is (re)enabled through this same serializer, a real (>=1) value
+        # is required below, so a stale `0` can never end up backing an
+        # active email notification.
+        email_enabled = attrs.get("email_enabled", False)
+        rooms_threshold_count = attrs.get("rooms_threshold_count")
+        if email_enabled and rooms_threshold_count == 0:
+            raise serializers.ValidationError(
+                {
+                    "rooms_threshold_count": [
+                        "Informe a quantidade de salas para o envio de e-mail"
+                    ]
+                }
+            )
+
         return attrs
 
     def validate_recipients(self, recipients):
         project = self.context["project"]
-        permission_uuids = [
-            item["uuid_project_permission"] for item in recipients
-        ]
+        emails = [item["email"] for item in recipients]
         permissions = ProjectPermission.objects.filter(
-            uuid__in=permission_uuids,
+            user__email__in=emails,
             project=project,
             is_deleted=False,
         ).select_related("user")
 
-        if permissions.count() != len(permission_uuids):
+        if permissions.count() != len(set(emails)):
             raise serializers.ValidationError(
                 "Um ou mais destinatários não pertencem ao projeto"
             )
