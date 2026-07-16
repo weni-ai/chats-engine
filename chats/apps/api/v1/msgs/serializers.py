@@ -49,10 +49,6 @@ class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
     )
 
 
-class BulkSendRoomsCountResponseSerializer(serializers.Serializer):
-    count = serializers.IntegerField()
-
-
 def _resolve_reply_index(message: ChatMessage, replied_id: str):
     """Resolve a :class:`ChatMessageReplyIndex` for a replied-to WAMID.
 
@@ -65,9 +61,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     collision between rooms/projects from surfacing a foreign message.
     """
 
-    exact_match = ChatMessageReplyIndex.objects.filter(
-        external_id=replied_id
-    ).first()
+    exact_match = ChatMessageReplyIndex.objects.filter(external_id=replied_id).first()
     if exact_match is not None:
         return exact_match
 
@@ -76,9 +70,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
         return None
 
     try:
-        project_uuid = str(message.room.project_uuid or "") or str(
-            message.project.uuid
-        )
+        project_uuid = str(message.room.project_uuid or "") or str(message.project.uuid)
     except Exception:
         project_uuid = ""
 
