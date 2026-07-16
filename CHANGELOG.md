@@ -1,53 +1,3 @@
-# 3.70.4
-# Add
-  - Configurable Celery worker concurrency for the archive chats queue
-
-# 3.70.3
-# Add
-  - Keyset pagination and configurable page size for archived message processing
-
-# 3.70.2
-# Add
-  - Weni EDA dependency and updated Weni Commons and feature flags packages
-
-# 3.70.1
-# Fix
-  - Queue migration branches merged to prevent migration conflicts
-
-# 3.70.0
-# Add
-  - CSAT ratings and comments in room history for project administrators
-  - Queue purpose field with feature flag support and Flows synchronization
-  - Dedicated Celery queues for inactivity and risk alert tasks
-
-# 3.69.0
-# Add
-  - CSAT-specific JWT authentication
-  - Romanian localization
-# Fix
-  - English, Spanish, and Brazilian Portuguese translations
-
-# 3.68.10
-# Fix
-  - Queue authorization uniqueness constraint for soft-deleted records
-
-# 3.68.9
-# Fix
-  - Spanish and Brazilian Portuguese room export email subject translations
-
-# 3.68.8
-# Fix
-  - Room exports and email notifications generated in the user's language
-
-# 3.68.7
-# Add
-  - Room export email templates and notifications
-  - Configurable archive chats schedule
-  - JWT authentication for additional internal endpoints
-# Fix
-  - Pinned room pagination and ordering
-  - Flow template retrieval to skip stale templates
-
 # 3.68.6
 # Add
   - Media download endpoint for message attachments
@@ -1548,7 +1498,6 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
-
 
 
 

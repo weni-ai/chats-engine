@@ -7,6 +7,7 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
+from chats.apps.api.core.serializers import CommaSeparatedListField
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
@@ -23,6 +24,33 @@ from chats.apps.ai_features.improve_user_message.tasks import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+BULK_SEND_ROOM_STATUS_CHOICES = ("waiting", "ongoing")
+
+
+class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    status = CommaSeparatedListField(
+        child=serializers.ChoiceField(choices=BULK_SEND_ROOM_STATUS_CHOICES),
+        required=True,
+        allow_empty=False,
+    )
+    queues = CommaSeparatedListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    agents = CommaSeparatedListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+
+
+class BulkSendRoomsCountResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
 
 
 def _resolve_reply_index(message: ChatMessage, replied_id: str):
