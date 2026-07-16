@@ -43,13 +43,22 @@ class GetRoomsCountForSendBulkMsgsUseCaseTests(TestCase):
         self.usecase = GetRoomsCountForSendBulkMsgsUseCase()
         self.project_uuid = str(self.project.uuid)
 
-    def _create_room(self, *, queue=None, user=None, is_active=True, contact_name="C"):
+    def _create_room(
+        self,
+        *,
+        queue=None,
+        user=None,
+        is_active=True,
+        is_waiting=False,
+        contact_name="C",
+    ):
         contact = Contact.objects.create(name=contact_name)
         return Room.objects.create(
             queue=queue or self.queue,
             contact=contact,
             user=user,
             is_active=is_active,
+            is_waiting=is_waiting,
             project_uuid=self.project_uuid
             if (queue or self.queue).sector.project_id == self.project.pk
             else str(self.other_project.uuid),
@@ -152,3 +161,42 @@ class GetRoomsCountForSendBulkMsgsUseCaseTests(TestCase):
         )
 
         self.assertEqual(count, 1)
+
+    def test_agents_with_waiting_status_excludes_waiting_rooms(self):
+        self._create_room(user=None)
+        self._create_room(user=self.agent, contact_name="Ongoing")
+
+        count = self.usecase.execute(
+            project_uuid=self.project_uuid,
+            statuses=["waiting"],
+            agents=[self.agent.email],
+        )
+
+        self.assertEqual(count, 0)
+
+    def test_agents_with_waiting_and_ongoing_only_counts_matching_agents(self):
+        self._create_room(user=None)
+        self._create_room(user=self.agent, contact_name="Ongoing")
+        self._create_room(user=self.agent_b, contact_name="Other agent")
+
+        count = self.usecase.execute(
+            project_uuid=self.project_uuid,
+            statuses=["waiting", "ongoing"],
+            agents=[self.agent.email],
+        )
+
+        self.assertEqual(count, 1)
+
+    def test_includes_is_waiting_rooms(self):
+        self._create_room(user=None, is_waiting=True, contact_name="Flow start waiting")
+        self._create_room(
+            user=self.agent, is_waiting=True, contact_name="Flow start ongoing"
+        )
+        self._create_room(user=None, contact_name="Waiting")
+
+        count = self.usecase.execute(
+            project_uuid=self.project_uuid,
+            statuses=["waiting", "ongoing"],
+        )
+
+        self.assertEqual(count, 3)

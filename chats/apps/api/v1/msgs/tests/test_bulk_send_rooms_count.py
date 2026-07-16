@@ -15,6 +15,7 @@ from chats.apps.sectors.models import Sector
 class TestBulkSendRoomsCount(APITestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Bulk Project")
+        self.other_project = Project.objects.create(name="Other Project")
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
@@ -27,6 +28,9 @@ class TestBulkSendRoomsCount(APITestCase):
 
         self.admin = User.objects.create_user(
             email="admin@example.com", password="testpass123"
+        )
+        self.other_admin = User.objects.create_user(
+            email="other.admin@example.com", password="testpass123"
         )
         self.attendant = User.objects.create_user(
             email="attendant@example.com", password="testpass123"
@@ -44,6 +48,11 @@ class TestBulkSendRoomsCount(APITestCase):
             role=ProjectPermission.ROLE_ADMIN,
         )
         ProjectPermission.objects.create(
+            project=self.other_project,
+            user=self.other_admin,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        ProjectPermission.objects.create(
             project=self.project,
             user=self.attendant,
             role=ProjectPermission.ROLE_ATTENDANT,
@@ -52,13 +61,22 @@ class TestBulkSendRoomsCount(APITestCase):
         self.url = reverse("message-bulk-send-rooms")
         self.project_uuid = str(self.project.uuid)
 
-    def _create_room(self, *, queue=None, user=None, is_active=True, contact_name="C"):
+    def _create_room(
+        self,
+        *,
+        queue=None,
+        user=None,
+        is_active=True,
+        is_waiting=False,
+        contact_name="C",
+    ):
         contact = Contact.objects.create(name=contact_name)
         return Room.objects.create(
             queue=queue or self.queue,
             contact=contact,
             user=user,
             is_active=is_active,
+            is_waiting=is_waiting,
             project_uuid=self.project_uuid,
         )
 
@@ -153,3 +171,57 @@ class TestBulkSendRoomsCount(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unauthenticated_is_unauthorized(self):
+        response = self.client.get(
+            self.url,
+            {
+                "project": self.project_uuid,
+                "status": "waiting",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_admin_of_other_project_is_forbidden(self):
+        response = self._get(
+            self.other_admin,
+            {
+                "project": self.project_uuid,
+                "status": "waiting",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_agents_with_waiting_and_ongoing_only_counts_matching_agents(self):
+        self._create_room(user=None, contact_name="Waiting")
+        self._create_room(user=self.agent, contact_name="Ongoing")
+        self._create_room(user=self.agent_b, contact_name="Other agent")
+
+        response = self._get(
+            self.admin,
+            {
+                "project": self.project_uuid,
+                "status": "waiting,ongoing",
+                "agents": self.agent.email,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_includes_is_waiting_rooms(self):
+        self._create_room(user=None, is_waiting=True, contact_name="Flow start")
+        self._create_room(user=self.agent, is_waiting=True, contact_name="Flow ongoing")
+
+        response = self._get(
+            self.admin,
+            {
+                "project": self.project_uuid,
+                "status": "waiting,ongoing",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
