@@ -188,3 +188,29 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             rooms_threshold_count=1,
         )
         self.assertEqual(len(mail.outbox), 0)
+
+
+class MetricGoalCeleryQueueRoutingTests(TestCase):
+    """Risk alert tasks must publish to RISK_ALERT_CELERY_QUEUE."""
+
+    def test_tasks_are_routed_to_risk_alert_queue(self):
+        from django.conf import settings
+
+        routes = getattr(settings, "CELERY_TASK_ROUTES", {})
+        for task_name in (
+            "check_metric_goal_violations",
+            "send_metric_goal_email",
+        ):
+            self.assertIn(task_name, routes)
+            self.assertEqual(
+                routes[task_name]["queue"],
+                settings.RISK_ALERT_CELERY_QUEUE,
+            )
+
+    def test_beat_schedule_publishes_to_risk_alert_queue(self):
+        from django.conf import settings
+
+        entry = settings.CELERY_BEAT_SCHEDULE["check-metric-goal-violations"]
+        self.assertEqual(
+            entry["options"]["queue"], settings.RISK_ALERT_CELERY_QUEUE
+        )

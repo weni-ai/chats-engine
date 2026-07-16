@@ -553,15 +553,15 @@ CELERY_TIMEZONE = TIME_ZONE
 # so environments without a dedicated worker keep working unchanged.
 INACTIVITY_CELERY_QUEUE = env.str("INACTIVITY_CELERY_QUEUE", default="celery")
 
-# Dedicated Celery queue for the risk alert feature, following the same
-# pattern as the inactivity queue. The feature itself lives in another
-# branch; this variable is exposed up-front so the infra side can be
-# provisioned independently. Routing/beat entries should be added when
-# the feature is merged.
+# Dedicated Celery queue for the risk alert / metric goal alerts feature,
+# following the same pattern as the inactivity queue. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
 RISK_ALERT_CELERY_QUEUE = env.str("RISK_ALERT_CELERY_QUEUE", default="celery")
 
 CELERY_TASK_ROUTES = {
     "check_inactivity_rooms": {"queue": INACTIVITY_CELERY_QUEUE},
+    "check_metric_goal_violations": {"queue": RISK_ALERT_CELERY_QUEUE},
+    "send_metric_goal_email": {"queue": RISK_ALERT_CELERY_QUEUE},
 }
 ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
 ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
@@ -592,6 +592,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": env.float(
             "METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0
         ),
+        "options": {"queue": RISK_ALERT_CELERY_QUEUE},
     },
 }
 
