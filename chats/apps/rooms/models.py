@@ -293,6 +293,24 @@ class Room(BaseModel, BaseConfigurableModel):
                 fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
                 name="rooms_inactivity_idx",
             ),
+            models.Index(
+                fields=["project_uuid", "added_to_queue_at"],
+                name="rooms_waiting_violation_idx",
+                condition=Q(
+                    is_active=True,
+                    user__isnull=True,
+                    added_to_queue_at__isnull=False,
+                ),
+            ),
+            models.Index(
+                fields=["project_uuid", "first_user_assigned_at"],
+                name="rooms_frt_violation_idx",
+                condition=Q(
+                    is_active=True,
+                    user__isnull=False,
+                    first_user_assigned_at__isnull=False,
+                ),
+            ),
             # Partial index used by `InactivityService.warn_inactive_rooms`.
             # Pre-filters rows that match every `rooms_room`-local predicate
             # of the warn queryset so the planner picks this index directly

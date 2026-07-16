@@ -30,6 +30,7 @@ from chats.apps.api.v1.internal.rooms.serializers import (
     RoomInternalListSerializer,
     InternalProtocolRoomsSerializer,
 )
+from chats.apps.dashboard.models import MetricGoal
 from chats.apps.rooms.models import Room
 from chats.apps.api.pagination import CustomCursorPagination
 
@@ -121,9 +122,36 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         self._pending_response_feature_active_cached = active
         return active
 
+    def _get_active_goals_by_metric(self) -> dict:
+        """Return the active ``MetricGoal`` rows for the requested project, keyed by metric.
+
+        Fetched once per request (not per room) to avoid N+1 queries when
+        computing the ``goals_metrics`` field on each serialized room.
+        Gated by the metric goal alerts feature flag so non-liberated
+        projects never expose goal breach data on this endpoint.
+        """
+        if hasattr(self, "_active_goals_by_metric_cached"):
+            return self._active_goals_by_metric_cached
+
+        from chats.apps.dashboard.services.metric_goal_alerts import (
+            is_metric_goal_alerts_enabled,
+        )
+
+        project_uuid = self.request.query_params.get("project") if self.request else None
+        goals_by_metric: dict = {}
+        if project_uuid and is_metric_goal_alerts_enabled(str(project_uuid)):
+            goals = MetricGoal.objects.filter(
+                project__uuid=project_uuid, is_active=True
+            )
+            goals_by_metric = {goal.metric: goal for goal in goals}
+
+        self._active_goals_by_metric_cached = goals_by_metric
+        return goals_by_metric
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["include_pending_response"] = self._is_pending_response_feature_active()
+        context["active_goals_by_metric"] = self._get_active_goals_by_metric()
         return context
 
     def get_queryset(self):

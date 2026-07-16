@@ -251,7 +251,7 @@ class TimeMetricsService:
             max_conversation_duration,
         ) = self._get_conversation_duration_metrics(filters, project)
 
-        return {
+        payload = {
             "avg_waiting_time": avg_waiting_time,
             "max_waiting_time": max_waiting_time,
             "avg_first_response_time": avg_first_response_time,
@@ -259,6 +259,25 @@ class TimeMetricsService:
             "avg_conversation_duration": avg_conversation_duration,
             "max_conversation_duration": max_conversation_duration,
         }
+
+        # Inline goal payloads for each active metric goal so the front can
+        # render the widget alert state in the same response. Gated by the
+        # same GrowthBook flag as CRUD/WS/sweep so projects without the
+        # feature never pay the breach queries (and never see goal keys).
+        from chats.apps.dashboard.services.metric_goal_alerts import (
+            is_metric_goal_alerts_enabled,
+        )
+
+        if is_metric_goal_alerts_enabled(str(project.uuid)):
+            from chats.apps.api.v1.dashboard.metric_goals.services import (
+                MetricGoalBreachService,
+            )
+
+            payload.update(
+                MetricGoalBreachService().get_goals_payload(project, filters)
+            )
+
+        return payload
 
     def get_time_metrics_for_analysis(self, filters: Filters, project):
         if not filters.start_date and not filters.end_date:
