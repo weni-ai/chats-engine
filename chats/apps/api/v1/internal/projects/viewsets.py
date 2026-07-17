@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -29,6 +31,9 @@ from chats.apps.rooms.models import Room
 from chats.core.views import persist_keycloak_user_by_email
 
 User = get_user_model()
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -150,10 +155,17 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
         if request.method == "POST":
             project_uuid = request.data.get("project")
+            user_status = request.data.get("status")
+            logger.info(
+                "Updating connection status: user=%s project=%s status=%s",
+                getattr(request.user, "email", request.user),
+                project_uuid,
+                user_status,
+            )
+            print(request.data)
             instance = get_object_or_404(
                 ProjectPermission, project__uuid=project_uuid, user=request.user
             )
-            user_status = request.data.get("status")
             if user_status is None:
                 return Response(
                     dict(connection_status=instance.status), status=status.HTTP_200_OK
@@ -180,6 +192,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 instance.save()
 
                 from chats.apps.projects.tasks import log_agent_status_change
+
                 log_agent_status_change.delay(
                     agent_email=instance.user.email,
                     project_uuid=str(instance.project.uuid),
@@ -223,6 +236,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
                 # Log status change
                 from chats.apps.projects.tasks import log_agent_status_change
+
                 log_agent_status_change.delay(
                     agent_email=instance.user.email,
                     project_uuid=str(instance.project.uuid),
@@ -254,6 +268,11 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
         elif request.method == "GET":
             project_uuid = request.query_params.get("project")
+            logger.info(
+                "Reading connection status: user=%s project=%s",
+                getattr(request.user, "email", request.user),
+                project_uuid,
+            )
             instance = get_object_or_404(
                 ProjectPermission, project__uuid=project_uuid, user=request.user
             )
