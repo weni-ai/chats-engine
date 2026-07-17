@@ -162,7 +162,8 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 project_uuid,
                 user_status,
             )
-            print(request.data)
+            print("request.data", request.data)
+            print("request.user", request.user)
             instance = get_object_or_404(
                 ProjectPermission, project__uuid=project_uuid, user=request.user
             )
