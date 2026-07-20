@@ -27,6 +27,6 @@ class GetBulkSendRoomsUseCase:
             queryset = queryset.filter(queue__uuid__in=queues)
 
         if agents:
-            queryset = queryset.filter(user_id__in=agents)
+            queryset = queryset.filter(user__email__in=agents)
 
         return queryset
