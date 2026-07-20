@@ -9,6 +9,9 @@ from chats.apps.msgs.models import (
     ChatMessageReplyIndex,
 )
 from chats.apps.msgs.usecases.get_bulk_send_rooms import GetBulkSendRoomsUseCase
+from chats.apps.msgs.usecases.send_bulk_message_to_room import (
+    SendBulkMessageToRoomUseCase,
+)
 from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
     UpdateStatusMessageUseCase,
 )
@@ -16,6 +19,7 @@ from chats.apps.rooms.models import Room
 
 update_message_usecase = UpdateStatusMessageUseCase()
 get_bulk_send_rooms_usecase = GetBulkSendRoomsUseCase()
+send_bulk_message_to_room_usecase = SendBulkMessageToRoomUseCase()
 
 
 @shared_task(
@@ -54,14 +58,7 @@ def process_bulk_message_send(bulk_send_uuid: UUID):
 def send_bulk_message_to_room(bulk_send_uuid: UUID, room_uuid: UUID):
     """
     Send the bulk message text to a single room.
-
-    Message creation and delivery are implemented in a later step.
     """
     bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
     room = Room.objects.get(uuid=room_uuid)
-
-    # TODO: Register progress
-
-    # Placeholder: create and deliver the message for ``room`` using
-    # ``bulk_send.text`` (and link via ``BulkMessageSendMessage``).
-    _ = (bulk_send, room)
+    send_bulk_message_to_room_usecase.execute(bulk_send, room)

@@ -4,7 +4,12 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendMessage,
+    BulkMessageSendStatus,
+    Message,
+)
 from chats.apps.msgs.tasks import process_bulk_message_send, send_bulk_message_to_room
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
@@ -132,10 +137,31 @@ class SendBulkMessageToRoomTaskTests(TestCase):
             status=BulkMessageSendStatus.PROCESSING,
         )
 
-    def test_loads_bulk_send_and_room_without_error(self):
-        result = send_bulk_message_to_room.run(self.bulk_send.uuid, self.room.uuid)
+    @patch("chats.apps.msgs.tasks.send_bulk_message_to_room_usecase")
+    def test_calls_usecase_with_loaded_bulk_send_and_room(self, mock_usecase):
+        send_bulk_message_to_room.run(self.bulk_send.uuid, self.room.uuid)
 
-        self.assertIsNone(result)
+        mock_usecase.execute.assert_called_once()
+        called_bulk_send, called_room = mock_usecase.execute.call_args[0]
+        self.assertEqual(called_bulk_send.uuid, self.bulk_send.uuid)
+        self.assertEqual(called_room.uuid, self.room.uuid)
+
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_creates_message_and_bulk_link(self, mock_notify_room):
+        with self.captureOnCommitCallbacks(execute=True):
+            send_bulk_message_to_room.run(self.bulk_send.uuid, self.room.uuid)
+
+        message = Message.objects.get(room=self.room)
+        self.assertEqual(message.text, self.bulk_send.text)
+        self.assertEqual(message.user, self.agent)
+        self.assertTrue(
+            BulkMessageSendMessage.objects.filter(
+                bulk_message_send=self.bulk_send,
+                message=message,
+            ).exists()
+        )
+        mock_notify_room.assert_called_once_with("create", True)
+
         self.bulk_send.refresh_from_db()
         self.assertEqual(self.bulk_send.status, BulkMessageSendStatus.PROCESSING)
 
