@@ -48,7 +48,7 @@ class StartBulkSendMessagesUseCase:
         )
 
         logger.info(
-            f"[StartBulkSendMessagesUseCase] Created bulk send messages with UUID {bulk_send.uuid}"
+            f"[StartBulkSendMessagesUseCase] Created bulk send messages with UUID {bulk_send.uuid} "
             f"with status {bulk_send.status}"
         )
 
