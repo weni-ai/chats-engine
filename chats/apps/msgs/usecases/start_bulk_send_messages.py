@@ -9,7 +9,7 @@ from chats.apps.projects.models import Project
 User = get_user_model()
 
 
-class BulkSendMessagesUseCase:
+class StartBulkSendMessagesUseCase:
     """
     Creates a PENDING ``BulkMessageSend`` record for asynchronous delivery.
 

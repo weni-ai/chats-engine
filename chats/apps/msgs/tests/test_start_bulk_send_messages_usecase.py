@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus, Message
-from chats.apps.msgs.usecases.bulk_send_messages import BulkSendMessagesUseCase
+from chats.apps.msgs.usecases.start_bulk_send_messages import StartBulkSendMessagesUseCase
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -12,7 +12,7 @@ from chats.apps.sectors.models import Sector
 User = get_user_model()
 
 
-class BulkSendMessagesUseCaseTests(TestCase):
+class StartBulkSendMessagesUseCaseTests(TestCase):
     def setUp(self):
         self.requester = User.objects.create_user(
             email="requester@test.com",
@@ -37,7 +37,7 @@ class BulkSendMessagesUseCaseTests(TestCase):
         )
         self.queue_one = Queue.objects.create(name="Queue One", sector=self.sector)
 
-        self.usecase = BulkSendMessagesUseCase()
+        self.usecase = StartBulkSendMessagesUseCase()
         self.text = "Bulk hello"
 
     def test_creates_pending_bulk_message_send_with_filter_snapshot(self):
