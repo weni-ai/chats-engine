@@ -537,3 +537,31 @@ class BulkMessageSend(BaseModel):
 
     def __str__(self):
         return f"{self.uuid} - {self.status}"
+
+
+class BulkMessageSendMessage(BaseModel):
+    """
+    Links a delivered ``Message`` to the ``BulkMessageSend`` that produced it.
+
+    One row per message; many rows per bulk send.
+    """
+
+    bulk_message_send = models.ForeignKey(
+        BulkMessageSend,
+        related_name="bulk_messages",
+        verbose_name=_("bulk message send"),
+        on_delete=models.CASCADE,
+    )
+    message = models.OneToOneField(
+        Message,
+        related_name="bulk_message_send_message",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk message send message")
+        verbose_name_plural = _("Bulk message send messages")
+
+    def __str__(self):
+        return f"{self.bulk_message_send.uuid} - {self.message.uuid}"

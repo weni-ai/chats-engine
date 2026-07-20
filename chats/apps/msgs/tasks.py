@@ -1,12 +1,21 @@
+from uuid import UUID
+
 from celery import shared_task
 from django.conf import settings
 
-from chats.apps.msgs.models import ChatMessageReplyIndex
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendStatus,
+    ChatMessageReplyIndex,
+)
+from chats.apps.msgs.usecases.get_bulk_send_rooms import GetBulkSendRoomsUseCase
 from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
     UpdateStatusMessageUseCase,
 )
+from chats.apps.rooms.models import Room
 
 update_message_usecase = UpdateStatusMessageUseCase()
+get_bulk_send_rooms_usecase = GetBulkSendRoomsUseCase()
 
 
 @shared_task(
@@ -25,3 +34,34 @@ def process_message_status(self, message_id: str, message_status: str):
         raise self.retry()
 
     update_message_usecase.update_status_message(message_id, message_status)
+
+
+@shared_task
+def process_bulk_message_send(bulk_send_uuid: UUID):
+    """
+    Mark a bulk send as PROCESSING and fan out one send task per matching room.
+    """
+    bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
+    bulk_send.status = BulkMessageSendStatus.PROCESSING
+    bulk_send.save(update_fields=["status", "modified_on"])
+
+    rooms = get_bulk_send_rooms_usecase.execute(bulk_send)
+    for room_uuid in rooms.values_list("uuid", flat=True):
+        send_bulk_message_to_room.delay(bulk_send_uuid, room_uuid)
+
+
+@shared_task
+def send_bulk_message_to_room(bulk_send_uuid: UUID, room_uuid: UUID):
+    """
+    Send the bulk message text to a single room.
+
+    Message creation and delivery are implemented in a later step.
+    """
+    bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
+    room = Room.objects.get(uuid=room_uuid)
+
+    # TODO: Register progress
+
+    # Placeholder: create and deliver the message for ``room`` using
+    # ``bulk_send.text`` (and link via ``BulkMessageSendMessage``).
+    _ = (bulk_send, room)
