@@ -1,3 +1,5 @@
+import logging
+
 from typing import List, Optional
 from uuid import UUID
 
@@ -7,6 +9,8 @@ from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
 from chats.apps.projects.models import Project
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 class StartBulkSendMessagesUseCase:
@@ -24,6 +28,11 @@ class StartBulkSendMessagesUseCase:
         queues: Optional[List[UUID]] = None,
         agents: Optional[List[str]] = None,
     ) -> BulkMessageSend:
+        logger.info(
+            f"[StartBulkSendMessagesUseCase] Starting bulk send messages "
+            f"for user {user_email} in project {project_uuid} "
+            f"with queues {queues} and agents {agents}"
+        )
         user = User.objects.get(email=user_email)
         project = Project.objects.get(uuid=project_uuid)
 
@@ -36,6 +45,11 @@ class StartBulkSendMessagesUseCase:
                 "agents": list(agents or []),
             },
             status=BulkMessageSendStatus.PENDING,
+        )
+
+        logger.info(
+            f"[StartBulkSendMessagesUseCase] Created bulk send messages with UUID {bulk_send.uuid}"
+            f"with status {bulk_send.status}"
         )
 
         # TODO: Call send bulk messages task
