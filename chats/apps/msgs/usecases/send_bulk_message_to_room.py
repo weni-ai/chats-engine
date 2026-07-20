@@ -1,7 +1,11 @@
+import logging
+
 from django.db import transaction
 
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendMessage, Message
 from chats.apps.rooms.models import Room
+
+logger = logging.getLogger(__name__)
 
 
 class SendBulkMessageToRoomUseCase:
@@ -13,6 +17,11 @@ class SendBulkMessageToRoomUseCase:
     """
 
     def execute(self, bulk_send: BulkMessageSend, room: Room) -> Message:
+        logger.info(
+            f"[SendBulkMessageToRoomUseCase] Sending bulk message to room with UUID {room.uuid}"
+            f"for bulk send with UUID {bulk_send.uuid}"
+        )
+
         with transaction.atomic():
             message = Message.objects.create(
                 room=room,
@@ -28,5 +37,10 @@ class SendBulkMessageToRoomUseCase:
             transaction.on_commit(lambda: message.notify_room("create", True))
 
             # TODO: Register progress (send an internal event)
+
+            logger.info(
+                f"[SendBulkMessageToRoomUseCase] Sent bulk message to room with UUID {room.uuid}"
+                f"for bulk send with UUID {bulk_send.uuid}"
+            )
 
             return message

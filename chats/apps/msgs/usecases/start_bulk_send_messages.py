@@ -6,6 +6,7 @@ from uuid import UUID
 from django.contrib.auth import get_user_model
 
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
+from chats.apps.msgs.tasks import process_bulk_message_send
 from chats.apps.projects.models import Project
 
 User = get_user_model()
@@ -52,6 +53,6 @@ class StartBulkSendMessagesUseCase:
             f"with status {bulk_send.status}"
         )
 
-        # TODO: Call send bulk messages task
+        process_bulk_message_send.delay(bulk_send.uuid)
 
         return bulk_send

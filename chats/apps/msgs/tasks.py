@@ -1,5 +1,5 @@
 from uuid import UUID
-
+import logging
 from celery import shared_task
 from django.conf import settings
 
@@ -16,6 +16,8 @@ from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
     UpdateStatusMessageUseCase,
 )
 from chats.apps.rooms.models import Room
+
+logger = logging.getLogger(__name__)
 
 update_message_usecase = UpdateStatusMessageUseCase()
 get_bulk_send_rooms_usecase = GetBulkSendRoomsUseCase()
@@ -45,13 +47,27 @@ def process_bulk_message_send(bulk_send_uuid: UUID):
     """
     Mark a bulk send as PROCESSING and fan out one send task per matching room.
     """
+    logger.info(
+        f"[process_bulk_message_send] Processing bulk send with UUID {bulk_send_uuid}"
+    )
+
     bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
     bulk_send.status = BulkMessageSendStatus.PROCESSING
     bulk_send.save(update_fields=["status", "modified_on"])
 
+    logger.info(
+        f"[process_bulk_message_send] Bulk send with UUID {bulk_send_uuid} "
+        f"marked as PROCESSING"
+    )
+
     rooms = get_bulk_send_rooms_usecase.execute(bulk_send)
     for room_uuid in rooms.values_list("uuid", flat=True):
         send_bulk_message_to_room.delay(bulk_send_uuid, room_uuid)
+
+    logger.info(
+        f"[process_bulk_message_send] Dispatched send bulk message to room tasks "
+        f"for bulk send with UUID {bulk_send_uuid}"
+    )
 
 
 @shared_task
@@ -59,6 +75,14 @@ def send_bulk_message_to_room(bulk_send_uuid: UUID, room_uuid: UUID):
     """
     Send the bulk message text to a single room.
     """
+    logger.info(
+        f"[send_bulk_message_to_room] Sending bulk message to room with UUID {room_uuid}"
+    )
+
     bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
     room = Room.objects.get(uuid=room_uuid)
     send_bulk_message_to_room_usecase.execute(bulk_send, room)
+
+    logger.info(
+        f"[send_bulk_message_to_room] Sent bulk message to room with UUID {room_uuid}"
+    )
