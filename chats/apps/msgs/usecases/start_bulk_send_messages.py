@@ -5,6 +5,7 @@ from uuid import UUID
 
 from django.contrib.auth import get_user_model
 
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
 from chats.apps.projects.models import Project
 
@@ -25,14 +26,17 @@ class StartBulkSendMessagesUseCase:
         user_email: str,
         text: str,
         project_uuid: UUID,
+        statuses: List[str],
         queues: Optional[List[UUID]] = None,
         agents: Optional[List[str]] = None,
     ) -> BulkMessageSend:
         logger.info(
             f"[StartBulkSendMessagesUseCase] Starting bulk send messages "
             f"for user {user_email} in project {project_uuid} "
-            f"with queues {queues} and agents {agents}"
+            f"with statuses {statuses}, queues {queues} and agents {agents}"
         )
+        self._validate_statuses(statuses)
+
         user = User.objects.get(email=user_email)
         project = Project.objects.get(uuid=project_uuid)
 
@@ -41,6 +45,7 @@ class StartBulkSendMessagesUseCase:
             project=project,
             text=text,
             filter_snapshot={
+                "statuses": list(statuses),
                 "queues": [str(queue_uuid) for queue_uuid in (queues or [])],
                 "agents": list(agents or []),
             },
@@ -55,3 +60,11 @@ class StartBulkSendMessagesUseCase:
         # TODO: Call send bulk messages task
 
         return bulk_send
+
+    def _validate_statuses(self, statuses: List[str]) -> None:
+        if not statuses:
+            raise ValueError("At least one status is required")
+
+        invalid = set(statuses) - set(BulkMessageSendRoomStatus.values)
+        if invalid:
+            raise ValueError(f"Invalid status(es): {sorted(invalid)}")

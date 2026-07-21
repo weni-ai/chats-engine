@@ -502,7 +502,7 @@ class BulkMessageSend(BaseModel):
     Metadata for a bulk message send request.
 
     Stores who requested the send, the message text, the project scope, and a
-    snapshot of the queue/agent filters applied when the request was created.
+    snapshot of the status/queue/agent filters applied when the request was created.
     Actual message delivery is handled asynchronously in a later step.
     """
 

@@ -3,6 +3,7 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus, Message
 from chats.apps.msgs.usecases.start_bulk_send_messages import StartBulkSendMessagesUseCase
 from chats.apps.projects.models import Project
@@ -39,6 +40,10 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
 
         self.usecase = StartBulkSendMessagesUseCase()
         self.text = "Bulk hello"
+        self.statuses = [
+            BulkMessageSendRoomStatus.ONGOING,
+            BulkMessageSendRoomStatus.WAITING,
+        ]
 
     def test_creates_pending_bulk_message_send_with_filter_snapshot(self):
         queues = [self.queue_one.uuid]
@@ -48,6 +53,7 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
             user_email=self.requester.email,
             text=self.text,
             project_uuid=self.project.uuid,
+            statuses=self.statuses,
             queues=queues,
             agents=agents,
         )
@@ -60,6 +66,7 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
         self.assertEqual(
             bulk_send.filter_snapshot,
             {
+                "statuses": ["ongoing", "waiting"],
                 "queues": [str(self.queue_one.uuid)],
                 "agents": [self.agent_one.email],
             },
@@ -71,12 +78,40 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
             user_email=self.requester.email,
             text=self.text,
             project_uuid=self.project.uuid,
+            statuses=[BulkMessageSendRoomStatus.ONGOING],
             queues=None,
             agents=[],
         )
 
-        self.assertEqual(bulk_send.filter_snapshot, {"queues": [], "agents": []})
+        self.assertEqual(
+            bulk_send.filter_snapshot,
+            {"statuses": ["ongoing"], "queues": [], "agents": []},
+        )
         self.assertEqual(bulk_send.status, BulkMessageSendStatus.PENDING)
+
+    def test_raises_when_statuses_is_empty(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.usecase.execute(
+                user_email=self.requester.email,
+                text=self.text,
+                project_uuid=self.project.uuid,
+                statuses=[],
+            )
+
+        self.assertEqual(str(ctx.exception), "At least one status is required")
+        self.assertEqual(BulkMessageSend.objects.count(), 0)
+
+    def test_raises_when_statuses_is_invalid(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.usecase.execute(
+                user_email=self.requester.email,
+                text=self.text,
+                project_uuid=self.project.uuid,
+                statuses=["closed"],
+            )
+
+        self.assertEqual(str(ctx.exception), "Invalid status(es): ['closed']")
+        self.assertEqual(BulkMessageSend.objects.count(), 0)
 
     def test_raises_when_user_email_does_not_exist(self):
         with self.assertRaises(User.DoesNotExist):
@@ -84,6 +119,7 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
                 user_email="missing@test.com",
                 text=self.text,
                 project_uuid=self.project.uuid,
+                statuses=self.statuses,
             )
 
     def test_raises_when_project_uuid_does_not_exist(self):
@@ -92,4 +128,5 @@ class StartBulkSendMessagesUseCaseTests(TestCase):
                 user_email=self.requester.email,
                 text=self.text,
                 project_uuid=uuid.uuid4(),
+                statuses=self.statuses,
             )
