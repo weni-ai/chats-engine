@@ -830,36 +830,6 @@ msgstr ""
 "\n"
 "Tente novamente mais tarde ou entre em contato com o suporte."
 
-#: chats/apps/rooms/email_templates.py:23
-#, python-format
-msgid ""
-"The chat export for the %(project)s project is ready.\n"
-"\n"
-"Copy and paste the URL below to download it:\n"
-"\n"
-"%(url)s"
-msgstr ""
-"A exportação de chat do projeto %(project)s está pronta.\n"
-"\n"
-"Copie e cole a URL abaixo para baixá-la:\n"
-"\n"
-"%(url)s"
-
-#: chats/apps/rooms/email_templates.py:43
-#, python-format
-msgid ""
-"Unable to generate chat export for the %(project)s project.\n"
-"\n"
-"Error: %(error)s\n"
-"\n"
-"Try again later or contact support."
-msgstr ""
-"Não foi possível gerar a exportação de chat do projeto %(project)s.\n"
-"\n"
-"Erro: %(error)s\n"
-"\n"
-"Tente novamente mais tarde ou entre em contato com o suporte."
-
 #: chats/apps/dashboard/email_templates.py:56
 msgid "Unknown error"
 msgstr "Erro desconhecido"

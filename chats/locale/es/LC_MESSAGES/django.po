@@ -834,36 +834,6 @@ msgstr ""
 "\n"
 "Inténtalo de nuevo más tarde o contacta con el soporte."
 
-#: chats/apps/rooms/email_templates.py:23
-#, python-format
-msgid ""
-"The chat export for the %(project)s project is ready.\n"
-"\n"
-"Copy and paste the URL below to download it:\n"
-"\n"
-"%(url)s"
-msgstr ""
-"La exportación de chat del proyecto %(project)s está lista.\n"
-"\n"
-"Copia y pega la URL a continuación para descargarla:\n"
-"\n"
-"%(url)s"
-
-#: chats/apps/rooms/email_templates.py:43
-#, python-format
-msgid ""
-"Unable to generate chat export for the %(project)s project.\n"
-"\n"
-"Error: %(error)s\n"
-"\n"
-"Try again later or contact support."
-msgstr ""
-"No se pudo generar la exportación de chat del proyecto %(project)s.\n"
-"\n"
-"Error: %(error)s\n"
-"\n"
-"Inténtalo de nuevo más tarde o contacta con el soporte."
-
 #: chats/apps/dashboard/email_templates.py:56
 msgid "Unknown error"
 msgstr "Error desconocido"
@@ -1511,26 +1481,6 @@ msgid ""
 msgstr ""
 "La exportación de datos del proyecto %(project_name)s está lista. Haz clic "
 "en el botón a continuación para descargarlo."
-
-#: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:16
-#: chats/apps/rooms/templates/rooms/emails/room_export_is_ready.html:16
-msgid "Hi, here is your chat export"
-msgstr "Hola, aquí está tu exportación de chat"
-
-#: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:31
-#, python-format
-msgid "Unable to generate chat export for the %(project_name)s project."
-msgstr ""
-"No se pudo generar la exportación de chat del proyecto %(project_name)s."
-
-#: chats/apps/rooms/templates/rooms/emails/room_export_is_ready.html:31
-#, python-format
-msgid ""
-"The chat export for the %(project_name)s project is ready. Click the button "
-"below to download it."
-msgstr ""
-"La exportación de chat del proyecto %(project_name)s está lista. Haz clic en "
-"el botón a continuación para descargarla."
 
 #: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:16
 #: chats/apps/rooms/templates/rooms/emails/room_export_is_ready.html:16
