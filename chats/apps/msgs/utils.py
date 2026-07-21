@@ -69,7 +69,7 @@ def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
     if not wamid.startswith(_WAMID_PREFIX):
         return None
 
-    encoded = wamid[len(_WAMID_PREFIX) :]
+    encoded = wamid[len(_WAMID_PREFIX):]
     encoded += "=" * ((-len(encoded)) % 4)
 
     try:
