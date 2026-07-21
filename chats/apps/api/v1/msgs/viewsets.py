@@ -21,12 +21,15 @@ from chats.apps.api.v1.msgs.permissions import (
     RestrictOfflineAgents,
 )
 from chats.apps.api.v1.msgs.serializers import (
+    BulkSendMessagesSerializer,
     MessageAndMediaSerializer,
     MessageMediaSerializer,
     MessageSerializer,
 )
+from chats.apps.api.v1.permissions import ProjectBodyFieldIsAdmin
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.usecases.start_bulk_send_messages import StartBulkSendMessagesUseCase
 
 
 class MessageViewset(
@@ -150,6 +153,31 @@ class MessageViewset(
 
         return build_media_download_response(
             media, log_context="MessageViewset.download"
+        )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_path="bulk-send",
+        permission_classes=[IsAuthenticated, ProjectBodyFieldIsAdmin],
+    )
+    def bulk_send(self, request, *args, **kwargs):
+        serializer = BulkSendMessagesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        bulk_send = StartBulkSendMessagesUseCase().execute(
+            user_email=request.user.email,
+            text=data["text"],
+            project_uuid=data["project"],
+            statuses=data["status"],
+            queues=data.get("queues") or None,
+            agents=data.get("agents") or None,
+        )
+
+        return Response(
+            {"status": "PROCESSING", "uuid": str(bulk_send.uuid)},
+            status=status.HTTP_202_ACCEPTED,
         )
 
 
