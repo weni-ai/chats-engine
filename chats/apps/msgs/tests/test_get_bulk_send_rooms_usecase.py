@@ -3,6 +3,7 @@ from django.db.models import QuerySet
 from django.test import TestCase
 
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
 from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
 from chats.apps.msgs.usecases.get_bulk_send_rooms import GetBulkSendRoomsUseCase
 from chats.apps.projects.models import Project
@@ -76,6 +77,20 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
             user=self.agent_one,
             is_active=True,
         )
+        self.waiting_room_queue_one = Room.objects.create(
+            contact=Contact.objects.create(name="Contact Waiting"),
+            queue=self.queue_one,
+            user=None,
+            is_active=True,
+            is_waiting=False,
+        )
+        self.flow_start_room = Room.objects.create(
+            contact=Contact.objects.create(name="Contact Flow Start"),
+            queue=self.queue_one,
+            user=None,
+            is_active=True,
+            is_waiting=True,
+        )
         self.inactive_room = Room.objects.create(
             contact=Contact.objects.create(name="Contact Inactive"),
             queue=self.queue_one,
@@ -91,12 +106,18 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
 
         self.usecase = GetBulkSendRoomsUseCase()
 
-    def _create_bulk_send(self, queues=None, agents=None):
+    def _create_bulk_send(self, queues=None, agents=None, statuses=None):
+        if statuses is None:
+            statuses = [
+                BulkMessageSendRoomStatus.ONGOING,
+                BulkMessageSendRoomStatus.WAITING,
+            ]
         return BulkMessageSend.objects.create(
             user=self.requester,
             project=self.project,
             text="Bulk hello",
             filter_snapshot={
+                "statuses": list(statuses),
                 "queues": [str(q) for q in (queues or [])],
                 "agents": list(agents or []),
             },
@@ -122,6 +143,7 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
                 self.room_queue_one_agent_one,
                 self.room_queue_one_agent_two,
                 self.room_queue_two_agent_one,
+                self.waiting_room_queue_one,
             ],
         )
 
@@ -132,7 +154,11 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
 
         self.assertCountEqual(
             list(result),
-            [self.room_queue_one_agent_one, self.room_queue_one_agent_two],
+            [
+                self.room_queue_one_agent_one,
+                self.room_queue_one_agent_two,
+                self.waiting_room_queue_one,
+            ],
         )
 
     def test_filters_by_agents_only(self):
@@ -154,6 +180,89 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
         result = self.usecase.execute(bulk_send)
 
         self.assertCountEqual(list(result), [self.room_queue_one_agent_one])
+
+    def test_filters_by_ongoing_status_only(self):
+        bulk_send = self._create_bulk_send(
+            statuses=[BulkMessageSendRoomStatus.ONGOING],
+        )
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertCountEqual(
+            list(result),
+            [
+                self.room_queue_one_agent_one,
+                self.room_queue_one_agent_two,
+                self.room_queue_two_agent_one,
+            ],
+        )
+        self.assertNotIn(self.waiting_room_queue_one, list(result))
+
+    def test_filters_by_waiting_status_only(self):
+        bulk_send = self._create_bulk_send(
+            statuses=[BulkMessageSendRoomStatus.WAITING],
+        )
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertCountEqual(list(result), [self.waiting_room_queue_one])
+
+    def test_filters_by_ongoing_and_waiting_statuses(self):
+        bulk_send = self._create_bulk_send(
+            statuses=[
+                BulkMessageSendRoomStatus.ONGOING,
+                BulkMessageSendRoomStatus.WAITING,
+            ],
+        )
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertCountEqual(
+            list(result),
+            [
+                self.room_queue_one_agent_one,
+                self.room_queue_one_agent_two,
+                self.room_queue_two_agent_one,
+                self.waiting_room_queue_one,
+            ],
+        )
+
+    def test_filters_by_status_and_queues_intersection(self):
+        bulk_send = self._create_bulk_send(
+            statuses=[BulkMessageSendRoomStatus.WAITING],
+            queues=[self.queue_one.uuid],
+        )
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertCountEqual(list(result), [self.waiting_room_queue_one])
+
+    def test_filters_by_status_and_agents_intersection(self):
+        bulk_send = self._create_bulk_send(
+            statuses=[BulkMessageSendRoomStatus.ONGOING],
+            agents=[self.agent_one.email],
+        )
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertCountEqual(
+            list(result),
+            [self.room_queue_one_agent_one, self.room_queue_two_agent_one],
+        )
+
+    def test_excludes_flow_start_rooms(self):
+        bulk_send = self._create_bulk_send()
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertNotIn(self.flow_start_room, list(result))
+
+    def test_empty_statuses_returns_no_rooms(self):
+        bulk_send = self._create_bulk_send(statuses=[])
+
+        result = self.usecase.execute(bulk_send)
+
+        self.assertEqual(list(result), [])
 
     def test_excludes_inactive_rooms(self):
         bulk_send = self._create_bulk_send(queues=[self.queue_one.uuid])
