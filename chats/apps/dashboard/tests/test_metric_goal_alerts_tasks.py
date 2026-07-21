@@ -3,6 +3,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
@@ -158,7 +159,10 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
         self.assertIn(self.recipient.email, sent.to)
-        self.assertIn(self.project.name, sent.subject)
+        self.assertIn("Live Desk", sent.subject)
+        self.assertTrue(sent.alternatives)
+        self.assertEqual(sent.alternatives[0][1], "text/html")
+        self.assertIn(settings.WENI_DASHBOARD_URL, sent.alternatives[0][0])
 
     def test_continuous_violation_emits_update_action(self):
         _seed_room(self.project, self.queue)

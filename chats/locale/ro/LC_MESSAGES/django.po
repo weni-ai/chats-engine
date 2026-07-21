@@ -1759,3 +1759,22 @@ msgstr "Modificat de"
 msgid "Deleted by"
 msgstr "Șters de"
 
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+msgid "Live Desk dashboard immediate attention needed!"
+msgstr "Dashboard-ul Live Desk necesită atenție imediată!"
+
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+#, python-format
+msgid "%(count)s chat exceeded the maximum wait time."
+msgid_plural "%(count)s chats exceeded the maximum wait time."
+msgstr[0] "%(count)s chat a depășit timpul maxim de așteptare."
+msgstr[1] "%(count)s chat-uri au depășit timpul maxim de așteptare."
+msgstr[2] "%(count)s de chat-uri au depășit timpul maxim de așteptare."
+
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+msgid "View details on the dashboard"
+msgstr "Vezi detalii pe dashboard"
+

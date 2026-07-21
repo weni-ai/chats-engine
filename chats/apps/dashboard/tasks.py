@@ -994,7 +994,7 @@ def send_metric_goal_email(
         return
 
     project_name = goal.project.name
-    plain, html = get_metric_goal_alert_email(
+    subject, plain, html = get_metric_goal_alert_email(
         project_name=project_name,
         metric=metric,
         violating_count=violating_count,
@@ -1003,7 +1003,6 @@ def send_metric_goal_email(
         rooms_threshold_count=rooms_threshold_count,
     )
 
-    subject = f"[Chats] Metric goal alert - {project_name}"
     email = EmailMultiAlternatives(
         subject=subject,
         body=plain,

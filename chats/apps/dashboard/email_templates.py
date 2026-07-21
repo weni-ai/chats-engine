@@ -1,6 +1,8 @@
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 
 def get_report_ready_email(project_name: str, download_url: str):
@@ -59,10 +61,11 @@ def get_metric_goal_alert_email(
     max_value_seconds: int,
     rooms_threshold_count: int,
 ):
-    """Returns ``(plain_text, html)`` for the metric goal alert email."""
+    """Returns ``(subject, plain_text, html)`` for the metric goal alert email."""
     metric_label = _METRIC_LABELS.get(metric, metric)
     threshold_friendly = _format_seconds_to_friendly(threshold_seconds)
     max_friendly = _format_seconds_to_friendly(max_value_seconds)
+    dashboard_url = settings.WENI_DASHBOARD_URL
 
     context = {
         "project_name": project_name,
@@ -74,30 +77,26 @@ def get_metric_goal_alert_email(
         "max_value_seconds": max_value_seconds,
         "max_value_friendly": max_friendly,
         "rooms_threshold_count": rooms_threshold_count,
+        "dashboard_url": dashboard_url,
         "current_year": timezone.now().year,
     }
 
-    try:
-        html = render_to_string("rooms/emails/metric_goal_alert.html", context)
-    except Exception:
-        html = None
+    html = render_to_string("rooms/emails/metric_goal_alert.html", context)
 
-    plain_text = _(
-        "Metric goal violation detected for project %(project)s.\n\n"
-        "Metric: %(metric)s\n"
-        "Rooms in violation: %(count)s (threshold: %(threshold_count)s)\n"
-        "Configured limit: %(threshold)s\n"
-        "Worst current value: %(max_value)s"
-    ) % {
-        "project": project_name,
-        "metric": metric_label,
-        "count": violating_count,
-        "threshold_count": rooms_threshold_count,
-        "threshold": threshold_friendly,
-        "max_value": max_friendly,
-    }
+    subject = _("Live Desk dashboard immediate attention needed!")
+    body_line = ngettext(
+        "%(count)s chat exceeded the maximum wait time.",
+        "%(count)s chats exceeded the maximum wait time.",
+        violating_count,
+    ) % {"count": violating_count}
+    cta_label = _("View details on the dashboard")
+    plain_text = (
+        f"{subject}\n\n"
+        f"{body_line}\n\n"
+        f"{cta_label}:\n{dashboard_url}"
+    )
 
-    return plain_text, html
+    return subject, plain_text, html
 
 
 def get_report_failed_email(project_name: str, error_message: str = None):

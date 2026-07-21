@@ -1907,6 +1907,24 @@ msgstr "Exportação da conversa da sala %(identifier)s - %(timestamp)s"
 msgid "Error generating conversation export for room %(identifier)s - %(timestamp)s"
 msgstr "Não foi possível gerar a exportação da conversa da sala %(identifier)s - %(timestamp)s"
 
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+msgid "Live Desk dashboard immediate attention needed!"
+msgstr "Dashboard Live Desk precisa de atenção imediata!"
+
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+#, python-format
+msgid "%(count)s chat exceeded the maximum wait time."
+msgid_plural "%(count)s chats exceeded the maximum wait time."
+msgstr[0] "%(count)s chat ultrapassou o tempo máximo de espera."
+msgstr[1] "%(count)s chats ultrapassaram o tempo máximo de espera."
+
+#: chats/apps/dashboard/email_templates.py
+#: chats/apps/rooms/templates/rooms/emails/metric_goal_alert.html
+msgid "View details on the dashboard"
+msgstr "Ver detalhes no dashboard"
+
 #~ msgid "Queue's ID"
 #~ msgstr "ID da Fila"
 
