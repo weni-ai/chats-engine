@@ -378,7 +378,7 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
             return False
 
         project_uuid_field_name = getattr(
-            view, "project_uuid_field_name", "project_uuid"
+            self, "project_uuid_field_name", "project_uuid"
         )
         project_uuid = request.data.get(project_uuid_field_name)
 
