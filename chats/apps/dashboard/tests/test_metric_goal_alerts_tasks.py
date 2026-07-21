@@ -102,9 +102,20 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
                 return_value=self.fake_redis,
             ),
             patch.object(dashboard_tasks, "send_channels_group"),
+            # detect_violations and send_metric_goal_email each bind their own import.
+            patch.object(
+                metric_goal_alerts,
+                "is_metric_goal_alerts_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                dashboard_tasks,
+                "is_metric_goal_alerts_enabled",
+                return_value=True,
+            ),
         ]
-        self.mock_send_group = self._patches[1].start()
-        self._patches[0].start()
+        started = [p.start() for p in self._patches]
+        self.mock_send_group = started[1]
 
     def _stop_patches(self):
         for p in self._patches:
@@ -159,8 +170,7 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             dashboard_tasks.check_metric_goal_violations()
 
         actions = [
-            call.kwargs["action"]
-            for call in self.mock_send_group.call_args_list
+            call.kwargs["action"] for call in self.mock_send_group.call_args_list
         ]
         self.assertIn("metric_goal.update", actions)
         self.assertNotIn("metric_goal.violated", actions)
@@ -177,3 +187,27 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             rooms_threshold_count=1,
         )
         self.assertEqual(len(mail.outbox), 0)
+
+
+class MetricGoalCeleryQueueRoutingTests(TestCase):
+    """Risk alert tasks must publish to RISK_ALERT_CELERY_QUEUE."""
+
+    def test_tasks_are_routed_to_risk_alert_queue(self):
+        from django.conf import settings
+
+        routes = getattr(settings, "CELERY_TASK_ROUTES", {})
+        for task_name in (
+            "check_metric_goal_violations",
+            "send_metric_goal_email",
+        ):
+            self.assertIn(task_name, routes)
+            self.assertEqual(
+                routes[task_name]["queue"],
+                settings.RISK_ALERT_CELERY_QUEUE,
+            )
+
+    def test_beat_schedule_publishes_to_risk_alert_queue(self):
+        from django.conf import settings
+
+        entry = settings.CELERY_BEAT_SCHEDULE["check-metric-goal-violations"]
+        self.assertEqual(entry["options"]["queue"], settings.RISK_ALERT_CELERY_QUEUE)

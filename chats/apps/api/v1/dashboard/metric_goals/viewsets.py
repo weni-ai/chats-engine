@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -54,7 +55,7 @@ class MetricGoalActionsMixin:
         url_name="metric-goals-list",
     )
     def metric_goals_list(self, request, uuid=None):
-        """Lista as metas de tempo configuradas para o projeto."""
+        """List the time goals configured for the project."""
         project = self.get_object()
         self._ensure_can_view(project)
 
@@ -73,7 +74,7 @@ class MetricGoalActionsMixin:
         url_name="metric-goals-detail",
     )
     def metric_goals_detail(self, request, uuid=None, metric=None):
-        """Cria, atualiza ou remove a meta de tempo de uma métrica."""
+        """Create, update, or delete the time goal for a metric."""
         project = self.get_object()
         self._validate_metric(metric)
 
@@ -129,7 +130,7 @@ class MetricGoalActionsMixin:
         try:
             goal = MetricGoal.objects.get(project=project, metric=metric)
         except MetricGoal.DoesNotExist:
-            raise NotFound("Meta não configurada para esta métrica")
+            raise NotFound(_("No goal configured for this metric"))
 
         goal.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

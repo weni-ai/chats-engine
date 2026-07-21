@@ -561,8 +561,9 @@ CELERY_TIMEZONE = TIME_ZONE
 # so environments without a dedicated worker keep working unchanged.
 INACTIVITY_CELERY_QUEUE = env.str("INACTIVITY_CELERY_QUEUE", default="celery")
 
-# Dedicated Celery queue for metric goal / risk alert tasks so the periodic
-# sweep and alert emails are not delayed by backlog on the default queue.
+# Dedicated Celery queue for the risk alert / metric goal alerts feature,
+# following the same pattern as the inactivity queue. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
 RISK_ALERT_CELERY_QUEUE = env.str("RISK_ALERT_CELERY_QUEUE", default="celery")
 
 CELERY_TASK_ROUTES = {
@@ -579,6 +580,8 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
 # Intervalo (em segundos) para a tarefa de relatórios (configurável por env)
 REPORTS_SCHEDULE_SECONDS = env.float("REPORTS_SCHEDULE_SECONDS", default=20.0)
+ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
+ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
 
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
@@ -591,7 +594,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-6", minute=0),
+        "schedule": crontab(
+            hour=ARCHIVE_CHATS_SCHEDULE_HOUR,
+            minute=ARCHIVE_CHATS_SCHEDULE_MINUTE,
+        ),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
@@ -930,6 +936,11 @@ ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
 )
+# Page size for keyset-paginated message iteration during archive.
+# Keeps peak memory bounded to one page of messages + their medias.
+ARCHIVE_CHATS_MESSAGE_PAGE_SIZE = env.int(
+    "ARCHIVE_CHATS_MESSAGE_PAGE_SIZE", default=500
+)
 # Soft-lock threshold used by ArchiveChatsService to decide whether an
 # in-progress RoomArchivedConversation is still being processed by another
 # worker or stale enough to be reclaimed.
@@ -1008,6 +1019,10 @@ WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
 METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY = env.str(
     "METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY",
     default="weniChatsMetricGoalAlerts",
+)
+METRIC_GOAL_ALERTS_FEATURE_FLAG_CACHE_TTL = env.int(
+    "METRIC_GOAL_ALERTS_FEATURE_FLAG_CACHE_TTL",
+    default=30,
 )
 
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(

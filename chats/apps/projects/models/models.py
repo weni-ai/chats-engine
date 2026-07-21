@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 class TemplateType(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(max_length=255)
-    setup = models.JSONField(_("Template Setup"), default=dict)
+    setup = models.JSONField(_("Template setup"), default=dict)
 
     def __str__(self) -> str:
         return self.name  # pragma: no cover
@@ -71,17 +71,17 @@ class Project(BaseConfigurableModel, BaseModel):
         (DATE_FORMAT_MONTH_FIRST, "MM-DD-YYYY"),
     )
 
-    name = models.CharField(_("name"), max_length=50)
+    name = models.CharField(_("Name"), max_length=50)
     timezone = TimeZoneField(verbose_name=_("Timezone"))
     flows_authorization = models.CharField(
-        _("Flows Authorization Token"), max_length=50, null=True, blank=True
+        _("Flows authorization token"), max_length=50, null=True, blank=True
     )
     date_format = models.CharField(
-        verbose_name=_("Date Format"),
+        verbose_name=_("Date format"),
         max_length=1,
         choices=DATE_FORMATS,
         default=DATE_FORMAT_DAY_FIRST,
-        help_text=_("Whether day comes first or month comes first in dates"),
+        help_text=_("Choose whether dates show the day or month first"),
     )
     is_template = models.BooleanField(_("is template?"), default=False)
     template_type = models.ForeignKey(
@@ -100,7 +100,7 @@ class Project(BaseConfigurableModel, BaseModel):
         choices=RoomRoutingType.choices,
         default=RoomRoutingType.QUEUE_PRIORITY,
         help_text=_(
-            "Whether to route rooms using the queue priority or general routing"
+            "Choose whether to route rooms based on queue priority or general routing"
         ),
     )
     internal_flags = models.JSONField(
@@ -336,7 +336,7 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_ADMIN, _("admin")),
-        (ROLE_ATTENDANT, _("Attendant")),
+        (ROLE_ATTENDANT, _("Representative")),
     ]
 
     STATUS_ONLINE = "ONLINE"
@@ -371,11 +371,11 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
     )
 
     status = models.CharField(
-        _("User Status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
+        _("User status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
     )
 
     first_access = models.BooleanField(
-        _("Is it the first access of user?"), default=True
+        _("Is this the user's first access?"), default=True
     )
 
     last_seen = models.DateTimeField(
@@ -399,8 +399,8 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
     auth = models.Manager()
 
     class Meta:
-        verbose_name = _("Project Permission")
-        verbose_name_plural = _("Project Permissions")
+        verbose_name = _("Project permission")
+        verbose_name_plural = _("Project permissions")
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "project"], name="unique_user_permission"
@@ -549,14 +549,14 @@ class LinkContact(BaseModel):
     )
     project = models.ForeignKey(
         Project,
-        verbose_name=_("project"),
+        verbose_name=_("Project"),
         related_name="linked_contacts",
         on_delete=models.CASCADE,
     )
 
     class Meta:
-        verbose_name = _("Linked Contact")
-        verbose_name_plural = _("Linked Contacts")
+        verbose_name = _("Linked contact")
+        verbose_name_plural = _("Linked contacts")
         constraints = [
             models.UniqueConstraint(
                 fields=["contact", "project"], name="unique_link_contact_per_project"
@@ -586,8 +586,8 @@ class FlowStart(BaseModel):
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
-    flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
-    name = models.TextField(_("flow name"), blank=True, null=True, default="")
+    flow = models.CharField(_("Flow ID"), max_length=200, blank=True, null=True)
+    name = models.TextField(_("Flow name"), blank=True, null=True, default="")
     project = models.ForeignKey(
         Project,
         verbose_name=_("Project"),
@@ -613,8 +613,8 @@ class FlowStart(BaseModel):
     contact_data = models.JSONField(_("contact data"), default=dict)
 
     class Meta:
-        verbose_name = _("Flow Start")
-        verbose_name_plural = _("Flow Starts")
+        verbose_name = _("Flow start")
+        verbose_name_plural = _("Flow starts")
 
     def __str__(self):
         return self.project.name
@@ -622,21 +622,21 @@ class FlowStart(BaseModel):
 
 class ContactGroupFlowReference(BaseModel):
     receiver_type = models.CharField(
-        _("Receiver Type"), max_length=50
+        _("Receiver type"), max_length=50
     )  # Contact or Group, may use choices in the future
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
     flow_start = models.ForeignKey(
         FlowStart,
-        verbose_name=_("Flow Start"),
+        verbose_name=_("Flow start"),
         related_name="references",
         on_delete=models.CASCADE,
     )
 
     class Meta:
-        verbose_name = _("Flow contact/group Reference")
-        verbose_name_plural = _("Flow contact/group References")
+        verbose_name = _("Flow contact/group reference")
+        verbose_name_plural = _("Flow contact/group references")
 
     def __str__(self):
         return self.receiver_type + ": " + self.external_id
@@ -708,7 +708,7 @@ class CustomStatus(BaseModel):
         "CustomStatusType", on_delete=models.CASCADE, to_field="uuid"
     )
     is_active = models.BooleanField(default=True)
-    break_time = models.PositiveIntegerField(_("Custom status timming"), default=0)
+    break_time = models.PositiveIntegerField(_("Custom status timing"), default=0)
     project = models.ForeignKey(
         Project,
         on_delete=models.CASCADE,
@@ -752,20 +752,20 @@ class AgentDisconnectLog(BaseModel):
     project = models.ForeignKey(
         "projects.Project",
         related_name="agent_disconnect_logs",
-        verbose_name=_("project"),
+        verbose_name=_("Project"),
         on_delete=models.CASCADE,
     )
     agent = models.ForeignKey(
         User,
         related_name="agent_disconnected_logs",
-        verbose_name=_("agent"),
+        verbose_name=_("Representative"),
         on_delete=models.CASCADE,
         to_field="email",
     )
     disconnected_by = models.ForeignKey(
         User,
         related_name="agent_disconnect_actions",
-        verbose_name=_("disconnected by"),
+        verbose_name=_("Disconnected by"),
         on_delete=models.CASCADE,
         to_field="email",
     )
@@ -787,23 +787,23 @@ class AgentStatusLog(BaseModel):
     agent = models.ForeignKey(
         "accounts.User",
         related_name="agent_status_logs",
-        verbose_name=_("agent"),
+        verbose_name=_("Representative"),
         on_delete=models.CASCADE,
         to_field="email",
     )
     project = models.ForeignKey(
         "projects.Project",
         related_name="agent_status_logs",
-        verbose_name=_("project"),
+        verbose_name=_("Project"),
         on_delete=models.CASCADE,
     )
 
     log_date = models.DateField(
-        _("log date"), help_text=_("Date of the log (agent's local timezone)")
+        _("Log date"), help_text=_("Log date (representative's local timezone)")
     )
 
     status_changes = models.JSONField(
-        _("status changes"),
+        _("Status changes"),
         default=list,
         help_text=_(
             "List of status change events: "
@@ -813,8 +813,8 @@ class AgentStatusLog(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Agent Status Log")
-        verbose_name_plural = _("Agent Status Logs")
+        verbose_name = _("Representative status log")
+        verbose_name_plural = _("Representative status logs")
         constraints = [
             models.UniqueConstraint(
                 fields=["agent", "project", "log_date"],

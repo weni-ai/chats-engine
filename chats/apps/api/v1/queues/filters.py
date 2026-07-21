@@ -13,7 +13,7 @@ class QueueFilter(filters.FilterSet):
         field_name="project",
         required=False,
         method="filter_project",
-        help_text=_("Project's UUID"),
+        help_text=_("Project UUID"),
     )
 
     def filter_project(self, queryset, name, value):
@@ -29,14 +29,14 @@ class QueueAuthorizationFilter(filters.FilterSet):
         field_name="queue",
         required=True,
         method="filter_queue",
-        help_text=_("queue's ID"),
+        help_text=_("Queue ID"),
     )
 
     status = filters.CharFilter(
         field_name="status",
         required=False,
         method="filter_status",
-        help_text=_("User Status"),
+        help_text=_("User status"),
     )
 
     def filter_status(self, queryset, name, value):

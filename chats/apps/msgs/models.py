@@ -81,10 +81,10 @@ class Message(BaseModelWithManualCreatedOn):
         null=True,
     )
     is_read = models.CharField(
-        _("message is read"), max_length=50, blank=True, null=True
+        _("message was read"), max_length=50, blank=True, null=True
     )
     is_delivered = models.CharField(
-        _("message is delivered"), max_length=50, blank=True, null=True
+        _("message was delivered"), max_length=50, blank=True, null=True
     )
     automatic_message_type = models.CharField(
         _("automatic message type"),
@@ -111,12 +111,12 @@ class Message(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         if self.room.is_24h_valid is False and self.user is not None:
             raise ValidationError(
                 {
                     "detail": _(
-                        "You cannot send messages after 24h from the last contact message"
+                        "You can't send messages after 24h from the last contact message"
                     )
                 }
             )
@@ -235,22 +235,22 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
         Message,
         related_name="medias",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.CASCADE,
     )
-    content_type = models.CharField(_("Content Type"), max_length=300)
+    content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"),
+        _("Media file"),
         null=True,
         blank=True,
         max_length=300,
         upload_to=message_media_upload_to,
     )
-    media_url = models.TextField(_("Media url"), null=True, blank=True)
+    media_url = models.TextField(_("Media URL"), null=True, blank=True)
 
     class Meta:
-        verbose_name = _("MessageMedia")
-        verbose_name_plural = _("MessageMedias")
+        verbose_name = _("Message media")
+        verbose_name_plural = _("Message media")
         indexes = [
             models.Index(
                 fields=["content_type"],
@@ -263,7 +263,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.message.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         return super().save(*args, **kwargs)
 
     @property

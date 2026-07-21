@@ -70,24 +70,24 @@ class QueueSerializer(AuditableModelSerializer):
             "sector",
         ]
 
-    def _get_audit_project(self):
+    def _get_audit_project(self, data=None):
         if self.instance is not None:
             return self.instance.sector.project
-        sector = (self.validated_data or {}).get("sector")
+        source = data if data is not None else getattr(self, "_validated_data", None)
+        if not source:
+            return None
+        sector = source.get("sector")
         return sector.project if sector else None
 
     def _validate_queue_purpose(self, data):
         if "queue_purpose" not in (self.initial_data or {}):
             return
 
-        queue_purpose = data.get("queue_purpose", self.initial_data.get("queue_purpose"))
+        queue_purpose = data.get(
+            "queue_purpose", self.initial_data.get("queue_purpose")
+        )
+        project = self._get_audit_project(data=data)
         request = self.context.get("request")
-
-        if self.instance is not None:
-            project = self.instance.sector.project
-        else:
-            sector = data.get("sector")
-            project = sector.project if sector else None
 
         if project:
             validate_queue_purpose_feature_flag(request, project, queue_purpose)
@@ -101,20 +101,18 @@ class QueueSerializer(AuditableModelSerializer):
         name = data.get("name")
         if name:
             if name == "":
-                raise serializers.ValidationError(
-                    {"detail": _("The name field can't be blank.")}
-                )
+                raise serializers.ValidationError({"detail": _("Enter a name")})
             if self.instance:
                 if Queue.objects.filter(
                     sector=self.instance.sector, name=name
                 ).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
             else:
                 if Queue.objects.filter(sector=data["sector"], name=name).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
 
         queue_limit = data.pop("queue_limit_info", None)
@@ -202,7 +200,7 @@ class QueueAuthorizationSerializer(AuditableModelSerializer):
         )
         if queue_user:
             raise serializers.ValidationError(
-                {"detail": _("you cant add a user two times in same queue.")}
+                {"detail": _("You can't add a user twice to the same queue")}
             )
         return data
 
@@ -296,7 +294,9 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
-    queue_purpose = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    queue_purpose = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(

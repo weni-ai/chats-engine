@@ -4618,13 +4618,13 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.1.2"
+version = "1.3.1"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "weni_commons-1.1.2-py3-none-any.whl", hash = "sha256:b727a4c2985c0acc8310c90e0ba1348278183c80452d26c13ece31c6239a3a3f"},
-    {file = "weni_commons-1.1.2.tar.gz", hash = "sha256:04ff80b6674ab5a2d512b3eac33ea5bfabe651810b8390af8040fe120c50e542"},
+    {file = "weni_commons-1.3.1-py3-none-any.whl", hash = "sha256:05435733aab90693f8ca955da686ff7e29d58e77e63c5b79f862a4c8ff21d8dd"},
+    {file = "weni_commons-1.3.1.tar.gz", hash = "sha256:fb1f73eac33f38acf369ffaf9fcde139e58968f43546f8711c80ce9bc5ae0163"},
 ]
 
 [package.dependencies]
@@ -4632,7 +4632,22 @@ celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
 django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
-weni-feature-flags = ">=2.1.2,<3.0.0"
+weni-eda = ">=0.1.2,<0.2.0"
+weni-feature-flags = ">=2.2.0,<3.0.0"
+
+[[package]]
+name = "weni-eda"
+version = "0.1.2"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "weni_eda-0.1.2-py3-none-any.whl", hash = "sha256:83696e1fa277dc494c0aa17c13340c7a3b8e491526419629f111a03cae934610"},
+    {file = "weni_eda-0.1.2.tar.gz", hash = "sha256:395ce3c9bf6a33a1a27c2482a60d49a40ccdad21fb1df39ce2b2db59f885f004"},
+]
+
+[package.dependencies]
+amqp = ">=5.2.0,<6.0.0"
 
 [[package]]
 name = "weni-eda"
@@ -4650,18 +4665,19 @@ amqp = ">=5.2.0,<6.0.0"
 
 [[package]]
 name = "weni-feature-flags"
-version = "2.1.2"
+version = "2.2.0"
 description = "Weni's feature flags SDK for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "weni_feature_flags-2.1.2-py3-none-any.whl", hash = "sha256:ce8ef0b8b0a78fa75c2399469b6deaeb4518cc4568b85111663080992536a3c4"},
-    {file = "weni_feature_flags-2.1.2.tar.gz", hash = "sha256:f38544ab5a8ec08d6257127769c2aa7dc64c709c75ffe613be82188aa29f7404"},
+    {file = "weni_feature_flags-2.2.0-py3-none-any.whl", hash = "sha256:a3d1898fa4992eca979261978d3db996973adff23a7cf98a75d5a22f73ba6b83"},
+    {file = "weni_feature_flags-2.2.0.tar.gz", hash = "sha256:145bfe816354bed204dd5efb4981cf1b4ec8df31d058740a669a8f400b8215d1"},
 ]
 
 [package.dependencies]
 celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
+django-celery-beat = ">=2.5.0,<3.0"
 django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
 growthbook = ">=1.0.0,<2.0"
@@ -4962,4 +4978,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "a31f8564f57aa88a2e1297433fc5be6746aea0feaca2b39f0bbd49734a34f97b"
+content-hash = "f49bf9cbe4ae2e6c8efc7a5e390c82a336dcc37f00772b17ce6e8e1e4370aacb"

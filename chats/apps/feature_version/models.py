@@ -13,7 +13,7 @@ class IntegratedFeature(BaseModel):
     )
     feature = models.CharField(_("feature uuid"), max_length=200, blank=True)
     current_version = models.JSONField(
-        _("sectors list"),
+        _("department list"),
         blank=True,
         null=True,
     )

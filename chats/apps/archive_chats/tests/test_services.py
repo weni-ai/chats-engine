@@ -289,12 +289,21 @@ class TestArchiveChatsService(TestCase):
         self.assertIn("savepoint_count", observed)
         self.assertEqual(observed["savepoint_count"], baseline_savepoints)
 
-    def test_process_messages(self):
+    @override_settings(ARCHIVE_CHATS_MESSAGE_PAGE_SIZE=2)
+    @patch(
+        "chats.apps.archive_chats.services.is_file_on_chats_bucket", return_value=True
+    )
+    def test_process_messages(self, mock_is_file_on_chats_bucket):
         message_a = Message.objects.create(
             room=self.room,
             user=self.user,
             text="Test message",
             created_on=timezone.now(),
+        )
+        MessageMedia.objects.create(
+            message=message_a,
+            content_type="image/png",
+            media_file="archives/test-a.png",
         )
         message_b = Message.objects.create(
             room=self.room,
@@ -317,6 +326,11 @@ class TestArchiveChatsService(TestCase):
             user=self.user,
             text="Test message",
             created_on=timezone.now(),
+        )
+        MessageMedia.objects.create(
+            message=message_d,
+            content_type="image/jpeg",
+            media_file="archives/test-d.jpg",
         )
         RoomNote.objects.create(
             room=self.room,
@@ -377,6 +391,19 @@ class TestArchiveChatsService(TestCase):
                         "text": internal_note.text,
                     },
                 )
+
+        media_a = messages_data[0].get("media")
+        self.assertEqual(len(media_a), 1)
+        self.assertEqual(media_a[0]["content_type"], "image/png")
+        self.assertIn("object_key=archives/test-a.png", media_a[0]["url"])
+
+        self.assertEqual(messages_data[1].get("media"), [])
+        self.assertEqual(messages_data[2].get("media"), [])
+
+        media_d = messages_data[3].get("media")
+        self.assertEqual(len(media_d), 1)
+        self.assertEqual(media_d[0]["content_type"], "image/jpeg")
+        self.assertIn("object_key=archives/test-d.jpg", media_d[0]["url"])
 
     def test_upload_messages_file(self):
         archived_conversation = RoomArchivedConversation.objects.create(

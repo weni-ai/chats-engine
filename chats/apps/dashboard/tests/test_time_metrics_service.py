@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -454,6 +455,12 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
         self.user = User.objects.create_user(email="agent@test.com")
         self.contact = Contact.objects.create(name="Contact", email="c@test.com")
         self.service = TimeMetricsService()
+        self.ff_patch = patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def _filters(self, **overrides) -> Filters:
         defaults = dict(
@@ -490,6 +497,21 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
 
         self.assertNotIn("waiting_time_goal", result)
 
+    def test_feature_flag_off_omits_goals_even_when_configured(self):
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_SECOND,
+        )
+        with patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_metric_goal_alerts_enabled",
+            return_value=False,
+        ):
+            result = self.service.get_time_metrics(self._filters(), self.project)
+
+        self.assertNotIn("waiting_time_goal", result)
+
     def test_active_goal_appears_with_threshold_value(self):
         MetricGoal.objects.create(
             project=self.project,
@@ -514,9 +536,7 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
         for i in range(3):
             room = Room.objects.create(
                 queue=self.queue,
-                contact=Contact.objects.create(
-                    name=f"c-{i}", email=f"c{i}@test.com"
-                ),
+                contact=Contact.objects.create(name=f"c-{i}", email=f"c{i}@test.com"),
                 user=None,
                 is_active=True,
             )
@@ -545,9 +565,7 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
         for i in range(5):
             room = Room.objects.create(
                 queue=self.queue,
-                contact=Contact.objects.create(
-                    name=f"c-{i}", email=f"c{i}@test.com"
-                ),
+                contact=Contact.objects.create(name=f"c-{i}", email=f"c{i}@test.com"),
                 user=None,
                 is_active=True,
             )

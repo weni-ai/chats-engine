@@ -908,60 +908,58 @@ class ReportFieldsValidatorViewSet(APIView):
             return v == 1
         return False
 
+    def _ensure_section_dict(self, fields_config, section):
+        if section not in fields_config:
+            return None
+        if not isinstance(fields_config[section], dict):
+            fields_config[section] = {}
+        return fields_config[section]
+
+    def _merge_root_dates(self, section, start_date, end_date):
+        if start_date and "start_date" not in section:
+            section["start_date"] = start_date
+        if end_date and "end_date" not in section:
+            section["end_date"] = end_date
+
+    def _extract_root_entities(self, request_data):
+        return {
+            "agents": (
+                request_data.get("users")
+                or request_data.get("agents")
+                or request_data.get("agent")
+            ),
+            "sectors": request_data.get("sectors") or request_data.get("sector"),
+            "queues": request_data.get("queues") or request_data.get("queue"),
+            "tags": (
+                request_data.get("sector_tags")
+                or request_data.get("tags")
+                or request_data.get("tag")
+            ),
+        }
+
     def _apply_root_filters_to_rooms(self, fields_config, request_data):
         open_chats = self._is_true(fields_config.pop("open_chats", None))
         closed_chats = self._is_true(fields_config.pop("closed_chats", None))
         root_start_date = fields_config.pop("start_date", None)
         root_end_date = fields_config.pop("end_date", None)
+        root_entities = self._extract_root_entities(request_data)
 
-        if "rooms" in fields_config and isinstance(fields_config["rooms"], dict):
-            fields_config["rooms"]["open_chats"] = open_chats
-            fields_config["rooms"]["closed_chats"] = closed_chats
-            if root_start_date and "start_date" not in fields_config["rooms"]:
-                fields_config["rooms"]["start_date"] = root_start_date
-            if root_end_date and "end_date" not in fields_config["rooms"]:
-                fields_config["rooms"]["end_date"] = root_end_date
+        rooms = self._ensure_section_dict(fields_config, "rooms")
+        if rooms is not None:
+            rooms["open_chats"] = open_chats
+            rooms["closed_chats"] = closed_chats
+            self._merge_root_dates(rooms, root_start_date, root_end_date)
+            for key, value in root_entities.items():
+                if value is not None:
+                    rooms[key] = value
 
-        if "agent_status_logs" in fields_config and isinstance(
-            fields_config["agent_status_logs"], dict
-        ):
-            if (
-                root_start_date
-                and "start_date" not in fields_config["agent_status_logs"]
-            ):
-                fields_config["agent_status_logs"]["start_date"] = root_start_date
-            if root_end_date and "end_date" not in fields_config["agent_status_logs"]:
-                fields_config["agent_status_logs"]["end_date"] = root_end_date
-
-        root_agents = (
-            request_data.get("users")
-            or request_data.get("agents")
-            or request_data.get("agent")
+        agent_status_logs = self._ensure_section_dict(
+            fields_config, "agent_status_logs"
         )
-        root_sectors = request_data.get("sectors") or request_data.get("sector")
-        root_queues = request_data.get("queues") or request_data.get("queue")
-        root_tags = (
-            request_data.get("sector_tags")
-            or request_data.get("tags")
-            or request_data.get("tag")
-        )
-        if "rooms" in fields_config:
-            if not isinstance(fields_config["rooms"], dict):
-                fields_config["rooms"] = {}
-            if root_agents is not None:
-                fields_config["rooms"]["agents"] = root_agents
-            if root_sectors is not None:
-                fields_config["rooms"]["sectors"] = root_sectors
-            if root_queues is not None:
-                fields_config["rooms"]["queues"] = root_queues
-            if root_tags is not None:
-                fields_config["rooms"]["tags"] = root_tags
-
-        if "agent_status_logs" in fields_config:
-            if not isinstance(fields_config["agent_status_logs"], dict):
-                fields_config["agent_status_logs"] = {}
-            if root_agents is not None:
-                fields_config["agent_status_logs"]["agents"] = root_agents
+        if agent_status_logs is not None:
+            self._merge_root_dates(agent_status_logs, root_start_date, root_end_date)
+            if root_entities["agents"] is not None:
+                agent_status_logs["agents"] = root_entities["agents"]
 
     def _filter_valid_models(self, fields_config):
         available_fields = ModelFieldsPresenter.get_models_info()

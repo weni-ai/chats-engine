@@ -22,7 +22,7 @@ from chats.apps.csat.models import (
 )
 from chats.apps.sectors.models import Sector
 from chats.core.cache import BaseCacheClient
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class CSATFlowService(BaseCSATService):
         self,
         flows_client: FlowRESTClient,
         cache_client: BaseCacheClient,
-        token_generator: JWTTokenGenerator,
+        token_generator: CSATJWTTokenGenerator,
     ):
         self.flows_client = flows_client
         self.cache_client = cache_client

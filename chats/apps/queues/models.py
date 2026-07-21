@@ -35,7 +35,7 @@ User = get_user_model()
 class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     sector = models.ForeignKey(
         "sectors.Sector",
-        verbose_name=_("sector"),
+        verbose_name=_("Department"),
         related_name="queues",
         on_delete=models.CASCADE,
     )
@@ -51,8 +51,8 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
     all_objects = QueueManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector Queue")
-        verbose_name_plural = _("Sector Queues")
+        verbose_name = _("Department queue")
+        verbose_name_plural = _("Department queues")
 
         constraints = [
             models.UniqueConstraint(fields=["sector", "name"], name="unique_queue_name")
@@ -336,7 +336,7 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_AGENT, _("agent")),
+        (ROLE_AGENT, _("Representative")),
     ]
 
     queue = models.ForeignKey(
@@ -360,11 +360,13 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     all_objects = QueueAuthorizationManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector Queue Authorization")
-        verbose_name_plural = _("Sector Queues Authorization")
+        verbose_name = _("Department queue authorization")
+        verbose_name_plural = _("Department queue authorizations")
         constraints = [
             models.UniqueConstraint(
-                fields=["queue", "permission"], name="unique_queue_auth"
+                fields=["queue", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_queue_auth",
             )
         ]
 

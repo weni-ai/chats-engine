@@ -261,15 +261,21 @@ class TimeMetricsService:
         }
 
         # Inline goal payloads for each active metric goal so the front can
-        # render the widget alert state in the same response. Imported here
-        # to avoid pulling the metric goals module on cold paths.
-        from chats.apps.api.v1.dashboard.metric_goals.services import (
-            MetricGoalBreachService,
+        # render the widget alert state in the same response. Gated by the
+        # same GrowthBook flag as CRUD/WS/sweep so projects without the
+        # feature never pay the breach queries (and never see goal keys).
+        from chats.apps.dashboard.services.metric_goal_alerts import (
+            is_metric_goal_alerts_enabled,
         )
 
-        payload.update(
-            MetricGoalBreachService().get_goals_payload(project, filters)
-        )
+        if is_metric_goal_alerts_enabled(str(project.uuid)):
+            from chats.apps.api.v1.dashboard.metric_goals.services import (
+                MetricGoalBreachService,
+            )
+
+            payload.update(
+                MetricGoalBreachService().get_goals_payload(project, filters)
+            )
 
         return payload
 

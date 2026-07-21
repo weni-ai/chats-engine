@@ -8,8 +8,9 @@ from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
 from chats.apps.dashboard.models import MetricGoal, RoomMetrics
 
-# Maps each MetricGoal metric to the output key used in `goals_metrics`.
-# `awaiting_time` matches the Insights nomenclature for queue wait time.
+# Maps each MetricGoal metric to the serializer method used to compute the
+# equivalent per-room value, so `goals_metrics` can reuse the exact same
+# figures already shown in `duration` / `waiting_time` / `first_response_time`.
 _GOAL_METRIC_TO_OUTPUT_KEY = {
     MetricGoal.METRIC_WAITING_TIME: "awaiting_time",
     MetricGoal.METRIC_FIRST_RESPONSE_TIME: "first_response_time",
@@ -20,7 +21,9 @@ _GOAL_METRIC_TO_OUTPUT_KEY = {
 class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     agent = serializers.SerializerMethodField()
-    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
+    user_email = serializers.EmailField(
+        source="user.email", default=None, read_only=True
+    )
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()

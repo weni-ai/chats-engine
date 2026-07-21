@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.authentication.classes import JWTAuthentication
 from chats.apps.api.authentication.permissions import (
     IsAuthenticatedOrHasInternalJWT,

@@ -1,6 +1,7 @@
 """Tests for the MetricGoalAlertConsumer."""
 
 import json
+from unittest.mock import patch
 
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
@@ -15,9 +16,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 @override_settings(
-    CHANNEL_LAYERS={
-        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-    }
+    CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 )
 class MetricGoalAlertConsumerTestCase(TestCase):
     def setUp(self):
@@ -65,11 +64,15 @@ class MetricGoalAlertConsumerTestCase(TestCase):
             user=self.attendant,
             role=ProjectPermission.ROLE_ATTENDANT,
         )
+        self.ff_patch = patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def _ws_url(self, project_uuid, token):
-        return (
-            f"/ws/dashboard/metric-goals?project={project_uuid}&Token={token}"
-        )
+        return f"/ws/dashboard/metric-goals?project={project_uuid}&Token={token}"
 
     async def test_rejects_without_token(self):
         comm = WebsocketCommunicator(
@@ -140,9 +143,7 @@ class MetricGoalAlertConsumerTestCase(TestCase):
         )
         message = await comm.receive_json_from(timeout=2)
         self.assertEqual(message["type"], "metric_goal.violated")
-        self.assertEqual(
-            message["content"]["project_uuid"], str(self.project.uuid)
-        )
+        self.assertEqual(message["content"]["project_uuid"], str(self.project.uuid))
         await comm.disconnect()
 
     async def test_does_not_receive_broadcast_for_other_project(self):
@@ -159,9 +160,7 @@ class MetricGoalAlertConsumerTestCase(TestCase):
             {
                 "type": "metric_goal_violated",
                 "action": "metric_goal.violated",
-                "content": json.dumps(
-                    {"project_uuid": str(self.other_project.uuid)}
-                ),
+                "content": json.dumps({"project_uuid": str(self.other_project.uuid)}),
             },
         )
         self.assertTrue(await comm.receive_nothing(timeout=0.5))
