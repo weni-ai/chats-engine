@@ -6,9 +6,10 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('queues', '0010_alter_queue_options_alter_queueauthorization_options_and_more'),
-        ('queues', '0010_queue_queue_purpose'),
+        (
+            "queues",
+            "0010_alter_queue_options_alter_queueauthorization_options_and_more",
+        ),
     ]
 
-    operations = [
-    ]
+    operations = []

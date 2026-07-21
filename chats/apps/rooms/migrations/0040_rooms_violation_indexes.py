@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("rooms", "0038_alter_roomnote_options_alter_roompin_options_and_more"),
+        ("rooms", "0039_alter_roomnote_options_alter_roompin_options_and_more"),
     ]
 
     operations = [
