@@ -7,8 +7,8 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('rooms', '0038_alter_roomnote_options_alter_roompin_options_and_more'),
-        ('dashboard', '0009_reportstatus_report_type_reportstatus_room'),
+        ('rooms', '0039_alter_roomnote_options_alter_roompin_options_and_more'),
+        ('dashboard', '0012_metricgoal_active_lookup_idx'),
     ]
 
     operations = [
