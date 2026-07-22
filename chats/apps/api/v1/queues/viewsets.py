@@ -21,6 +21,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from chats.apps.api.v1.internal.eda_clients.change_history_client import (
+    publish_change_history,
+)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -119,6 +122,7 @@ class QueueViewset(ModelViewSet):
             QueueGroupSectorAuthorizationCreationUseCase(instance).execute()
 
         if not settings.USE_WENI_FLOWS:
+            publish_change_history(after=instance, user=self.request.user)
             return super().perform_create(serializer)
 
         should_use_integration = (
@@ -150,20 +154,27 @@ class QueueViewset(ModelViewSet):
                 project, instance.sector.secondary_project
             )
 
+        publish_change_history(after=instance, user=self.request.user)
         return instance
 
     def perform_update(self, serializer):
+        before = Queue.objects.get(pk=serializer.instance.pk)
         instance = serializer.save(modified_by=self.request.user)
+        publish_change_history(
+            before=before,
+            after=instance,
+            user=self.request.user,
+        )
+
+        if not settings.USE_WENI_FLOWS:
+            return super().perform_create(serializer)
+
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
             "queue_purpose": instance.queue_purpose,
             "sector_uuid": str(instance.sector.uuid),
         }
-
-        if not settings.USE_WENI_FLOWS:
-            return super().perform_create(serializer)
-
         response = FlowRESTClient().update_queue(**content)
 
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
@@ -313,24 +324,22 @@ class QueueViewset(ModelViewSet):
             instance, self.request, instance.sector.project, on_delete=True
         )
 
-        if not settings.USE_WENI_FLOWS:
-            instance.delete()
-            return
+        if settings.USE_WENI_FLOWS:
+            response = FlowRESTClient().destroy_queue(**content)
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+                status.HTTP_204_NO_CONTENT,
+                status.HTTP_404_NOT_FOUND,
+            ]:
+                raise exceptions.APIException(
+                    detail=(
+                        f"[{response.status_code}] Error deleting the queue on "
+                        f"flows. Exception: {response.content}"
+                    )
+                )
 
-        response = FlowRESTClient().destroy_queue(**content)
-
-        if response.status_code == status.HTTP_404_NOT_FOUND:
-            instance.delete()
-            return
-
-        if response.status_code not in [
-            status.HTTP_200_OK,
-            status.HTTP_201_CREATED,
-            status.HTTP_204_NO_CONTENT,
-        ]:
-            raise exceptions.APIException(
-                detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
-            )
+        publish_change_history(before=instance, user=self.request.user)
         instance.delete()
 
     @action(detail=True, methods=["POST"])
@@ -352,7 +361,12 @@ class QueueViewset(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        is_new = not QueueAuthorization.objects.filter(
+            queue=queue, permission=permission, is_deleted=False
+        ).exists()
         queue_auth = queue.set_user_authorization(permission, 1)
+        if is_new:
+            publish_change_history(after=queue_auth, user=request.user)
 
         return Response(
             {
@@ -513,22 +527,45 @@ class QueueAuthorizationViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        instance = serializer.save(
+            created_by=self.request.user, modified_by=self.request.user
+        )
+        publish_change_history(after=instance, user=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(modified_by=self.request.user)
+        before = QueueAuthorization.objects.get(pk=serializer.instance.pk)
+        instance = serializer.save(modified_by=self.request.user)
+        publish_change_history(
+            before=before,
+            after=instance,
+            user=self.request.user,
+        )
+
+    def perform_destroy(self, instance):
+        apply_audit_fields(
+            instance,
+            self.request,
+            instance.queue.sector.project,
+            on_delete=True,
+        )
+        publish_change_history(before=instance, user=self.request.user)
+        instance.delete()
 
     @action(detail=True, methods=["PATCH"])
     def update_queue_permissions(self, request, *args, **kwargs):
         queue_permission = self.get_object()
+        before = QueueAuthorization.objects.get(pk=queue_permission.pk)
 
-        role = request.data.get("role")
-
-        queue_permission.role = role
+        queue_permission.role = request.data.get("role")
         apply_audit_fields(
             queue_permission, request, queue_permission.queue.sector.project
         )
         queue_permission.save()
+        publish_change_history(
+            before=before,
+            after=queue_permission,
+            user=request.user,
+        )
 
         serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(
             queue_permission

@@ -8,6 +8,9 @@ from rest_framework import exceptions, status
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.internal.eda_clients.change_history_client import (
+    publish_change_history,
+)
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -85,18 +88,19 @@ class BulkQueueCreationUseCase:
             user__in=[email.lower() for email in agent_emails],
             is_deleted=False,
         )
-        QueueAuthorization.objects.bulk_create(
-            [
-                QueueAuthorization(
-                    queue=queue,
-                    permission=perm,
-                    role=QueueAuthorization.ROLE_AGENT,
-                    created_by=self.user,
-                    modified_by=self.user,
-                )
-                for perm in permissions
-            ]
-        )
+        authorizations = [
+            QueueAuthorization(
+                queue=queue,
+                permission=perm,
+                role=QueueAuthorization.ROLE_AGENT,
+                created_by=self.user,
+                modified_by=self.user,
+            )
+            for perm in permissions
+        ]
+        created = QueueAuthorization.objects.bulk_create(authorizations)
+        for auth in created:
+            publish_change_history(after=auth, user=self.user)
 
     def _persist_queues(self) -> List[Queue]:
         created_queues: List[Queue] = []
@@ -104,7 +108,7 @@ class BulkQueueCreationUseCase:
         for queue_data in self.queues_data:
             agent_emails = queue_data.get("agents", []) or []
             queue = self._build_queue(queue_data)
-
+            publish_change_history(after=queue, user=self.user)
             self._create_queue_authorizations(queue, agent_emails)
 
             if self.has_group_sectors:
