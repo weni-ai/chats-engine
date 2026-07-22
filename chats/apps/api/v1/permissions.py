@@ -13,31 +13,6 @@ from chats.apps.projects.models import Project
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
 
-class IsProjectAdminSpecific(permissions.BasePermission):
-    def has_permission(self, request, view):
-        if request.user.is_anonymous:
-            return False
-        
-        if request.method == 'GET':
-            project_uuid = request.query_params.get('project_uuid')
-        elif request.method == 'POST':
-            project_uuid = request.data.get('project_uuid')
-        else:
-            return False
-            
-        if not project_uuid:
-            return False
-            
-        try:
-            project = Project.objects.get(uuid=project_uuid)
-            ProjectPermission.objects.get(
-                user=request.user, 
-                project=project,
-                role=1
-            )
-            return True
-        except (Project.DoesNotExist, ProjectPermission.DoesNotExist):
-            return False
 
 class IsProjectAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -422,3 +397,30 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
 
 class ProjectBodyFieldIsAdmin(ProjectBodyIsAdmin):
     project_uuid_field_name = "project"
+
+
+class ProjectQueryIsAdmin(permissions.BasePermission):
+    """
+    Requires the user to be a project admin for the ``project`` query param.
+    Uses GetPermission so ``project`` resolves the same way as other project-scoped endpoints.
+    """
+
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+
+        if not request.query_params.get("project"):
+            raise ValidationError(
+                {"project": ["This field is required"]}, code="required"
+            )
+
+        try:
+            permission = GetPermission(request).permission
+        except (AttributeError, ProjectPermission.DoesNotExist, ObjectDoesNotExist):
+            return False
+
+        if permission is None:
+            return False
+
+        request._cached_project_permission = permission
+        return permission.is_admin
