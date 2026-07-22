@@ -403,11 +403,14 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
         if request.user.is_anonymous:
             return False
 
-        project_uuid = request.data.get("project_uuid")
+        project_uuid_field_name = getattr(
+            self, "project_uuid_field_name", "project_uuid"
+        )
+        project_uuid = request.data.get(project_uuid_field_name)
 
         if not project_uuid:
             raise ValidationError(
-                {"project_uuid": ["This field is required"]}, code="required"
+                {project_uuid_field_name: ["This field is required"]}, code="required"
             )
 
         return ProjectPermission.objects.filter(
@@ -415,3 +418,7 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
             user=request.user,
             role=ProjectPermission.ROLE_ADMIN,
         ).exists()
+
+
+class ProjectBodyFieldIsAdmin(ProjectBodyIsAdmin):
+    project_uuid_field_name = "project"
