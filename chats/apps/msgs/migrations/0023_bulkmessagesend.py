@@ -9,7 +9,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0036_alter_agentstatuslog_options_and_more'),
+        ('projects', '0039_alter_agentstatuslog_options_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('msgs', '0022_alter_messagemedia_options_and_more'),
     ]
