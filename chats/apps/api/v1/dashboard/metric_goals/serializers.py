@@ -16,7 +16,7 @@ class MetricGoalRecipientReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectPermission
-        fields = ["uuid", "first_name", "last_name", "email"]
+        fields = ["first_name", "last_name", "email"]
 
 
 class MetricGoalReadSerializer(serializers.ModelSerializer):

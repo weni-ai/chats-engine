@@ -617,6 +617,10 @@ METRIC_GOAL_STATE_TTL_SECONDS = env.int(
 METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
     "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
 )
+# Base URL of the Weni dashboard used as the CTA link in risk alert emails.
+WENI_DASHBOARD_URL = env.str(
+    "WENI_DASHBOARD_URL", default="https://dash.weni.ai"
+)
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
