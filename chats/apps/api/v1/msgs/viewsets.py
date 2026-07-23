@@ -236,20 +236,19 @@ class MessageViewset(
             created_on__gte=window_start,
         ).order_by("-created_on")
 
-        total = queryset.count()
-        if total > BULK_SEND_RECENT_HISTORY_LIMIT:
+        results = list(queryset[: BULK_SEND_RECENT_HISTORY_LIMIT + 1])
+        if len(results) > BULK_SEND_RECENT_HISTORY_LIMIT:
             logger.info(
-                "Bulk send recent history for project %s has %s records; "
+                "Bulk send recent history for project %s exceeded %s records; "
                 "returning the last %s",
                 project_uuid,
-                total,
+                len(results),
                 BULK_SEND_RECENT_HISTORY_LIMIT,
             )
-
-        queryset = queryset[:BULK_SEND_RECENT_HISTORY_LIMIT]
+            results = results[:BULK_SEND_RECENT_HISTORY_LIMIT]
 
         return Response(
-            {"results": BulkSendRecentHistorySerializer(queryset, many=True).data}
+            {"results": BulkSendRecentHistorySerializer(results, many=True).data}
         )
 
 
