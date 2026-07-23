@@ -639,6 +639,9 @@ if USE_EDA:
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
     ROOMS_INFO_EXCHANGE = env("ROOMS_INFO_EXCHANGE", default="rooms.topic")
+    CHANGE_HISTORY_EXCHANGE = env(
+        "CHANGE_HISTORY_EXCHANGE", default="change-history.topic"
+    )
     PROJECT_UPDATE_EXCHANGE = env(
         "PROJECT_UPDATE_EXCHANGE", default="update-projects.topic"
     )
