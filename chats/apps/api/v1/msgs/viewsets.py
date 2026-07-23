@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -26,7 +28,11 @@ from chats.apps.api.v1.msgs.serializers import (
     MessageMediaSerializer,
     MessageSerializer,
 )
-from chats.apps.api.v1.permissions import ProjectBodyFieldIsAdmin
+from chats.apps.api.v1.permissions import (
+    ProjectBodyFieldIsAdmin,
+    ProjectQueryFieldIsAdmin,
+)
+from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.usecases.start_bulk_send_messages import StartBulkSendMessagesUseCase
@@ -179,6 +185,30 @@ class MessageViewset(
             {"status": "PROCESSING", "uuid": str(bulk_send.uuid)},
             status=status.HTTP_202_ACCEPTED,
         )
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/has-past-messages",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_has_past_messages(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project")
+        cache_key = f"bulk_send:has_past_messages:{project_uuid}"
+
+        if cache.get(cache_key) is not None:
+            return Response({"status": True})
+
+        has_past = BulkMessageSend.objects.filter(project__uuid=project_uuid).exists()
+
+        if has_past:
+            cache.set(
+                cache_key,
+                True,
+                settings.BULK_SEND_HAS_PAST_MESSAGES_CACHE_TTL,
+            )
+
+        return Response({"status": has_past})
 
 
 class MessageMediaViewset(
