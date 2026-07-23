@@ -164,6 +164,64 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         self.assertEqual(sent.alternatives[0][1], "text/html")
         self.assertIn(settings.WENI_DASHBOARD_URL, sent.alternatives[0][0])
 
+    def test_send_metric_goal_email_respects_recipient_language(self):
+        self.recipient.language = "pt-BR"
+        self.recipient.save(update_fields=["language"])
+
+        dashboard_tasks.send_metric_goal_email(
+            project_uuid=str(self.project.uuid),
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            violating_count=3,
+            threshold_seconds=60,
+            max_value_seconds=120,
+            rooms_threshold_count=1,
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertIn(self.recipient.email, sent.to)
+        self.assertEqual(
+            sent.subject, "Dashboard Live Desk precisa de atenção imediata!"
+        )
+        self.assertIn("ultrapassaram o tempo máximo de espera", sent.body)
+        self.assertIn(
+            "ultrapassaram o tempo máximo de espera",
+            sent.alternatives[0][0],
+        )
+
+    def test_send_metric_goal_email_groups_recipients_by_language(self):
+        other, _ = create_user_and_token(nickname="recip_es")
+        other.language = "es"
+        other.save(update_fields=["language"])
+        other_permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=other,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        SectorAuthorization.objects.create(
+            permission=other_permission,
+            sector=self.sector,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+        self.goal.recipients.add(other_permission)
+
+        self.recipient.language = "pt-BR"
+        self.recipient.save(update_fields=["language"])
+
+        dashboard_tasks.send_metric_goal_email(
+            project_uuid=str(self.project.uuid),
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            violating_count=2,
+            threshold_seconds=60,
+            max_value_seconds=120,
+            rooms_threshold_count=1,
+        )
+        self.assertEqual(len(mail.outbox), 2)
+        subjects = {email.subject for email in mail.outbox}
+        self.assertIn("Dashboard Live Desk precisa de atenção imediata!", subjects)
+        self.assertIn(
+            "¡El dashboard de Live Desk necesita atención inmediata!", subjects
+        )
+
     def test_continuous_violation_emits_update_action(self):
         _seed_room(self.project, self.queue)
         with patch.object(dashboard_tasks.send_metric_goal_email, "delay"):

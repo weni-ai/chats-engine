@@ -33,11 +33,14 @@ def get_report_ready_email(project_name: str, download_url: str):
     return plain_text, html
 
 
-_METRIC_LABELS = {
-    "waiting_time": _("Waiting time"),
-    "first_response_time": _("First response time"),
-    "conversation_duration": _("Conversation duration"),
-}
+def _metric_label(metric: str) -> str:
+    """Resolve the metric label under the active language."""
+    labels = {
+        "waiting_time": _("Waiting time"),
+        "first_response_time": _("First response time"),
+        "conversation_duration": _("Conversation duration"),
+    }
+    return labels.get(metric, metric)
 
 
 def _format_seconds_to_friendly(total_seconds: int) -> str:
@@ -62,7 +65,7 @@ def get_metric_goal_alert_email(
     rooms_threshold_count: int,
 ):
     """Returns ``(subject, plain_text, html)`` for the metric goal alert email."""
-    metric_label = _METRIC_LABELS.get(metric, metric)
+    metric_label = _metric_label(metric)
     threshold_friendly = _format_seconds_to_friendly(threshold_seconds)
     max_friendly = _format_seconds_to_friendly(max_value_seconds)
     dashboard_url = settings.WENI_DASHBOARD_URL

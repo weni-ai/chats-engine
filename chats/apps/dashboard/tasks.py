@@ -3,8 +3,9 @@ import logging
 import os
 import tempfile
 import zipfile
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 import pandas as pd
@@ -12,6 +13,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.utils import translation
 
 from chats.apps.dashboard.email_templates import (
     get_metric_goal_alert_email,
@@ -941,19 +943,74 @@ def check_metric_goal_violations():
             )
 
 
-def _eligible_recipient_emails(goal: MetricGoal) -> List[str]:
-    """Return the emails of recipients still eligible for notifications."""
+def _eligible_recipients_by_language(goal: MetricGoal) -> Dict[str, List[str]]:
+    """Return eligible recipient emails grouped by user language."""
     permissions = goal.recipients.select_related("user").prefetch_related(
         "sector_authorizations"
     )
-    emails: List[str] = []
+    emails_by_language: Dict[str, List[str]] = defaultdict(list)
     for permission in permissions:
         user = getattr(permission, "user", None)
         if not user or not user.email:
             continue
         if permission.is_admin or permission.sector_authorizations.all():
-            emails.append(user.email)
-    return emails
+            language = user.language or settings.DEFAULT_LANGUAGE
+            emails_by_language[language].append(user.email)
+    return emails_by_language
+
+
+def _send_metric_goal_email_for_language(
+    language: str,
+    recipients: List[str],
+    *,
+    project_uuid: str,
+    project_name: str,
+    metric: str,
+    violating_count: int,
+    threshold_seconds: int,
+    max_value_seconds: int,
+    rooms_threshold_count: int,
+) -> None:
+    """Render and send the alert email for a single language group."""
+    with translation.override(language):
+        subject, plain, html = get_metric_goal_alert_email(
+            project_name=project_name,
+            metric=metric,
+            violating_count=violating_count,
+            threshold_seconds=threshold_seconds,
+            max_value_seconds=max_value_seconds,
+            rooms_threshold_count=rooms_threshold_count,
+        )
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=plain,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+    )
+    if html:
+        email.attach_alternative(html, "text/html")
+    email.extra_headers = {
+        "X-No-Track": "True",
+        "X-Track-Click": "no",
+        "o:tracking-clicks": "no",
+    }
+    try:
+        email.send(fail_silently=False)
+        logger.info(
+            "metric_goal_email sent project=%s metric=%s language=%s recipients=%s",
+            project_uuid,
+            metric,
+            language,
+            len(recipients),
+        )
+    except Exception:
+        logger.exception(
+            "metric_goal_email failed project=%s metric=%s language=%s",
+            project_uuid,
+            metric,
+            language,
+        )
 
 
 @app.task(name="send_metric_goal_email")
@@ -989,42 +1046,20 @@ def send_metric_goal_email(
         )
         return
 
-    recipients = _eligible_recipient_emails(goal)
-    if not recipients:
+    recipients_by_language = _eligible_recipients_by_language(goal)
+    if not recipients_by_language:
         return
 
     project_name = goal.project.name
-    subject, plain, html = get_metric_goal_alert_email(
-        project_name=project_name,
-        metric=metric,
-        violating_count=violating_count,
-        threshold_seconds=threshold_seconds,
-        max_value_seconds=max_value_seconds,
-        rooms_threshold_count=rooms_threshold_count,
-    )
-
-    email = EmailMultiAlternatives(
-        subject=subject,
-        body=plain,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=recipients,
-    )
-    if html:
-        email.attach_alternative(html, "text/html")
-    email.extra_headers = {
-        "X-No-Track": "True",
-        "X-Track-Click": "no",
-        "o:tracking-clicks": "no",
-    }
-    try:
-        email.send(fail_silently=False)
-        logger.info(
-            "metric_goal_email sent project=%s metric=%s recipients=%s",
-            project_uuid,
-            metric,
-            len(recipients),
-        )
-    except Exception:
-        logger.exception(
-            "metric_goal_email failed project=%s metric=%s", project_uuid, metric
+    for language, recipients in recipients_by_language.items():
+        _send_metric_goal_email_for_language(
+            language,
+            recipients,
+            project_uuid=project_uuid,
+            project_name=project_name,
+            metric=metric,
+            violating_count=violating_count,
+            threshold_seconds=threshold_seconds,
+            max_value_seconds=max_value_seconds,
+            rooms_threshold_count=rooms_threshold_count,
         )
