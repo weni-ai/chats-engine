@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0039_rooms_violation_indexes"),
+        ("rooms", "0039_alter_roomnote_options_alter_roompin_options_and_more"),
         ("msgs", "0024_bulkmessagesendmessage"),
     ]
 

@@ -23,7 +23,7 @@ def reverse_noop(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0039_rooms_violation_indexes"),
+        ("rooms", "0039_alter_roomnote_options_alter_roompin_options_and_more"),
         ("msgs", "0025_bulkmessagesendmessage_errors_and_more"),
     ]
 
