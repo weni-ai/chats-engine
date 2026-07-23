@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 import uuid
 
@@ -11,10 +11,17 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.msgs.serializers import BulkSendRecentHistorySerializer
-from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendStatus
+from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendMessage,
+    BulkMessageSendMessageStatus,
+    BulkMessageSendStatus,
+)
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
@@ -72,7 +79,9 @@ class TestBulkSendMessagesViewSetAsAnonymousUser(BaseBulkSendMessagesViewSetTest
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class TestBulkSendMessagesViewSetAsAuthenticatedUser(BaseBulkSendMessagesViewSetTestCase):
+class TestBulkSendMessagesViewSetAsAuthenticatedUser(
+    BaseBulkSendMessagesViewSetTestCase
+):
     """
     Test bulk send messages view set as authenticated user.
     """
@@ -260,9 +269,7 @@ class TestBulkSendMessagesViewSetAsAuthenticatedUser(BaseBulkSendMessagesViewSet
         """
         Test that a nonexistent project returns forbidden when the user is not its admin.
         """
-        response = self.bulk_send(
-            self.bulk_send_payload(project=str(uuid.uuid4()))
-        )
+        response = self.bulk_send(self.bulk_send_payload(project=str(uuid.uuid4())))
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -641,3 +648,390 @@ class TestBulkSendRecentHistoryViewSetAsAuthenticatedUser(
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 100)
         mock_logger_info.assert_called_once()
+
+
+class BaseBulkSendHistoryViewSetTestCase(APITestCase):
+    """
+    Base test case for bulk send history views.
+    """
+
+    def history(self, **params) -> Response:
+        """
+        Get the bulk send history endpoint.
+        """
+        url = reverse("message-bulk-send-history")
+        return self.client.get(url, data=params)
+
+    def _create_sector_and_queue(self, project: Project, queue_name: str = "Queue"):
+        sector = Sector.objects.create(
+            name="Sector",
+            project=project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        queue = Queue.objects.create(name=queue_name, sector=sector)
+        return sector, queue
+
+    def _create_bulk_message(
+        self,
+        *,
+        user: User,
+        project: Project,
+        queue: Queue,
+        contact_name: str,
+        status_value: str = BulkMessageSendMessageStatus.SUCCESS,
+        created_on=None,
+    ) -> BulkMessageSendMessage:
+        bulk_send = BulkMessageSend.objects.create(
+            user=user,
+            project=project,
+            text="Bulk hello",
+            status=BulkMessageSendStatus.FINISHED,
+        )
+        room = Room.objects.create(
+            contact=Contact.objects.create(name=contact_name),
+            queue=queue,
+        )
+        bulk_message = BulkMessageSendMessage.objects.create(
+            bulk_message_send=bulk_send,
+            room=room,
+            status=status_value,
+        )
+        if created_on is not None:
+            BulkMessageSendMessage.objects.filter(uuid=bulk_message.uuid).update(
+                created_on=created_on
+            )
+            bulk_message.refresh_from_db()
+        return bulk_message
+
+
+class TestBulkSendHistoryViewSetAsAnonymousUser(BaseBulkSendHistoryViewSetTestCase):
+    """
+    Test bulk send history view set as anonymous.
+    """
+
+    def setUp(self) -> None:
+        self.project = Project.objects.create(name="Test Project")
+
+    def test_cannot_history_as_anonymous(self) -> None:
+        """
+        Test that anonymous users cannot fetch bulk send history.
+        """
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTestCase):
+    """
+    Test bulk send history view set as authenticated user.
+    """
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            email="moderator@test.com",
+            first_name="Kallil",
+        )
+        self.other_user = User.objects.create_user(
+            email="other@test.com",
+            first_name="Other",
+        )
+        self.project = Project.objects.create(name="Test Project")
+        self.other_project = Project.objects.create(name="Other Project")
+        self.sector, self.queue = self._create_sector_and_queue(
+            self.project, queue_name="Pokedex"
+        )
+        self.other_sector, self.other_queue = self._create_sector_and_queue(
+            self.other_project, queue_name="Other Queue"
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def test_cannot_history_without_project_permission(self) -> None:
+        """
+        Test that authenticated users without project permission cannot fetch.
+        """
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
+    def test_cannot_history_as_attendant(self) -> None:
+        """
+        Test that attendant users cannot fetch bulk send history.
+        """
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cannot_history_as_admin_of_other_project(self) -> None:
+        """
+        Test that admins of another project cannot fetch bulk send history.
+        """
+        ProjectPermission.objects.create(
+            project=self.other_project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cannot_history_without_project(self) -> None:
+        """
+        Test that the project query param is required.
+        """
+        response = self.history()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["project"][0].code, "required")
+
+    @with_project_permission()
+    def test_returns_empty_results_when_no_history_exists(self) -> None:
+        """
+        Test that results is empty when the project has no bulk send history.
+        """
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+        self.assertIsNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+    @with_project_permission()
+    def test_returns_history_item_shape(self) -> None:
+        """
+        Test that history items return contact, queue, sent_by, date, and status.
+        """
+        bulk_message = self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Eduardo",
+            status_value=BulkMessageSendMessageStatus.FAILED,
+        )
+
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0],
+            {
+                "contact": {"name": "Eduardo"},
+                "queue": {"name": "Pokedex"},
+                "sent_by": {"name": "Kallil"},
+                "date": bulk_message.created_on.date().isoformat(),
+                "status": BulkMessageSendMessageStatus.FAILED,
+            },
+        )
+
+    @with_project_permission()
+    def test_filters_by_date(self) -> None:
+        """
+        Test that the date filter returns only matching rows.
+        """
+        matching = self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Matching",
+            created_on=datetime(2026, 9, 1, 12, 0, tzinfo=dt_timezone.utc),
+        )
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Other Day",
+            created_on=datetime(2026, 9, 2, 12, 0, tzinfo=dt_timezone.utc),
+        )
+
+        response = self.history(project=str(self.project.uuid), date="2026-09-01")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["contact"]["name"], "Matching")
+        self.assertEqual(
+            response.data["results"][0]["date"],
+            matching.created_on.date().isoformat(),
+        )
+
+    @with_project_permission()
+    def test_filters_by_sender(self) -> None:
+        """
+        Test that the sender filter returns only rows from that moderator.
+        """
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="From Moderator",
+        )
+        self._create_bulk_message(
+            user=self.other_user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="From Other",
+        )
+
+        response = self.history(
+            project=str(self.project.uuid),
+            sender=self.user.email,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["contact"]["name"], "From Moderator"
+        )
+        self.assertEqual(response.data["results"][0]["sent_by"]["name"], "Kallil")
+
+    @with_project_permission()
+    def test_filters_by_status(self) -> None:
+        """
+        Test that the status filter returns only matching rows.
+        """
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Success Contact",
+            status_value=BulkMessageSendMessageStatus.SUCCESS,
+        )
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Failed Contact",
+            status_value=BulkMessageSendMessageStatus.FAILED,
+        )
+
+        response = self.history(
+            project=str(self.project.uuid),
+            status=BulkMessageSendMessageStatus.FAILED,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["contact"]["name"], "Failed Contact"
+        )
+        self.assertEqual(
+            response.data["results"][0]["status"],
+            BulkMessageSendMessageStatus.FAILED,
+        )
+
+    @with_project_permission()
+    def test_filters_by_combined_params(self) -> None:
+        """
+        Test that date, sender, and status filters can be combined.
+        """
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Match",
+            status_value=BulkMessageSendMessageStatus.SUCCESS,
+            created_on=datetime(2026, 9, 1, 10, 0, tzinfo=dt_timezone.utc),
+        )
+        self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Wrong Status",
+            status_value=BulkMessageSendMessageStatus.FAILED,
+            created_on=datetime(2026, 9, 1, 11, 0, tzinfo=dt_timezone.utc),
+        )
+        self._create_bulk_message(
+            user=self.other_user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Wrong Sender",
+            status_value=BulkMessageSendMessageStatus.SUCCESS,
+            created_on=datetime(2026, 9, 1, 12, 0, tzinfo=dt_timezone.utc),
+        )
+
+        response = self.history(
+            project=str(self.project.uuid),
+            date="2026-09-01",
+            sender=self.user.email,
+            status=BulkMessageSendMessageStatus.SUCCESS,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["contact"]["name"], "Match")
+
+    @with_project_permission()
+    def test_excludes_history_from_other_project(self) -> None:
+        """
+        Test that history rows from another project are excluded.
+        """
+        self._create_bulk_message(
+            user=self.user,
+            project=self.other_project,
+            queue=self.other_queue,
+            contact_name="Other Project Contact",
+        )
+
+        response = self.history(project=str(self.project.uuid))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+
+    @with_project_permission()
+    def test_rejects_invalid_status(self) -> None:
+        """
+        Test that an invalid status query param returns 400.
+        """
+        response = self.history(
+            project=str(self.project.uuid),
+            status="PENDING",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @with_project_permission()
+    def test_paginates_with_limit_and_offset(self) -> None:
+        """
+        Test that LimitOffset pagination returns count, next, and pages.
+        """
+        for i in range(3):
+            self._create_bulk_message(
+                user=self.user,
+                project=self.project,
+                queue=self.queue,
+                contact_name=f"Contact {i}",
+            )
+
+        first_page = self.history(
+            project=str(self.project.uuid),
+            limit=1,
+            offset=0,
+        )
+
+        self.assertEqual(first_page.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_page.data["count"], 3)
+        self.assertEqual(len(first_page.data["results"]), 1)
+        self.assertIsNotNone(first_page.data["next"])
+        self.assertIsNone(first_page.data["previous"])
+
+        second_page = self.history(
+            project=str(self.project.uuid),
+            limit=1,
+            offset=1,
+        )
+
+        self.assertEqual(second_page.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_page.data["count"], 3)
+        self.assertEqual(len(second_page.data["results"]), 1)
+        self.assertIsNotNone(second_page.data["next"])
+        self.assertIsNotNone(second_page.data["previous"])
+        self.assertNotEqual(
+            first_page.data["results"][0]["contact"]["name"],
+            second_page.data["results"][0]["contact"]["name"],
+        )

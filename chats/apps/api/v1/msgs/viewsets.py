@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -27,6 +28,8 @@ from chats.apps.api.v1.msgs.permissions import (
     RestrictOfflineAgents,
 )
 from chats.apps.api.v1.msgs.serializers import (
+    BulkSendHistoryQueryParamsSerializer,
+    BulkSendHistorySerializer,
     BulkSendMessagesSerializer,
     BulkSendRoomsCountQueryParamsSerializer,
     BulkSendRecentHistorySerializer,
@@ -39,7 +42,7 @@ from chats.apps.api.v1.permissions import (
     ProjectBodyFieldIsAdmin,
     ProjectQueryFieldIsAdmin,
 )
-from chats.apps.msgs.models import BulkMessageSend
+from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendMessage
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.usecases.start_bulk_send_messages import (
@@ -246,6 +249,46 @@ class MessageViewset(
         return Response(
             {"results": BulkSendRecentHistorySerializer(results, many=True).data}
         )
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/history",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_history(self, request, *args, **kwargs):
+        query_serializer = BulkSendHistoryQueryParamsSerializer(
+            data=request.query_params
+        )
+        query_serializer.is_valid(raise_exception=True)
+        params = query_serializer.validated_data
+
+        project_uuid = request.query_params.get("project")
+        queryset = (
+            BulkMessageSendMessage.objects.filter(
+                bulk_message_send__project__uuid=project_uuid
+            )
+            .select_related(
+                "room__contact",
+                "room__queue",
+                "bulk_message_send__user",
+            )
+            .order_by("-created_on")
+        )
+
+        if "date" in params:
+            queryset = queryset.filter(created_on__date=params["date"])
+        if "sender" in params:
+            queryset = queryset.filter(
+                bulk_message_send__user__email=params["sender"]
+            )
+        if "status" in params:
+            queryset = queryset.filter(status=params["status"])
+
+        paginator = LimitOffsetPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = BulkSendHistorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class MessageMediaViewset(
