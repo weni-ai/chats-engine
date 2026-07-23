@@ -11,7 +11,7 @@ from chats.apps.api.core.serializers import CommaSeparatedListField
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.choices import BulkMessageSendRoomStatus
-from chats.apps.msgs.models import ChatMessageReplyIndex
+from chats.apps.msgs.models import BulkMessageSend, ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
@@ -72,6 +72,14 @@ class BulkSendMessagesSerializer(serializers.Serializer):
         allow_null=True,
         default=list,
     )
+
+
+class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
+    sent_at = serializers.DateTimeField(source="created_on", read_only=True)
+
+    class Meta:
+        model = BulkMessageSend
+        fields = ["uuid", "text", "sent_at"]
 
 
 def _resolve_reply_index(message: ChatMessage, replied_id: str):
