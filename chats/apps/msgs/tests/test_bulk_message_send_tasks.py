@@ -7,6 +7,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import (
     BulkMessageSend,
     BulkMessageSendMessage,
+    BulkMessageSendMessageStatus,
     BulkMessageSendStatus,
     Message,
 )
@@ -154,12 +155,13 @@ class SendBulkMessageToRoomTaskTests(TestCase):
         message = Message.objects.get(room=self.room)
         self.assertEqual(message.text, self.bulk_send.text)
         self.assertEqual(message.user, self.agent)
-        self.assertTrue(
-            BulkMessageSendMessage.objects.filter(
-                bulk_message_send=self.bulk_send,
-                message=message,
-            ).exists()
+        link = BulkMessageSendMessage.objects.get(
+            bulk_message_send=self.bulk_send,
+            message=message,
         )
+        self.assertEqual(link.room, self.room)
+        self.assertEqual(link.status, BulkMessageSendMessageStatus.SUCCESS)
+        self.assertIsNone(link.errors)
         mock_notify_room.assert_called_once_with("create", True)
 
         self.bulk_send.refresh_from_db()

@@ -30,6 +30,11 @@ class BulkMessageSendStatus(models.TextChoices):
     FINISHED = "FINISHED", _("Finished")
 
 
+class BulkMessageSendMessageStatus(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    FAILED = "FAILED", _("Failed")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -541,9 +546,11 @@ class BulkMessageSend(BaseModel):
 
 class BulkMessageSendMessage(BaseModel):
     """
-    Links a delivered ``Message`` to the ``BulkMessageSend`` that produced it.
+    Tracks the outcome of sending a bulk message to a single room.
 
-    One row per message; many rows per bulk send.
+    On success, ``message`` points to the delivered ``Message``. On failure,
+    ``message`` is null and ``errors`` stores the failure reason/traceback.
+    One row per room attempt; many rows per bulk send.
     """
 
     bulk_message_send = models.ForeignKey(
@@ -552,11 +559,29 @@ class BulkMessageSendMessage(BaseModel):
         verbose_name=_("bulk message send"),
         on_delete=models.CASCADE,
     )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="bulk_message_send_messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
     message = models.OneToOneField(
         Message,
         related_name="bulk_message_send_message",
         verbose_name=_("message"),
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkMessageSendMessageStatus.choices,
+    )
+    errors = models.JSONField(
+        _("errors"),
+        null=True,
+        blank=True,
     )
 
     class Meta:
@@ -564,4 +589,4 @@ class BulkMessageSendMessage(BaseModel):
         verbose_name_plural = _("Bulk message send messages")
 
     def __str__(self):
-        return f"{self.bulk_message_send.uuid} - {self.message.uuid}"
+        return f"{self.bulk_message_send.uuid} - {self.room.uuid} - {self.status}"
