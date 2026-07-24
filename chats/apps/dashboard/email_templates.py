@@ -55,6 +55,7 @@ def _format_seconds_to_friendly(total_seconds: int) -> str:
 
 def get_metric_goal_alert_email(
     project_name: str,
+    project_uuid: str,
     metric: str,
     violating_count: int,
     threshold_seconds: int,
@@ -65,7 +66,9 @@ def get_metric_goal_alert_email(
     metric_label = _METRIC_LABELS.get(metric, metric)
     threshold_friendly = _format_seconds_to_friendly(threshold_seconds)
     max_friendly = _format_seconds_to_friendly(max_value_seconds)
-    dashboard_url = settings.WENI_DASHBOARD_URL
+    dashboard_url = (
+        f"{settings.WENI_DASHBOARD_URL.rstrip('/')}/projects/{project_uuid}/insights/"
+    )
 
     context = {
         "project_name": project_name,

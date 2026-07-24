@@ -996,6 +996,7 @@ def send_metric_goal_email(
     project_name = goal.project.name
     subject, plain, html = get_metric_goal_alert_email(
         project_name=project_name,
+        project_uuid=project_uuid,
         metric=metric,
         violating_count=violating_count,
         threshold_seconds=threshold_seconds,
