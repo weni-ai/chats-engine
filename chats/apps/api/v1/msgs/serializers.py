@@ -9,6 +9,7 @@ from rest_framework import exceptions, serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
@@ -23,6 +24,30 @@ from chats.apps.ai_features.improve_user_message.tasks import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+
+class BulkSendMessagesSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    status = serializers.ListField(
+        child=serializers.ChoiceField(choices=BulkMessageSendRoomStatus.choices),
+        required=True,
+        allow_empty=False,
+    )
+    project = serializers.UUIDField(required=True)
+    queues = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
+    agents = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
 
 
 def _resolve_reply_index(message: ChatMessage, replied_id: str):
