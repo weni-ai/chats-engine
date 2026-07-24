@@ -37,15 +37,4 @@ jobs:
       target_repository: weni-ai/kubernetes-manifests-chats
       target_application: chats-engine
       target_patch_file: deployment.json
-      image_arch: |-
-        [
-          {
-            "platform": "linux/amd64",
-            "runner": "ubuntu-latest"
-          }
-        ]
-#          {
-#            "platform": "linux/arm64",
-#            "runner": "ubuntu-latest"
-#          },
     secrets: inherit
