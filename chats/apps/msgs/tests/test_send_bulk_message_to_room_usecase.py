@@ -63,8 +63,11 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
             is_active=is_active,
         )
 
+    @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_sends_message_as_room_user_when_assigned(self, mock_notify_room):
+    def test_sends_message_as_room_user_when_assigned(
+        self, mock_notify_room, mock_progress_delay
+    ):
         room = self._create_room(user=self.agent)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -89,9 +92,13 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         self.assertEqual(room.last_message_user, self.agent)
 
         mock_notify_room.assert_called_once_with("create", True)
+        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
+    @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_sends_message_with_empty_user_when_unassigned(self, mock_notify_room):
+    def test_sends_message_with_empty_user_when_unassigned(
+        self, mock_notify_room, mock_progress_delay
+    ):
         room = self._create_room(user=None)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -119,22 +126,29 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         self.assertIsNone(room.last_message_user)
 
         mock_notify_room.assert_called_once_with("create", True)
+        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
+    @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_does_not_notify_before_commit(self, mock_notify_room):
+    def test_does_not_notify_before_commit(
+        self, mock_notify_room, mock_progress_delay
+    ):
         room = self._create_room(user=self.agent)
 
         with self.captureOnCommitCallbacks(execute=False):
             self.usecase.execute(self.bulk_send, room)
 
         mock_notify_room.assert_not_called()
+        mock_progress_delay.assert_not_called()
         self.assertEqual(Message.objects.count(), 1)
 
+    @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_fails_when_room_is_inactive(self, mock_notify_room):
+    def test_fails_when_room_is_inactive(self, mock_notify_room, mock_progress_delay):
         room = self._create_room(user=self.agent, is_active=False)
 
-        bulk_message = self.usecase.execute(self.bulk_send, room)
+        with self.captureOnCommitCallbacks(execute=True):
+            bulk_message = self.usecase.execute(self.bulk_send, room)
 
         self.assertEqual(bulk_message.status, BulkMessageSendMessageStatus.FAILED)
         self.assertIsNone(bulk_message.message)
@@ -144,11 +158,13 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         self.assertEqual(bulk_message.errors["traceback"], "")
         self.assertEqual(Message.objects.count(), 0)
         mock_notify_room.assert_not_called()
+        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
+    @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
     @patch("chats.apps.msgs.usecases.send_bulk_message_to_room.Message.objects.create")
     def test_fails_when_message_create_raises(
-        self, mock_create_message, mock_notify_room
+        self, mock_create_message, mock_notify_room, mock_progress_delay
     ):
         room = self._create_room(user=self.agent)
         mock_create_message.side_effect = RuntimeError("boom")
@@ -156,7 +172,8 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         with self.assertLogs(
             "chats.apps.msgs.usecases.send_bulk_message_to_room", level="INFO"
         ) as logs:
-            bulk_message = self.usecase.execute(self.bulk_send, room)
+            with self.captureOnCommitCallbacks(execute=True):
+                bulk_message = self.usecase.execute(self.bulk_send, room)
 
         self.assertEqual(bulk_message.status, BulkMessageSendMessageStatus.FAILED)
         self.assertIsNone(bulk_message.message)
@@ -170,3 +187,4 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
             any("Failed to send bulk message" in message for message in logs.output)
         )
         mock_notify_room.assert_not_called()
+        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
