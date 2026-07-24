@@ -544,6 +544,11 @@ class BulkMessageSend(BaseModel):
         choices=BulkMessageSendStatus.choices,
         default=BulkMessageSendStatus.PENDING,
     )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = _("Bulk message send")

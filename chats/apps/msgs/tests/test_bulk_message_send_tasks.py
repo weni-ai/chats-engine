@@ -79,6 +79,7 @@ class ProcessBulkMessageSendTaskTests(TestCase):
 
         self.bulk_send.refresh_from_db()
         self.assertEqual(self.bulk_send.status, BulkMessageSendStatus.PROCESSING)
+        self.assertEqual(self.bulk_send.rooms_qty, 2)
         mock_usecase.execute.assert_called_once()
         called_bulk_send = mock_usecase.execute.call_args[0][0]
         self.assertEqual(called_bulk_send.uuid, self.bulk_send.uuid)
@@ -98,6 +99,7 @@ class ProcessBulkMessageSendTaskTests(TestCase):
 
         self.bulk_send.refresh_from_db()
         self.assertEqual(self.bulk_send.status, BulkMessageSendStatus.PROCESSING)
+        self.assertEqual(self.bulk_send.rooms_qty, 0)
         mock_delay.assert_not_called()
 
 

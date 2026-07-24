@@ -323,6 +323,19 @@ BULK_SEND_RECENT_HISTORY_WINDOW_MINUTES = env.int(
     default=60,
 )
 
+BULK_SEND_PROGRESS_COOLDOWN_SECONDS = env.int(
+    "BULK_SEND_PROGRESS_COOLDOWN_SECONDS",
+    default=1,
+)
+BULK_SEND_PROGRESS_RETRY_DELAY = env.int(
+    "BULK_SEND_PROGRESS_RETRY_DELAY",
+    default=1,
+)
+BULK_SEND_STALE_FINISH_MINUTES = env.int(
+    "BULK_SEND_STALE_FINISH_MINUTES",
+    default=30,
+)
+
 # Logging
 
 LOGGING = DEFAULT_LOGGING
@@ -618,6 +631,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "check_metric_goal_violations",
         "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
         "options": {"queue": RISK_ALERT_CELERY_QUEUE},
+    },
+    "finish-stale-bulk-message-sends": {
+        "task": "finish_stale_bulk_message_sends",
+        "schedule": 300.0,
     },
 }
 
