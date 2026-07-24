@@ -1,53 +1,19 @@
 from datetime import time
 from unittest import mock
-from unittest.mock import MagicMock
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.eda_clients.change_history_client import (
-    ChangeHistoryMixin,
-    PublishChangeHistoryUseCase,
     publish_change_history,
 )
-from chats.apps.projects.models.models import Project
-from chats.apps.queues.models import Queue
+from chats.apps.projects.models.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
 
 
-class ChangeHistoryMixinTests(SimpleTestCase):
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.EventDrivenAPP"
-    )
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.settings"
-    )
-    def test_publish_change(self, mock_settings, mock_app):
-        mock_settings.USE_EDA = True
-        mock_settings.CHANGE_HISTORY_EXCHANGE = "change-history.topic"
-        mock_settings.DEFAULT_DEAD_LETTER_EXCHANGE = "chats.dlx.topic"
-
-        ChangeHistoryMixin().publish_change({"foo": "bar"})
-
-        mock_app.return_value.backend.basic_publish.assert_called_once_with(
-            content={"foo": "bar"},
-            exchange="change-history.topic",
-            headers={"callback_exchange": "chats.dlx.topic"},
-        )
-
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.EventDrivenAPP"
-    )
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.settings"
-    )
-    def test_skipped_when_eda_disabled(self, mock_settings, mock_app):
-        mock_settings.USE_EDA = False
-        ChangeHistoryMixin().publish_change({"foo": "bar"})
-        mock_app.assert_not_called()
-
-
-class PublishChangeHistoryUseCaseTests(TransactionTestCase):
+@override_settings(AMQ_BROKER_HOST="localhost")
+class PublishChangeHistoryTests(TransactionTestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -59,38 +25,84 @@ class PublishChangeHistoryUseCaseTests(TransactionTestCase):
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.user = User.objects.create(email="manager@test.com")
-        self.publisher = MagicMock()
-        self.use_case = PublishChangeHistoryUseCase(publisher=self.publisher)
 
-    def test_create(self):
-        content = self.use_case.execute(after=self.queue, user=self.user)
-        self.assertEqual(
-            content,
-            {
-                "action": "CREATE",
-                "model": "queues.queue",
-                "object_id": str(self.queue.uuid),
-                "user": "manager@test.com",
-            },
-        )
-        self.publisher.publish_change.assert_called_once_with(content)
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
+    )
+    def test_create_queue(self, mock_notifier):
+        publish_change_history(after=self.queue, user=self.user)
 
-    def test_update(self):
+        mock_notifier.notify_change.assert_called_once()
+        args = mock_notifier.notify_change.call_args[0]
+        self.assertEqual(args[0], str(self.project.uuid))
+        self.assertEqual(args[1], "manager@test.com")
+        self.assertEqual(args[3].value, "CREATE")
+        self.assertEqual(args[4].value, "QUEUE")
+        self.assertEqual(args[5].value, "LIVE_DESK")
+
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
+    )
+    def test_update_queue_sends_name_diff(self, mock_notifier):
         after = Queue.objects.get(pk=self.queue.pk)
-        after.name = "Updated"
-        content = self.use_case.execute(
-            before=self.queue, after=after, user=self.user
+        after.name = "Renamed"
+
+        publish_change_history(before=self.queue, after=after, user=self.user)
+
+        kwargs = mock_notifier.notify_change.call_args[1]
+        self.assertEqual(kwargs["old_value"], "Test Queue")
+        self.assertEqual(kwargs["new_value"], "Renamed")
+        self.assertEqual(
+            mock_notifier.notify_change.call_args[0][3].value, "UPDATE"
         )
-        self.assertEqual(content["action"], "UPDATE")
 
-    def test_delete(self):
-        content = self.use_case.execute(before=self.queue, user=self.user)
-        self.assertEqual(content["action"], "DELETE")
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
+    )
+    def test_delete_keeps_object_name_after_soft_delete_mutation(
+        self, mock_notifier
+    ):
+        publish_change_history(before=self.queue, user=self.user)
 
-    def test_shortcut(self):
-        with mock.patch(
-            "chats.apps.api.v1.internal.eda_clients.change_history_client"
-            ".PublishChangeHistoryUseCase.execute"
-        ) as mock_execute:
-            publish_change_history(after=self.queue, user=self.user)
-            mock_execute.assert_called_once()
+        # Soft delete mutates the in-memory instance after scheduling publish.
+        self.queue.name += self.queue.deleted_sufix()
+        self.queue.is_deleted = True
+
+        kwargs = mock_notifier.notify_change.call_args[1]
+        self.assertEqual(kwargs["object_name"], "Test Queue")
+        self.assertEqual(
+            mock_notifier.notify_change.call_args[0][3].value, "DELETE"
+        )
+
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
+    )
+    def test_add_agent_uses_action_add_and_entity_user(self, mock_notifier):
+        permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        auth = QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        publish_change_history(after=auth, user=self.user)
+
+        args = mock_notifier.notify_change.call_args[0]
+        self.assertEqual(args[3].value, "ADD")
+        self.assertEqual(args[4].value, "USER")
+
+    def test_both_none_raises(self):
+        with self.assertRaises(ValueError):
+            publish_change_history()
+
+    @override_settings(AMQ_BROKER_HOST="")
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
+    )
+    def test_skips_when_amq_host_not_configured(self, mock_notifier):
+        publish_change_history(after=self.queue, user=self.user)
+        mock_notifier.notify_change.assert_not_called()

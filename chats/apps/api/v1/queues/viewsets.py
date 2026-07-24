@@ -122,7 +122,11 @@ class QueueViewset(ModelViewSet):
             QueueGroupSectorAuthorizationCreationUseCase(instance).execute()
 
         if not settings.USE_WENI_FLOWS:
-            publish_change_history(after=instance, user=self.request.user)
+            publish_change_history(
+                after=instance,
+                user=self.request.user,
+                request=self.request,
+            )
             return super().perform_create(serializer)
 
         should_use_integration = (
@@ -154,7 +158,11 @@ class QueueViewset(ModelViewSet):
                 project, instance.sector.secondary_project
             )
 
-        publish_change_history(after=instance, user=self.request.user)
+        publish_change_history(
+            after=instance,
+            user=self.request.user,
+            request=self.request,
+        )
         return instance
 
     def perform_update(self, serializer):
@@ -164,6 +172,7 @@ class QueueViewset(ModelViewSet):
             before=before,
             after=instance,
             user=self.request.user,
+            request=self.request,
         )
 
         if not settings.USE_WENI_FLOWS:
@@ -339,7 +348,11 @@ class QueueViewset(ModelViewSet):
                     )
                 )
 
-        publish_change_history(before=instance, user=self.request.user)
+        publish_change_history(
+            before=instance,
+            user=self.request.user,
+            request=self.request,
+        )
         instance.delete()
 
     @action(detail=True, methods=["POST"])
@@ -366,7 +379,11 @@ class QueueViewset(ModelViewSet):
         ).exists()
         queue_auth = queue.set_user_authorization(permission, 1)
         if is_new:
-            publish_change_history(after=queue_auth, user=request.user)
+            publish_change_history(
+                after=queue_auth,
+                user=request.user,
+                request=request,
+            )
 
         return Response(
             {
@@ -460,6 +477,7 @@ class QueueViewset(ModelViewSet):
             sector=serializer.validated_data["sector"],
             queues_data=serializer.validated_data["queues"],
             user=request.user,
+            request=request,
         )
         created_queues = use_case.execute()
 
@@ -530,7 +548,11 @@ class QueueAuthorizationViewset(ModelViewSet):
         instance = serializer.save(
             created_by=self.request.user, modified_by=self.request.user
         )
-        publish_change_history(after=instance, user=self.request.user)
+        publish_change_history(
+            after=instance,
+            user=self.request.user,
+            request=self.request,
+        )
 
     def perform_update(self, serializer):
         before = QueueAuthorization.objects.get(pk=serializer.instance.pk)
@@ -539,6 +561,7 @@ class QueueAuthorizationViewset(ModelViewSet):
             before=before,
             after=instance,
             user=self.request.user,
+            request=self.request,
         )
 
     def perform_destroy(self, instance):
@@ -548,7 +571,11 @@ class QueueAuthorizationViewset(ModelViewSet):
             instance.queue.sector.project,
             on_delete=True,
         )
-        publish_change_history(before=instance, user=self.request.user)
+        publish_change_history(
+            before=instance,
+            user=self.request.user,
+            request=self.request,
+        )
         instance.delete()
 
     @action(detail=True, methods=["PATCH"])
@@ -565,6 +592,7 @@ class QueueAuthorizationViewset(ModelViewSet):
             before=before,
             after=queue_permission,
             user=request.user,
+            request=request,
         )
 
         serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(

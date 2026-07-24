@@ -621,6 +621,16 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
 USE_EDA = env.bool("USE_EDA", default=False)
 
+# Broker settings used by weni-commons change-history Notifier
+# (weni.eda AMQConnectionParamsFactory).
+AMQ_BROKER_HOST = env("AMQ_BROKER_HOST", default="")
+AMQ_BROKER_PORT = env.int("AMQ_BROKER_PORT", default=5671)
+AMQ_BROKER_USER = env("AMQ_BROKER_USER", default="")
+AMQ_BROKER_PASSWORD = env("AMQ_BROKER_PASSWORD", default="")
+AMQ_VIRTUAL_HOST = env("AMQ_VIRTUAL_HOST", default="/")
+AMQ_BROKER_SSL_SERVER_HOSTNAME = env("AMQ_BROKER_SSL_SERVER_HOSTNAME", default=None)
+AMQ_BROKER_HEARTBEAT = env.int("AMQ_BROKER_HEARTBEAT", default=300)
+
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
     EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
@@ -635,9 +645,6 @@ if USE_EDA:
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
     ROOMS_INFO_EXCHANGE = env("ROOMS_INFO_EXCHANGE", default="rooms.topic")
-    CHANGE_HISTORY_EXCHANGE = env(
-        "CHANGE_HISTORY_EXCHANGE", default="change-history.topic"
-    )
     PROJECT_UPDATE_EXCHANGE = env(
         "PROJECT_UPDATE_EXCHANGE", default="update-projects.topic"
     )

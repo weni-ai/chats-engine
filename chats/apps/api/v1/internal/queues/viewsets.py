@@ -42,7 +42,11 @@ class QueueInternalViewset(viewsets.ModelViewSet):
         instance = serializer.save(
             created_by=self.request.user, modified_by=self.request.user
         )
-        publish_change_history(after=instance, user=self.request.user)
+        publish_change_history(
+            after=instance,
+            user=self.request.user,
+            request=self.request,
+        )
 
     def perform_update(self, serializer):
         before = Queue.objects.get(pk=serializer.instance.pk)
@@ -51,13 +55,18 @@ class QueueInternalViewset(viewsets.ModelViewSet):
             before=before,
             after=instance,
             user=self.request.user,
+            request=self.request,
         )
 
     def perform_destroy(self, instance):
         apply_audit_fields(
             instance, self.request, instance.sector.project, on_delete=True
         )
-        publish_change_history(before=instance, user=self.request.user)
+        publish_change_history(
+            before=instance,
+            user=self.request.user,
+            request=self.request,
+        )
         instance.is_deleted = True
         instance.save()
 
@@ -86,7 +95,11 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
         instance = serializer.save(
             created_by=self.request.user, modified_by=self.request.user
         )
-        publish_change_history(after=instance, user=self.request.user)
+        publish_change_history(
+            after=instance,
+            user=self.request.user,
+            request=self.request,
+        )
 
     def perform_update(self, serializer):
         before = QueueAuthorization.objects.get(pk=serializer.instance.pk)
@@ -95,6 +108,7 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
             before=before,
             after=instance,
             user=self.request.user,
+            request=self.request,
         )
 
     def perform_destroy(self, instance):
@@ -104,6 +118,10 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
             instance.queue.sector.project,
             on_delete=True,
         )
-        publish_change_history(before=instance, user=self.request.user)
+        publish_change_history(
+            before=instance,
+            user=self.request.user,
+            request=self.request,
+        )
         instance.is_deleted = True
         instance.save()
