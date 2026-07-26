@@ -228,11 +228,38 @@ class TestSectorInactivityTimeoutSerializer(TestCase):
         serializer = SectorInactivityTimeoutSerializer(data=payload)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_blank_message_texts_are_accepted(self):
+    def test_message_enabled_without_message_text_fails(self):
         payload = self._full_payload(
+            is_close_room_enabled=False,
+            message_timeout_text="",
+        )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("message_timeout_text", serializer.errors)
+
+    def test_message_enabled_with_whitespace_only_text_fails(self):
+        payload = self._full_payload(
+            is_close_room_enabled=False,
+            message_timeout_text="   ",
+        )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("message_timeout_text", serializer.errors)
+
+    def test_disabled_features_accept_blank_message_text(self):
+        payload = self._full_payload(
+            is_message_timeout_enabled=False,
+            is_close_room_enabled=False,
             message_timeout_text="",
             close_room_message_text="",
+            message_timeout_time=None,
+            close_room_timeout_time=None,
         )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_close_room_message_text_remains_optional(self):
+        payload = self._full_payload(close_room_message_text="")
         serializer = SectorInactivityTimeoutSerializer(data=payload)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
