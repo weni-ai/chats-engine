@@ -536,6 +536,118 @@ class QueueTransferAgentsTests(APITestCase):
         self.assertNotIn(offline_agent.email, returned_emails)
         self.assertNotIn(offline_admin.email, returned_emails)
 
+    @with_project_permission()
+    def test_transfer_agents_filter_moderators_hides_project_admins(self):
+        self.project.config = {"filter_moderators": True}
+        self.project.save(update_fields=["config"])
+
+        agent = User.objects.create(email="agent-filter-mod@test.com")
+        agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        manager = User.objects.create(email="manager-filter-mod@test.com")
+        manager_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=manager,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        SectorAuthorization.objects.create(
+            sector=self.sector,
+            permission=manager_perm,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+        admin = User.objects.create(email="admin-filter-mod@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=admin,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_emails = [user_data.get("email") for user_data in response.data]
+
+        self.assertIn(agent.email, returned_emails)
+        self.assertIn(manager.email, returned_emails)
+        self.assertNotIn(admin.email, returned_emails)
+
+    @with_project_permission()
+    def test_transfer_agents_filter_moderators_and_offline_agents(self):
+        self.project.config = {
+            "filter_moderators": True,
+            "filter_offline_agents": True,
+        }
+        self.project.save(update_fields=["config"])
+
+        online_agent = User.objects.create(email="online-agent-both@test.com")
+        online_agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=online_agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        offline_agent = User.objects.create(email="offline-agent-both@test.com")
+        offline_agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=offline_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_OFFLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=offline_agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        online_manager = User.objects.create(email="online-manager-both@test.com")
+        online_manager_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_manager,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        SectorAuthorization.objects.create(
+            sector=self.sector,
+            permission=online_manager_perm,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+        online_admin = User.objects.create(email="online-admin-both@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=online_admin,
+            role=ProjectPermission.ROLE_ADMIN,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_emails = [user_data.get("email") for user_data in response.data]
+
+        self.assertIn(online_agent.email, returned_emails)
+        self.assertIn(online_manager.email, returned_emails)
+        self.assertNotIn(offline_agent.email, returned_emails)
+        self.assertNotIn(online_admin.email, returned_emails)
+
     @override_settings(VTEX_INTERNAL_DOMAINS=["vtex.com", "weni.ai"])
     def test_transfer_agents_with_when_user_is_internal(self):
         domains = get_vtex_internal_domains_with_at_symbol()
