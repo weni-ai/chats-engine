@@ -1,5 +1,6 @@
 import io
 import logging
+from typing import Optional
 
 import magic
 from django.conf import settings
@@ -7,6 +8,13 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
+from chats.apps.ai_features.improve_user_message.choices import (
+    ImprovedUserMessageStatusChoices,
+    ImprovedUserMessageTypeChoices,
+)
+from chats.apps.ai_features.improve_user_message.tasks import (
+    register_message_improvement_task,
+)
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.choices import BulkMessageSendRoomStatus
@@ -19,16 +27,33 @@ from chats.apps.msgs.models import (
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
-from chats.apps.ai_features.improve_user_message.choices import (
-    ImprovedUserMessageStatusChoices,
-    ImprovedUserMessageTypeChoices,
-)
 from chats.apps.rooms.models import RoomNote
-from chats.apps.ai_features.improve_user_message.tasks import (
-    register_message_improvement_task,
-)
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_message_bulk_message_data(message: ChatMessage) -> Optional[dict]:
+    """
+    Build the ``bulk_message`` payload for a message, if it was sent via bulk send.
+
+    Returns ``{"sent_by": {"email": ..., "name": ...}}`` for the bulk requester,
+    or ``None`` when the message was not part of a bulk send.
+    """
+    try:
+        link = message.bulk_message_send_message
+    except BulkMessageSendMessage.DoesNotExist:
+        return None
+
+    if link is None:
+        return None
+
+    user = link.bulk_message_send.user
+    return {
+        "sent_by": {
+            "email": user.email,
+            "name": user.full_name,
+        }
+    }
 
 
 class BulkSendMessagesSerializer(serializers.Serializer):
@@ -108,9 +133,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     collision between rooms/projects from surfacing a foreign message.
     """
 
-    exact_match = ChatMessageReplyIndex.objects.filter(
-        external_id=replied_id
-    ).first()
+    exact_match = ChatMessageReplyIndex.objects.filter(external_id=replied_id).first()
     if exact_match is not None:
         return exact_match
 
@@ -119,9 +142,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
         return None
 
     try:
-        project_uuid = str(message.room.project_uuid or "") or str(
-            message.project.uuid
-        )
+        project_uuid = str(message.room.project_uuid or "") or str(message.project.uuid)
     except Exception:
         project_uuid = ""
 
@@ -387,6 +408,7 @@ class MessageSerializer(BaseMessageSerializer):
     media = MessageMediaSimpleSerializer(many=True, required=False)
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
+    bulk_message = serializers.SerializerMethodField(read_only=True)
     ai_text_improvement = AITextImprovementSerializer(
         write_only=True, required=False, allow_null=True
     )
@@ -411,12 +433,14 @@ class MessageSerializer(BaseMessageSerializer):
             "is_automatic_message",
             "automatic_message_type",
             "ai_text_improvement",
+            "bulk_message",
         ]
         read_only_fields = [
             "uuid",
             "user",
             "created_on",
             "contact",
+            "bulk_message",
         ]
 
     def create(self, validated_data):
@@ -510,6 +534,9 @@ class MessageSerializer(BaseMessageSerializer):
                 for media in note.medias.all()
             ],
         }
+
+    def get_bulk_message(self, obj):
+        return get_message_bulk_message_data(obj)
 
 
 class MessageWSSerializer(MessageSerializer):
