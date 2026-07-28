@@ -277,3 +277,26 @@ class GetBulkSendRoomsUseCaseTests(TestCase):
         result = self.usecase.execute(bulk_send)
 
         self.assertNotIn(self.other_project_room, list(result))
+
+    def test_excludes_rooms_from_soft_deleted_queue(self):
+        self.queue_one.is_deleted = True
+        self.queue_one.save(update_fields=["is_deleted"])
+
+        bulk_send = self._create_bulk_send()
+
+        result = list(self.usecase.execute(bulk_send))
+
+        self.assertNotIn(self.room_queue_one_agent_one, result)
+        self.assertNotIn(self.room_queue_one_agent_two, result)
+        self.assertNotIn(self.waiting_room_queue_one, result)
+        self.assertCountEqual(result, [self.room_queue_two_agent_one])
+
+    def test_excludes_rooms_from_soft_deleted_sector(self):
+        self.sector.is_deleted = True
+        self.sector.save(update_fields=["is_deleted"])
+
+        bulk_send = self._create_bulk_send()
+
+        result = list(self.usecase.execute(bulk_send))
+
+        self.assertEqual(result, [])
