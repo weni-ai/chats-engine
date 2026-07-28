@@ -53,10 +53,11 @@ def process_bulk_message_send(bulk_send_uuid: UUID):
 
     bulk_send = BulkMessageSend.objects.get(uuid=bulk_send_uuid)
     rooms = get_bulk_send_rooms_usecase.execute(bulk_send)
+    rooms_count = rooms.count()
     room_uuids = list(rooms.values_list("uuid", flat=True))
 
     bulk_send.status = BulkMessageSendStatus.PROCESSING
-    bulk_send.rooms_qty = len(room_uuids)
+    bulk_send.rooms_qty = rooms_count
     bulk_send.save(update_fields=["status", "rooms_qty", "modified_on"])
 
     logger.info(
