@@ -9,15 +9,18 @@ class GetBulkSendRoomsUseCase:
     """
     Returns the rooms that match a ``BulkMessageSend`` filter snapshot.
 
-    Always scopes to active rooms in the bulk send's project. Required
-    ``statuses`` and optional ``queues`` / ``agents`` keys in
-    ``filter_snapshot`` further narrow the queryset when non-empty.
+    Always scopes to active rooms in the bulk send's project, excluding
+    soft-deleted queues and sectors. Required ``statuses`` and optional
+    ``queues`` / ``agents`` keys in ``filter_snapshot`` further narrow
+    the queryset when non-empty.
     """
 
     def execute(self, bulk_send: BulkMessageSend) -> "QuerySet[Room]":
         queryset = Room.objects.filter(
             is_active=True,
             queue__sector__project=bulk_send.project,
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
         )
 
         filter_snapshot = bulk_send.filter_snapshot or {}
