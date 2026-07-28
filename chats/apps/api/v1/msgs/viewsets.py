@@ -72,6 +72,7 @@ class MessageViewset(
         "internal_note",
         "internal_note__user",
         "automatic_message",
+        "bulk_message_send_message__bulk_message_send__user",
     ).prefetch_related("medias", "internal_note__medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
@@ -279,9 +280,7 @@ class MessageViewset(
         if "date" in params:
             queryset = queryset.filter(created_on__date=params["date"])
         if "sender" in params:
-            queryset = queryset.filter(
-                bulk_message_send__user__email=params["sender"]
-            )
+            queryset = queryset.filter(bulk_message_send__user__email=params["sender"])
         if "status" in params:
             queryset = queryset.filter(status=params["status"])
 
