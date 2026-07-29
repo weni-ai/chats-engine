@@ -9,6 +9,9 @@ from django.test import TestCase
 from django.utils import timezone
 
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+    MetricGoalAlertConsumer,
+)
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard import tasks as dashboard_tasks
 from chats.apps.dashboard.models import MetricGoal
@@ -137,10 +140,16 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         first_call = self.mock_send_group.call_args_list[0]
         self.assertEqual(
             first_call.kwargs["group_name"],
-            f"metric_goal_alerts:{self.project.uuid}",
+            MetricGoalAlertConsumer.group_name_for(
+                str(self.project.uuid), self.recipient.email
+            ),
         )
-        self.assertEqual(first_call.kwargs["action"], "metric_goal.violated")
+        self.assertEqual(first_call.kwargs["action"], "metric_goal.alert")
         self.assertEqual(first_call.kwargs["content"]["transition"], "new")
+        self.assertIn(
+            self.recipient.email.lower(),
+            first_call.kwargs["content"]["recipients"],
+        )
 
         self.assertTrue(mock_delay.called)
         kwargs = mock_delay.call_args.kwargs
@@ -178,7 +187,7 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             for call in self.mock_send_group.call_args_list
         ]
         self.assertIn("metric_goal.update", actions)
-        self.assertNotIn("metric_goal.violated", actions)
+        self.assertNotIn("metric_goal.alert", actions)
 
     def test_send_metric_goal_email_skips_when_disabled(self):
         self.goal.email_enabled = False
