@@ -234,7 +234,7 @@ class DetectViolationsTestCase(TestCase):
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].violating_count, 1)
-        self.assertEqual(assigned.user_id, user.pk)
+        self.assertEqual(assigned.user_id, user.email)
 
 
 class ProcessViolationsTestCase(TestCase):
