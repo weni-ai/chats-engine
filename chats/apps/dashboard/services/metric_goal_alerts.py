@@ -11,15 +11,15 @@ not via the denormalized ``Room.project_uuid`` field, since that field
 is only populated by one of the room-creation paths and would otherwise
 undercount violations.
 
-Email and toast (``metric_goal.alert``) fire together when:
+Two independent Redis state machines run in parallel:
 
-1. ``email_enabled`` is true, and
-2. ``violating_count`` crosses into ``>= rooms_threshold_count``.
-
-While the count stays at or above the rooms threshold, we only emit
-``metric_goal.update`` (no new toast/email). When the count drops below
-the rooms threshold, state is cleared so the next time the count reaches
-the threshold again, email and toast fire once more.
+1. **Widget / project broadcast** (``metric_goal.violated`` /
+   ``update`` / ``resolved``): claimed as soon as a single room breaches
+   ``threshold_seconds``. Cleared when no rooms remain in breach.
+2. **Toast / email** (``metric_goal.alert`` + email): claimed when
+   ``email_enabled`` is true and ``violating_count`` crosses into
+   ``>= rooms_threshold_count``. Dropping below that count clears the
+   toast state so the next climb back to the threshold fires again.
 """
 
 from __future__ import annotations
@@ -90,10 +90,12 @@ def is_metric_goal_alerts_enabled(project_uuid: str) -> bool:
 
 
 STATE_VIOLATING = "violating"
+STATE_ALERTING = "alerting"
 
 DEFAULT_STATE_TTL_SECONDS = 30 * 60
 
 STATE_KEY_TEMPLATE = "metric_goal_state:{project_uuid}:{metric}"
+ALERT_STATE_KEY_TEMPLATE = "metric_goal_alert_state:{project_uuid}:{metric}"
 
 
 TRANSITION_NEW = "new"
@@ -105,10 +107,10 @@ TRANSITION_RESOLVED = "resolved"
 class Violation:
     """A project with one or more rooms currently above ``threshold_seconds``.
 
-    Email/toast only fire when ``email_enabled`` is true and
-    ``meets_rooms_threshold`` is true (see ``process_violations``). The
-    dashboard widget still treats a single breached room as alertable via
-    ``MetricGoalBreachService``.
+    Widget broadcasts (``metric_goal.violated`` / ``update`` / ``resolved``)
+    fire as soon as ``violating_count >= 1``. Email/toast
+    (``metric_goal.alert``) only fire when ``email_enabled`` is true and
+    ``meets_rooms_threshold`` is true (see ``process_violations``).
     """
 
     project_uuid: str
@@ -200,9 +202,7 @@ def _max_age_field(metric: str) -> str:
     return "first_user_assigned_at"
 
 
-def _resolve_threshold_count(
-    goal_data: dict, active_rooms_count: int | None
-) -> int:
+def _resolve_threshold_count(goal_data: dict, active_rooms_count: int | None) -> int:
     percent = goal_data.get("rooms_threshold_percent")
     if percent and active_rooms_count is not None:
         return max(1, ceil(active_rooms_count * percent / 100))
@@ -221,9 +221,7 @@ def _project_active_room_counts(project_uuids: Iterable[str]) -> Dict[str, int]:
         .values("queue__sector__project__uuid")
         .annotate(count=Count("uuid"))
     )
-    return {
-        str(row["queue__sector__project__uuid"]): row["count"] for row in rows
-    }
+    return {str(row["queue__sector__project__uuid"]): row["count"] for row in rows}
 
 
 def detect_violations(
@@ -236,8 +234,9 @@ def detect_violations(
     sweet spot and keeps query shapes index-friendly.
 
     A project is included as soon as at least one room breaches
-    ``threshold_seconds``. ``process_violations`` applies the rooms /
-    email gates before claiming Redis state or firing notifications.
+    ``threshold_seconds``. ``process_violations`` then drives the widget
+    state machine on that list and applies the rooms / email gates only
+    for toast and email notifications.
     """
     now = now or timezone.now()
     goals = [
@@ -303,31 +302,55 @@ def _state_key(project_uuid: str, metric: str) -> str:
     return STATE_KEY_TEMPLATE.format(project_uuid=project_uuid, metric=metric)
 
 
-def _claim_state(
-    redis_conn, project_uuid: str, metric: str, ttl_seconds: int
-) -> bool:
-    """Attempt to mark the (project, metric) as above the rooms threshold.
+def _alert_state_key(project_uuid: str, metric: str) -> str:
+    return ALERT_STATE_KEY_TEMPLATE.format(
+        project_uuid=project_uuid, metric=metric
+    )
 
-    Returns ``True`` when this call transitioned the state from clean to
-    alerting (i.e. a fresh email/toast). Returns ``False`` when the state
-    was already set, in which case we simply refresh the TTL.
-    """
-    key = _state_key(project_uuid, metric)
-    was_set = redis_conn.set(key, STATE_VIOLATING, nx=True, ex=ttl_seconds)
+
+def _claim_key(redis_conn, key: str, value: str, ttl_seconds: int) -> bool:
+    """SET NX + refresh TTL. Returns True when the key was newly created."""
+    was_set = redis_conn.set(key, value, nx=True, ex=ttl_seconds)
     if was_set:
         return True
     redis_conn.expire(key, ttl_seconds)
     return False
 
 
+def _claim_state(
+    redis_conn, project_uuid: str, metric: str, ttl_seconds: int
+) -> bool:
+    """Mark (project, metric) as violating (any room in breach)."""
+    return _claim_key(
+        redis_conn, _state_key(project_uuid, metric), STATE_VIOLATING, ttl_seconds
+    )
+
+
+def _claim_alert_state(
+    redis_conn, project_uuid: str, metric: str, ttl_seconds: int
+) -> bool:
+    """Mark (project, metric) as above the rooms threshold for toast/email."""
+    return _claim_key(
+        redis_conn,
+        _alert_state_key(project_uuid, metric),
+        STATE_ALERTING,
+        ttl_seconds,
+    )
+
+
 def _clear_state(redis_conn, project_uuid: str, metric: str) -> bool:
-    """Remove the state key. Returns ``True`` when something was cleared."""
+    """Remove the violating state key."""
     return bool(redis_conn.delete(_state_key(project_uuid, metric)))
 
 
-def _alerting_keys_for_metric(redis_conn, metric: str) -> Set[str]:
-    """List ``project_uuid`` values currently flagged as above threshold."""
-    pattern = STATE_KEY_TEMPLATE.format(project_uuid="*", metric=metric)
+def _clear_alert_state(redis_conn, project_uuid: str, metric: str) -> bool:
+    """Remove the toast/email alerting state key."""
+    return bool(redis_conn.delete(_alert_state_key(project_uuid, metric)))
+
+
+def _keys_for_metric(redis_conn, template: str, metric: str) -> Set[str]:
+    """List ``project_uuid`` values currently flagged for ``template``."""
+    pattern = template.format(project_uuid="*", metric=metric)
     project_uuids: Set[str] = set()
     for raw in redis_conn.scan_iter(match=pattern):
         key = raw.decode() if isinstance(raw, bytes) else raw
@@ -339,12 +362,23 @@ def _alerting_keys_for_metric(redis_conn, metric: str) -> Set[str]:
     return project_uuids
 
 
+def _violating_keys_for_metric(redis_conn, metric: str) -> Set[str]:
+    """List ``project_uuid`` values currently flagged as violating."""
+    return _keys_for_metric(redis_conn, STATE_KEY_TEMPLATE, metric)
+
+
+def _alerting_keys_for_metric(redis_conn, metric: str) -> Set[str]:
+    """List ``project_uuid`` values currently flagged for toast/email."""
+    return _keys_for_metric(redis_conn, ALERT_STATE_KEY_TEMPLATE, metric)
+
+
 @dataclass(frozen=True)
 class ProcessingResult:
     metric: str
     new_alerts: List[Violation]
     updates: List[Violation]
     resolved: List[str]
+    toasts: List[Violation] = field(default_factory=list)
 
 
 def _safe_call(
@@ -376,17 +410,21 @@ def process_violations(
     on_new_alert=None,
     on_update=None,
     on_resolved=None,
+    on_toast=None,
     on_email=None,
     now: datetime | None = None,
     # Kept for call-site compatibility; rearm-by-threshold replaced cooldown.
     email_cooldown_seconds: int | None = None,
 ) -> ProcessingResult:
-    """Detect violations and reconcile with the Redis state machine.
+    """Detect violations and reconcile with the Redis state machines.
 
-    Alert state is claimed only when ``email_enabled`` and
-    ``violating_count >= rooms_threshold_count``. Dropping below that
-    count clears state so a later climb back to the threshold fires
-    email/toast again.
+    Widget path (``on_new_alert`` / ``on_update`` / ``on_resolved``):
+    claimed as soon as any room breaches ``threshold_seconds``.
+
+    Toast/email path (``on_toast`` / ``on_email``): claimed only when
+    ``email_enabled`` and ``violating_count >= rooms_threshold_count``.
+    Dropping below that count clears toast state so a later climb back
+    fires toast/email again.
 
     The callbacks are intentionally optional so the service can be
     exercised in tests without the Celery/Channels stack. Real callers
@@ -397,18 +435,18 @@ def process_violations(
     violations = detect_violations(metric, now=now)
     redis_conn = get_redis_connection()
 
+    previously_violating = _violating_keys_for_metric(redis_conn, metric)
     previously_alerting = _alerting_keys_for_metric(redis_conn, metric)
+    currently_violating: Set[str] = set()
     currently_alerting: Set[str] = set()
 
     new_alerts: List[Violation] = []
     updates: List[Violation] = []
+    toasts: List[Violation] = []
     emails_sent: List[Violation] = []
 
     for violation in violations:
-        if not violation.email_enabled or not violation.meets_rooms_threshold:
-            continue
-
-        currently_alerting.add(violation.project_uuid)
+        currently_violating.add(violation.project_uuid)
         is_new = _claim_state(
             redis_conn, violation.project_uuid, metric, state_ttl_seconds
         )
@@ -422,14 +460,6 @@ def process_violations(
                 metric,
                 violation,
             )
-            if _safe_call(
-                on_email,
-                "metric_goal: on_email failed (project=%s metric=%s)",
-                violation.project_uuid,
-                metric,
-                violation,
-            ):
-                emails_sent.append(violation)
         else:
             updates.append(violation)
             _safe_call(
@@ -440,9 +470,37 @@ def process_violations(
                 violation,
             )
 
-    resolved_uuids = list(previously_alerting - currently_alerting)
+        if not violation.email_enabled or not violation.meets_rooms_threshold:
+            continue
+
+        currently_alerting.add(violation.project_uuid)
+        is_new_toast = _claim_alert_state(
+            redis_conn, violation.project_uuid, metric, state_ttl_seconds
+        )
+        if not is_new_toast:
+            continue
+
+        toasts.append(violation)
+        _safe_call(
+            on_toast,
+            "metric_goal: on_toast failed (project=%s metric=%s)",
+            violation.project_uuid,
+            metric,
+            violation,
+        )
+        if _safe_call(
+            on_email,
+            "metric_goal: on_email failed (project=%s metric=%s)",
+            violation.project_uuid,
+            metric,
+            violation,
+        ):
+            emails_sent.append(violation)
+
+    resolved_uuids = list(previously_violating - currently_violating)
     for project_uuid in resolved_uuids:
         _clear_state(redis_conn, project_uuid, metric)
+        _clear_alert_state(redis_conn, project_uuid, metric)
         _safe_call(
             on_resolved,
             "metric_goal: on_resolved failed (project=%s metric=%s)",
@@ -452,12 +510,20 @@ def process_violations(
             metric,
         )
 
+    # Dropped below rooms threshold but still violating: clear toast state
+    # so the next climb re-fires toast/email without a widget resolve.
+    for project_uuid in previously_alerting - currently_alerting:
+        if project_uuid in currently_violating:
+            _clear_alert_state(redis_conn, project_uuid, metric)
+
     logger.info(
-        "metric_goal sweep: metric=%s new=%s updates=%s resolved=%s emails=%s",
+        "metric_goal sweep: metric=%s new=%s updates=%s resolved=%s "
+        "toasts=%s emails=%s",
         metric,
         len(new_alerts),
         len(updates),
         len(resolved_uuids),
+        len(toasts),
         len(emails_sent),
     )
 
@@ -466,4 +532,5 @@ def process_violations(
         new_alerts=new_alerts,
         updates=updates,
         resolved=resolved_uuids,
+        toasts=toasts,
     )

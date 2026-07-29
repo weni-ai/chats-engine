@@ -1,10 +1,13 @@
 """WebSocket consumer that streams metric goal alerts to a project.
 
 The consumer authenticates via the existing ``TokenAuthMiddleware`` and
-joins the per-user Channels group
-``metric_goal_alerts:{project_uuid}:{user_hash}``. Toast alerts
-(``metric_goal.alert``) are fan-out only to configured email recipients,
-so users without email configured never receive the socket event.
+joins two Channels groups:
+
+* ``metric_goal_alerts.{project_uuid}`` — project-wide events
+  (``metric_goal.violated`` / ``update`` / ``resolved``) for every
+  dashboard viewer.
+* ``metric_goal_alerts.{project_uuid}.{user_hash}`` — toast events
+  (``metric_goal.alert``) fan-out only to configured email recipients.
 """
 
 from __future__ import annotations
@@ -29,23 +32,28 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
     """Minimal read-only consumer for metric goal alerts."""
 
     # Channels group names only accept ``[A-Za-z0-9._-]`` and are capped
-    # at 100 chars. We hash the (normalized) email so ``@``, ``+`` and
-    # unicode addresses can't break the channel layer, and use ``.`` as
-    # separator since ``:`` isn't allowed.
-    GROUP_TEMPLATE = "metric_goal_alerts.{project_uuid}.{user_hash}"
+    # at 100 chars. We use ``.`` as separator since ``:`` isn't allowed.
+    PROJECT_GROUP_TEMPLATE = "metric_goal_alerts.{project_uuid}"
+    USER_GROUP_TEMPLATE = "metric_goal_alerts.{project_uuid}.{user_hash}"
+
+    @classmethod
+    def project_group_name(cls, project_uuid: str) -> str:
+        return cls.PROJECT_GROUP_TEMPLATE.format(project_uuid=project_uuid)
 
     @classmethod
     def group_name_for(cls, project_uuid: str, user_email: str) -> str:
+        """Per-user group used for toast (``metric_goal.alert``) fan-out."""
         normalized = user_email.strip().lower().encode("utf-8")
         user_hash = hashlib.sha1(normalized).hexdigest()[:16]
-        return cls.GROUP_TEMPLATE.format(
+        return cls.USER_GROUP_TEMPLATE.format(
             project_uuid=project_uuid,
             user_hash=user_hash,
         )
 
     async def connect(self):
         self.project_uuid = None
-        self.group_name = None
+        self.project_group_name = None
+        self.user_group_name = None
 
         try:
             self.user = self.scope["user"]
@@ -79,16 +87,24 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
             return
 
-        self.group_name = self.group_name_for(self.project_uuid, self.user.email)
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        self.project_group_name = MetricGoalAlertConsumer.project_group_name(
+            self.project_uuid
+        )
+        self.user_group_name = MetricGoalAlertConsumer.group_name_for(
+            self.project_uuid, self.user.email
+        )
+        # Backwards-compat alias used by disconnect / older call sites.
+        self.group_name = self.user_group_name
+        await self.channel_layer.group_add(self.project_group_name, self.channel_name)
+        await self.channel_layer.group_add(self.user_group_name, self.channel_name)
         await self.accept()
 
     async def disconnect(self, code):
-        if getattr(self, "group_name", None):
+        for name in (self.project_group_name, self.user_group_name):
+            if not name:
+                continue
             try:
-                await self.channel_layer.group_discard(
-                    self.group_name, self.channel_name
-                )
+                await self.channel_layer.group_discard(name, self.channel_name)
             except Exception:
                 logger.debug("group_discard failed", exc_info=True)
 
@@ -100,7 +116,6 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
         await self._forward(event, "metric_goal.alert")
 
     async def metric_goal_violated(self, event):
-        # Legacy Channels type; prefer metric_goal_alert / metric_goal.alert.
         await self._forward(event, "metric_goal.violated")
 
     async def metric_goal_update(self, event):
