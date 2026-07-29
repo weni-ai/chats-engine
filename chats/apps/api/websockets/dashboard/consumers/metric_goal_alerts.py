@@ -1,13 +1,15 @@
 """WebSocket consumer that streams metric goal alerts to a project.
 
 The consumer authenticates via the existing ``TokenAuthMiddleware`` and
-joins the ``metric_goal_alerts:{project_uuid}`` Channels group. Once
-joined, it receives broadcasts produced by the Celery sweep at
-``chats.apps.dashboard.tasks.check_metric_goal_violations``.
+joins the per-user Channels group
+``metric_goal_alerts:{project_uuid}:{user_hash}``. Toast alerts
+(``metric_goal.alert``) are fan-out only to configured email recipients,
+so users without email configured never receive the socket event.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 
@@ -26,7 +28,20 @@ logger = logging.getLogger(__name__)
 class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
     """Minimal read-only consumer for metric goal alerts."""
 
-    GROUP_TEMPLATE = "metric_goal_alerts:{project_uuid}"
+    # Channels group names only accept ``[A-Za-z0-9._-]`` and are capped
+    # at 100 chars. We hash the (normalized) email so ``@``, ``+`` and
+    # unicode addresses can't break the channel layer, and use ``.`` as
+    # separator since ``:`` isn't allowed.
+    GROUP_TEMPLATE = "metric_goal_alerts.{project_uuid}.{user_hash}"
+
+    @classmethod
+    def group_name_for(cls, project_uuid: str, user_email: str) -> str:
+        normalized = user_email.strip().lower().encode("utf-8")
+        user_hash = hashlib.sha1(normalized).hexdigest()[:16]
+        return cls.GROUP_TEMPLATE.format(
+            project_uuid=project_uuid,
+            user_hash=user_hash,
+        )
 
     async def connect(self):
         self.project_uuid = None
@@ -43,6 +58,7 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
             self.user is None
             or getattr(self.user, "is_anonymous", True)
             or not self.project_uuid
+            or not getattr(self.user, "email", None)
         ):
             await self.close()
             return
@@ -63,7 +79,7 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
             return
 
-        self.group_name = self.GROUP_TEMPLATE.format(project_uuid=self.project_uuid)
+        self.group_name = self.group_name_for(self.project_uuid, self.user.email)
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
@@ -80,7 +96,11 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
         if isinstance(content, dict) and content.get("type") == "ping":
             await self.send_json({"type": "pong"})
 
+    async def metric_goal_alert(self, event):
+        await self._forward(event, "metric_goal.alert")
+
     async def metric_goal_violated(self, event):
+        # Legacy Channels type; prefer metric_goal_alert / metric_goal.alert.
         await self._forward(event, "metric_goal.violated")
 
     async def metric_goal_update(self, event):

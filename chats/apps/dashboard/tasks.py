@@ -885,35 +885,106 @@ def process_pending_reports():
         _handle_report_error(report, e, user_email)
 
 
-def _metric_goal_group(project_uuid: str) -> str:
-    return f"metric_goal_alerts:{project_uuid}"
+def _metric_goal_user_group(project_uuid: str, user_email: str) -> str:
+    """Per-user group so toast alerts only reach configured email recipients.
 
-
-def _broadcast_metric_goal(call_type: str, action: str, content: dict) -> None:
-    """Send a metric goal event to the project's WebSocket group."""
-    project_uuid = content["project_uuid"]
-    send_channels_group(
-        group_name=_metric_goal_group(project_uuid),
-        call_type=call_type,
-        content=content,
-        action=action,
+    Channels group names only accept ``[A-Za-z0-9._-]`` and are capped at
+    100 chars, so we hash the (normalized) email to avoid ``@``/``+``/
+    unicode breaking the channel layer in production.
+    """
+    from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+        MetricGoalAlertConsumer,
     )
+
+    return MetricGoalAlertConsumer.group_name_for(project_uuid, user_email)
+
+
+def _broadcast_metric_goal_to_emails(
+    *,
+    project_uuid: str,
+    emails: List[str],
+    call_type: str,
+    action: str,
+    content: dict,
+) -> None:
+    """Fan-out a metric goal event to each recipient's WebSocket group."""
+    seen: set = set()
+    for email in emails:
+        if not email:
+            continue
+        normalized = email.strip().lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        send_channels_group(
+            group_name=_metric_goal_user_group(project_uuid, normalized),
+            call_type=call_type,
+            content=content,
+            action=action,
+        )
+
+
+def _eligible_recipient_emails(goal: MetricGoal) -> List[str]:
+    """Return the emails of recipients still eligible for notifications."""
+    permissions = goal.recipients.select_related("user").prefetch_related(
+        "sector_authorizations"
+    )
+    emails: List[str] = []
+    for permission in permissions:
+        user = getattr(permission, "user", None)
+        if not user or not user.email:
+            continue
+        if permission.is_admin or permission.sector_authorizations.all():
+            emails.append(user.email.strip().lower())
+    return emails
+
+
+def _goal_for(project_uuid: str, metric: str) -> Optional[MetricGoal]:
+    try:
+        return MetricGoal.objects.get(project__uuid=project_uuid, metric=metric)
+    except MetricGoal.DoesNotExist:
+        return None
+
+
+def _recipients_for_project_metric(project_uuid: str, metric: str) -> List[str]:
+    goal = _goal_for(project_uuid, metric)
+    if goal is None:
+        return []
+    return _eligible_recipient_emails(goal)
 
 
 def _broadcast_new_alert(violation: Violation) -> None:
+    """Send ``metric_goal.alert`` only to users with email configured."""
+    recipients = _recipients_for_project_metric(
+        violation.project_uuid, violation.metric
+    )
+    if not recipients:
+        return
+
     payload = violation.as_broadcast_payload(state="violating")
     payload["transition"] = "new"
-    _broadcast_metric_goal(
-        call_type="metric_goal_violated",
-        action="metric_goal.violated",
+    payload["recipients"] = recipients
+    _broadcast_metric_goal_to_emails(
+        project_uuid=violation.project_uuid,
+        emails=recipients,
+        call_type="metric_goal_alert",
+        action="metric_goal.alert",
         content=payload,
     )
 
 
 def _broadcast_update(violation: Violation) -> None:
+    recipients = _recipients_for_project_metric(
+        violation.project_uuid, violation.metric
+    )
+    if not recipients:
+        return
+
     payload = violation.as_broadcast_payload(state="violating")
     payload["transition"] = "update"
-    _broadcast_metric_goal(
+    _broadcast_metric_goal_to_emails(
+        project_uuid=violation.project_uuid,
+        emails=recipients,
         call_type="metric_goal_update",
         action="metric_goal.update",
         content=payload,
@@ -921,13 +992,19 @@ def _broadcast_update(violation: Violation) -> None:
 
 
 def _broadcast_resolved(project_uuid: str, metric: str) -> None:
+    recipients = _recipients_for_project_metric(project_uuid, metric)
+    if not recipients:
+        return
+
     payload = {
         "project_uuid": project_uuid,
         "metric": metric,
         "state": "ok",
         "detected_at": datetime.now(timezone.utc).isoformat(),
     }
-    _broadcast_metric_goal(
+    _broadcast_metric_goal_to_emails(
+        project_uuid=project_uuid,
+        emails=recipients,
         call_type="metric_goal_resolved",
         action="metric_goal.resolved",
         content=payload,
@@ -960,15 +1037,11 @@ def check_metric_goal_violations():
         MetricGoal.METRIC_CONVERSATION_DURATION,
     ]
     state_ttl = getattr(settings, "METRIC_GOAL_STATE_TTL_SECONDS", 30 * 60)
-    email_cooldown = getattr(
-        settings, "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", 15 * 60
-    )
     for metric in metrics:
         try:
             process_violations(
                 metric,
                 state_ttl_seconds=state_ttl,
-                email_cooldown_seconds=email_cooldown,
                 on_new_alert=_broadcast_new_alert,
                 on_update=_broadcast_update,
                 on_resolved=_broadcast_resolved,
@@ -978,21 +1051,6 @@ def check_metric_goal_violations():
             logger.exception(
                 "metric_goal sweep failed for metric=%s", metric
             )
-
-
-def _eligible_recipient_emails(goal: MetricGoal) -> List[str]:
-    """Return the emails of recipients still eligible for notifications."""
-    permissions = goal.recipients.select_related("user").prefetch_related(
-        "sector_authorizations"
-    )
-    emails: List[str] = []
-    for permission in permissions:
-        user = getattr(permission, "user", None)
-        if not user or not user.email:
-            continue
-        if permission.is_admin or permission.sector_authorizations.all():
-            emails.append(user.email)
-    return emails
 
 
 @app.task(name="send_metric_goal_email")
