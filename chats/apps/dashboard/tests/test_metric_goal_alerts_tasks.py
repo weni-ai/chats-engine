@@ -137,18 +137,29 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             self.mock_send_group.called,
             "Expected at least one WebSocket broadcast",
         )
-        first_call = self.mock_send_group.call_args_list[0]
+        actions = {
+            call.kwargs["action"]: call
+            for call in self.mock_send_group.call_args_list
+        }
+        self.assertIn("metric_goal.violated", actions)
+        violated_call = actions["metric_goal.violated"]
         self.assertEqual(
-            first_call.kwargs["group_name"],
+            violated_call.kwargs["group_name"],
+            MetricGoalAlertConsumer.project_group_name(str(self.project.uuid)),
+        )
+        self.assertEqual(violated_call.kwargs["content"]["transition"], "new")
+
+        self.assertIn("metric_goal.alert", actions)
+        alert_call = actions["metric_goal.alert"]
+        self.assertEqual(
+            alert_call.kwargs["group_name"],
             MetricGoalAlertConsumer.group_name_for(
                 str(self.project.uuid), self.recipient.email
             ),
         )
-        self.assertEqual(first_call.kwargs["action"], "metric_goal.alert")
-        self.assertEqual(first_call.kwargs["content"]["transition"], "new")
         self.assertIn(
             self.recipient.email.lower(),
-            first_call.kwargs["content"]["recipients"],
+            alert_call.kwargs["content"]["recipients"],
         )
 
         self.assertTrue(mock_delay.called)
@@ -187,6 +198,7 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         ]
         self.assertIn("metric_goal.update", actions)
         self.assertNotIn("metric_goal.alert", actions)
+        self.assertNotIn("metric_goal.violated", actions)
 
     def test_send_metric_goal_email_skips_when_disabled(self):
         self.goal.email_enabled = False

@@ -127,6 +127,32 @@ class MetricGoalAlertConsumerTestCase(TransactionTestCase):
         self.assertTrue(connected)
         await comm.disconnect()
 
+    async def test_receives_project_broadcast_violated(self):
+        comm = WebsocketCommunicator(
+            self.application,
+            self._ws_url(self.project.uuid, self.admin_token.key),
+        )
+        connected, _ = await comm.connect()
+        self.assertTrue(connected)
+
+        layer = get_channel_layer()
+        await layer.group_send(
+            MetricGoalAlertConsumer.project_group_name(str(self.project.uuid)),
+            {
+                "type": "metric_goal_violated",
+                "action": "metric_goal.violated",
+                "content": json.dumps(
+                    {"project_uuid": str(self.project.uuid)}
+                ),
+            },
+        )
+        message = await comm.receive_json_from(timeout=2)
+        self.assertEqual(message["type"], "metric_goal.violated")
+        self.assertEqual(
+            message["content"]["project_uuid"], str(self.project.uuid)
+        )
+        await comm.disconnect()
+
     async def test_receives_broadcast_for_own_user_group(self):
         comm = WebsocketCommunicator(
             self.application,
@@ -196,12 +222,12 @@ class MetricGoalAlertConsumerTestCase(TransactionTestCase):
 
         layer = get_channel_layer()
         await layer.group_send(
-            MetricGoalAlertConsumer.group_name_for(
-                str(self.other_project.uuid), self.admin.email
+            MetricGoalAlertConsumer.project_group_name(
+                str(self.other_project.uuid)
             ),
             {
-                "type": "metric_goal_alert",
-                "action": "metric_goal.alert",
+                "type": "metric_goal_violated",
+                "action": "metric_goal.violated",
                 "content": json.dumps(
                     {"project_uuid": str(self.other_project.uuid)}
                 ),

@@ -885,6 +885,15 @@ def process_pending_reports():
         _handle_report_error(report, e, user_email)
 
 
+def _metric_goal_project_group(project_uuid: str) -> str:
+    """Project-wide group for violated / update / resolved broadcasts."""
+    from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+        MetricGoalAlertConsumer,
+    )
+
+    return MetricGoalAlertConsumer.project_group_name(project_uuid)
+
+
 def _metric_goal_user_group(project_uuid: str, user_email: str) -> str:
     """Per-user group so toast alerts only reach configured email recipients.
 
@@ -897,6 +906,22 @@ def _metric_goal_user_group(project_uuid: str, user_email: str) -> str:
     )
 
     return MetricGoalAlertConsumer.group_name_for(project_uuid, user_email)
+
+
+def _broadcast_metric_goal(
+    *,
+    project_uuid: str,
+    call_type: str,
+    action: str,
+    content: dict,
+) -> None:
+    """Send a metric goal event to the project's WebSocket group."""
+    send_channels_group(
+        group_name=_metric_goal_project_group(project_uuid),
+        call_type=call_type,
+        content=content,
+        action=action,
+    )
 
 
 def _broadcast_metric_goal_to_emails(
@@ -954,6 +979,18 @@ def _recipients_for_project_metric(project_uuid: str, metric: str) -> List[str]:
 
 
 def _broadcast_new_alert(violation: Violation) -> None:
+    """Send ``metric_goal.violated`` to every dashboard viewer on the project."""
+    payload = violation.as_broadcast_payload(state="violating")
+    payload["transition"] = "new"
+    _broadcast_metric_goal(
+        project_uuid=violation.project_uuid,
+        call_type="metric_goal_violated",
+        action="metric_goal.violated",
+        content=payload,
+    )
+
+
+def _broadcast_toast(violation: Violation) -> None:
     """Send ``metric_goal.alert`` only to users with email configured."""
     recipients = _recipients_for_project_metric(
         violation.project_uuid, violation.metric
@@ -974,17 +1011,10 @@ def _broadcast_new_alert(violation: Violation) -> None:
 
 
 def _broadcast_update(violation: Violation) -> None:
-    recipients = _recipients_for_project_metric(
-        violation.project_uuid, violation.metric
-    )
-    if not recipients:
-        return
-
     payload = violation.as_broadcast_payload(state="violating")
     payload["transition"] = "update"
-    _broadcast_metric_goal_to_emails(
+    _broadcast_metric_goal(
         project_uuid=violation.project_uuid,
-        emails=recipients,
         call_type="metric_goal_update",
         action="metric_goal.update",
         content=payload,
@@ -992,19 +1022,14 @@ def _broadcast_update(violation: Violation) -> None:
 
 
 def _broadcast_resolved(project_uuid: str, metric: str) -> None:
-    recipients = _recipients_for_project_metric(project_uuid, metric)
-    if not recipients:
-        return
-
     payload = {
         "project_uuid": project_uuid,
         "metric": metric,
         "state": "ok",
         "detected_at": datetime.now(timezone.utc).isoformat(),
     }
-    _broadcast_metric_goal_to_emails(
+    _broadcast_metric_goal(
         project_uuid=project_uuid,
-        emails=recipients,
         call_type="metric_goal_resolved",
         action="metric_goal.resolved",
         content=payload,
@@ -1045,6 +1070,7 @@ def check_metric_goal_violations():
                 on_new_alert=_broadcast_new_alert,
                 on_update=_broadcast_update,
                 on_resolved=_broadcast_resolved,
+                on_toast=_broadcast_toast,
                 on_email=_queue_metric_goal_email,
             )
         except Exception:

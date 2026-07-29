@@ -248,13 +248,16 @@ class ProcessViolationsTestCase(TestCase):
     def test_first_run_emits_new_alert_and_email(self):
         self._seed_violation()
         new_alerts: list[Violation] = []
+        toasts: list[Violation] = []
         emails: list[Violation] = []
         result = process_violations(
             MetricGoal.METRIC_WAITING_TIME,
             on_new_alert=new_alerts.append,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
         self.assertEqual(len(new_alerts), 1)
+        self.assertEqual(len(toasts), 1)
         self.assertEqual(len(emails), 1)
         self.assertEqual(result.resolved, [])
         state_key = STATE_KEY_TEMPLATE.format(
@@ -319,13 +322,17 @@ class ProcessViolationsTestCase(TestCase):
         ).update(email_enabled=False)
         self._seed_violation()
         emails: list[Violation] = []
+        toasts: list[Violation] = []
         result = process_violations(
             MetricGoal.METRIC_WAITING_TIME,
             on_new_alert=lambda v: None,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
         self.assertEqual(len(emails), 0)
-        self.assertEqual(len(result.new_alerts), 0)
+        self.assertEqual(len(toasts), 0)
+        # Widget path still fires with a single breached room.
+        self.assertEqual(len(result.new_alerts), 1)
 
     def test_alert_and_email_skipped_when_below_rooms_threshold(self):
         """Below rooms_threshold_count: no toast and no email."""
@@ -336,16 +343,19 @@ class ProcessViolationsTestCase(TestCase):
         self._seed_violation()
 
         new_alerts: list[Violation] = []
+        toasts: list[Violation] = []
         emails: list[Violation] = []
         result = process_violations(
             MetricGoal.METRIC_WAITING_TIME,
             on_new_alert=new_alerts.append,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
 
-        self.assertEqual(len(new_alerts), 0)
+        self.assertEqual(len(new_alerts), 1)
+        self.assertEqual(len(toasts), 0)
         self.assertEqual(len(emails), 0)
-        self.assertEqual(len(result.new_alerts), 0)
+        self.assertEqual(len(result.toasts), 0)
 
     def test_alert_and_email_fire_when_rooms_threshold_is_reached(self):
         """Crossing into rooms_threshold_count fires toast + email together."""
@@ -356,22 +366,25 @@ class ProcessViolationsTestCase(TestCase):
 
         self._seed_violation()
         emails: list[Violation] = []
+        toasts: list[Violation] = []
         first = process_violations(
             MetricGoal.METRIC_WAITING_TIME,
             on_new_alert=lambda v: None,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
-        self.assertEqual(len(first.new_alerts), 0)
+        self.assertEqual(len(first.new_alerts), 1)
+        self.assertEqual(len(toasts), 0)
         self.assertEqual(len(emails), 0)
 
         self._seed_violation()
-        new_alerts: list[Violation] = []
         process_violations(
             MetricGoal.METRIC_WAITING_TIME,
-            on_new_alert=new_alerts.append,
+            on_update=lambda v: None,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
-        self.assertEqual(len(new_alerts), 1)
+        self.assertEqual(len(toasts), 1)
         self.assertEqual(len(emails), 1)
         self.assertEqual(emails[0].violating_count, 2)
 
@@ -387,17 +400,18 @@ class ProcessViolationsTestCase(TestCase):
             for _ in range(5)
         ]
         emails: list[Violation] = []
-        alerts: list[Violation] = []
+        toasts: list[Violation] = []
 
         process_violations(
             MetricGoal.METRIC_WAITING_TIME,
-            on_new_alert=alerts.append,
+            on_new_alert=lambda v: None,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
-        self.assertEqual(len(alerts), 1)
+        self.assertEqual(len(toasts), 1)
         self.assertEqual(len(emails), 1)
 
-        # Resolve 3 rooms → 2 remain (below threshold) → clear state.
+        # Resolve 3 rooms → 2 remain (still violating, below toast threshold).
         for room in rooms[:3]:
             room.is_active = False
             room.save(update_fields=["is_active"])
@@ -405,22 +419,24 @@ class ProcessViolationsTestCase(TestCase):
         resolved: list[str] = []
         process_violations(
             MetricGoal.METRIC_WAITING_TIME,
+            on_update=lambda v: None,
             on_resolved=lambda uuid, metric: resolved.append(uuid),
             on_email=emails.append,
         )
-        self.assertEqual(resolved, [str(self.project.uuid)])
+        self.assertEqual(resolved, [])
         self.assertEqual(len(emails), 1)
 
-        # 3 new rooms → 5 again → fire once more.
+        # 3 new rooms → 5 again → fire toast/email once more.
         for _ in range(3):
             _build_active_room(self.project, self.queue, age_seconds=300)
 
         process_violations(
             MetricGoal.METRIC_WAITING_TIME,
-            on_new_alert=alerts.append,
+            on_update=lambda v: None,
+            on_toast=toasts.append,
             on_email=emails.append,
         )
-        self.assertEqual(len(alerts), 2)
+        self.assertEqual(len(toasts), 2)
         self.assertEqual(len(emails), 2)
         self.assertEqual(emails[-1].violating_count, 5)
 
