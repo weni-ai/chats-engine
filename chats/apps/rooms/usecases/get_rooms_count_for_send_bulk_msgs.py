@@ -20,7 +20,9 @@ class GetRoomsCountForSendBulkMsgsUseCase:
     ) -> int:
         queryset = Room.objects.filter(
             is_active=True,
-            project_uuid=str(project_uuid),
+            queue__sector__project_id=str(project_uuid),
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
         )
 
         status_q = Q()
