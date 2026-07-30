@@ -13,6 +13,7 @@ def basic_publish(
     properties: dict = {"delivery_mode": 2},
     headers: dict = {},
     content_encoding: str = None,
+    routing_key: str = "",
 ) -> None:
     channel.basic_publish(
         amqp.Message(
@@ -23,6 +24,7 @@ def basic_publish(
             application_headers=headers,
         ),
         exchange=exchange,
+        routing_key=routing_key,
     )
 
 
@@ -99,6 +101,7 @@ class PyAMQPConnectionBackend:
         exchange: str,
         content_type: str = "application/octet-stream",
         headers: dict = {},
+        routing_key: str = "",
     ):
         sent = False
         while not sent:
@@ -111,6 +114,7 @@ class PyAMQPConnectionBackend:
                         properties={"delivery_mode": 2},
                         exchange=exchange,
                         headers=headers,
+                        routing_key=routing_key,
                     )
                     sent = True
             except Exception as err:

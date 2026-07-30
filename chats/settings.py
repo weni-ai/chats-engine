@@ -671,6 +671,16 @@ EDA_CONSUMERS_HANDLES = {
     "msg_edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
 }
 
+# Broker settings used by weni-commons change-history Notifier and Amazon MQ
+# (weni.eda AMQConnectionParamsFactory).
+AMQ_BROKER_HOST = env("AMQ_BROKER_HOST", default="")
+AMQ_BROKER_PORT = env.int("AMQ_BROKER_PORT", default=5671)
+AMQ_BROKER_USER = env("AMQ_BROKER_USER", default="")
+AMQ_BROKER_PASSWORD = env("AMQ_BROKER_PASSWORD", default="")
+AMQ_VIRTUAL_HOST = env("AMQ_VIRTUAL_HOST", default="/")
+AMQ_BROKER_SSL_SERVER_HOSTNAME = env("AMQ_BROKER_SSL_SERVER_HOSTNAME", default=None)
+AMQ_BROKER_HEARTBEAT = env.int("AMQ_BROKER_HEARTBEAT", default=300)
+
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
     EDA_CONSUMERS_HANDLE_LEGACY = "chats.apps.event_driven.handle.handle_consumers"
@@ -686,14 +696,6 @@ if USE_EDA:
     EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
     EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
     EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
-
-    # TEMPORARY[EDA Migration]: Connection params for the new Amazon MQ broker,
-    # consumed by weni.eda's AMQConnectionParamsFactory. Remove once the
-    # migration to Weni EDA is complete and EDA_* points to the new broker.
-    AMQ_BROKER_HOST = env.str("AMQ_BROKER_HOST", default="localhost:5672")
-    AMQ_BROKER_USER = env.str("AMQ_BROKER_USER", default="guest")
-    AMQ_BROKER_PASSWORD = env.str("AMQ_BROKER_PASSWORD", default="guest")
-    AMQ_VIRTUAL_HOST = env.str("AMQ_VIRTUAL_HOST", default="/")
 
     # Queue name for the project creation consumer on the new Amazon MQ broker.
     # Override via env if the cloud configures a different queue name.
