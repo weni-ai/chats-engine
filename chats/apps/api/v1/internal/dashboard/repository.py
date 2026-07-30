@@ -633,7 +633,36 @@ class AgentRepository:
 
         if filters.agent:
             agents = agents.filter(email=filters.agent)
-        return agents
+
+        # With sector/queue filters: keep agents that have authorization on the
+        # filtered sector/queue OR had a closed room there in the selected period.
+        rooms_in_period = Q(rooms__is_active=False)
+        start_date, end_date = self._get_converted_dates(filters, project)
+        if start_date:
+            rooms_in_period &= Q(rooms__ended_at__gte=start_date)
+        if end_date:
+            rooms_in_period &= Q(rooms__ended_at__lte=end_date)
+
+        if filters.queues:
+            agents = agents.filter(
+                Q(project_permissions__queue_authorizations__queue__in=filters.queues)
+                | (Q(rooms__queue__in=filters.queues) & rooms_in_period)
+            )
+        elif filters.queue:
+            agents = agents.filter(
+                Q(project_permissions__queue_authorizations__queue=filters.queue)
+                | (Q(rooms__queue=filters.queue) & rooms_in_period)
+            )
+        elif filters.sector:
+            agents = agents.filter(
+                Q(project_permissions__sector_authorizations__sector__in=filters.sector)
+                | Q(
+                    project_permissions__queue_authorizations__queue__sector__in=filters.sector
+                )
+                | (Q(rooms__queue__sector__in=filters.sector) & rooms_in_period)
+            )
+
+        return agents.distinct()
 
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
@@ -685,7 +714,7 @@ class AgentRepository:
                 ),
                 Value(0.0),
             ),
-        ).exclude(is_deleted=True, rooms_count=0)
+        ).exclude(is_deleted=True, rooms_count=0).distinct()
 
         return self._get_csat_general(filters, project), agents
 
