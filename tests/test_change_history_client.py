@@ -10,6 +10,7 @@ from chats.apps.api.v1.internal.eda_clients.change_history_client import (
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
+from weni_commons.change_history import Entity
 
 
 @override_settings(AMQ_BROKER_HOST="localhost")
@@ -37,7 +38,7 @@ class PublishChangeHistoryTests(TransactionTestCase):
         self.assertEqual(args[0], str(self.project.uuid))
         self.assertEqual(args[1], "manager@test.com")
         self.assertEqual(args[3].value, "CREATE")
-        self.assertEqual(args[4].value, "QUEUE")
+        self.assertEqual(args[4], Entity.QUEUE)
         self.assertEqual(args[5].value, "LIVE_DESK")
 
     @mock.patch(

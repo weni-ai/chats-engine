@@ -1,5 +1,4 @@
 import logging
-from types import SimpleNamespace
 
 from django.conf import settings
 from django.db import models, transaction
@@ -8,15 +7,11 @@ from weni_commons.change_history import Action, Entity, Module, Notifier
 
 logger = logging.getLogger(__name__)
 
-# Commons Entity enum does not include QUEUE yet — send the string value
-# the consumer expects until Entity.QUEUE exists upstream.
-_QUEUE_ENTITY = getattr(Entity, "QUEUE", None) or SimpleNamespace(value="QUEUE")
-
 
 def _entity_for(instance: models.Model):
     label = instance._meta.label_lower
     if label == "queues.queue":
-        return _QUEUE_ENTITY
+        return Entity.QUEUE
     if label == "queues.queueauthorization":
         return Entity.USER
     raise ValueError("Unsupported model for change history: %s" % label)

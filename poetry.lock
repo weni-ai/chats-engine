@@ -4815,14 +4815,14 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.3.2a8"
+version = "1.3.2a16"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "weni_commons-1.3.2a8-py3-none-any.whl", hash = "sha256:412808fb89157c158057a7529ac4e901b49e7874e5532d3f9283b9b93ebd9369"},
-    {file = "weni_commons-1.3.2a8.tar.gz", hash = "sha256:fd70760b3f9742ea5cc09eb6d4bff4980271242e9deb41b9865260ee7b36aba7"},
+    {file = "weni_commons-1.3.2a16-py3-none-any.whl", hash = "sha256:d071dcde2eccf19efbdb8c7cb779e21a4e89881278fe659871f1e7ca0634e1c9"},
+    {file = "weni_commons-1.3.2a16.tar.gz", hash = "sha256:6a126b954416f6f376d371b15464dfe344174396ba7dae74a791c2c6aa7d02f4"},
 ]
 
 [package.dependencies]
@@ -4834,7 +4834,7 @@ djangorestframework = ">=3.12.0,<4.0"
 mozilla-django-oidc = ">=2.0.0,<5.0"
 pyjwt = ">=2.8.0,<3.0"
 requests = ">=2.25.0"
-weni-eda = ">=0.1.2,<0.3.0"
+weni-eda = ">=0.1.2a0"
 weni-feature-flags = ">=2.2.0,<3.0.0"
 
 [[package]]
@@ -5174,4 +5174,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "2e8a1c9400961dc95283f8f2b4aaf3a654f0843f1b73487db8aa139f07cd28ba"
+content-hash = "deedefdc24a7861ccafdfa16bee8f60113991b0884e40dfa349da055d24892a1"
