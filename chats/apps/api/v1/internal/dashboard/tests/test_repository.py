@@ -1224,6 +1224,48 @@ class AgentRepositoryTestCase(TestCase):
         self.assertIn("in_sector@test.com", agent_emails)
         self.assertNotIn("other_sector@test.com", agent_emails)
 
+    def test_get_csat_agents_normalizes_queue_and_sectors_aliases(self):
+        user_queue = User.objects.create(
+            email="by_queue@test.com", first_name="By", last_name="Queue"
+        )
+        user_sector = User.objects.create(
+            email="by_sector@test.com", first_name="By", last_name="Sector"
+        )
+        user_other = User.objects.create(
+            email="other@test.com", first_name="Other", last_name="Agent"
+        )
+
+        permission_queue = ProjectPermission.objects.create(
+            user=user_queue, project=self.project, role=2
+        )
+        permission_sector = ProjectPermission.objects.create(
+            user=user_sector, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(
+            user=user_other, project=self.project, role=2
+        )
+
+        QueueAuthorization.objects.create(permission=permission_queue, queue=self.queue)
+        SectorAuthorization.objects.create(
+            permission=permission_sector, sector=self.sector, role=1
+        )
+
+        agents_by_queue = self.repository._get_csat_agents(
+            Filters(queue=self.queue.uuid), self.project
+        )
+        self.assertEqual(
+            list(agents_by_queue.values_list("email", flat=True)),
+            ["by_queue@test.com"],
+        )
+
+        agents_by_sectors = self.repository._get_csat_agents(
+            Filters(sectors=[self.sector.uuid]), self.project
+        )
+        agent_emails = list(agents_by_sectors.values_list("email", flat=True))
+        self.assertIn("by_sector@test.com", agent_emails)
+        self.assertIn("by_queue@test.com", agent_emails)
+        self.assertNotIn("other@test.com", agent_emails)
+
     def test_get_csat_agents_includes_agent_with_rooms_in_period_without_auth(self):
         utc_tz = pytz.timezone("UTC")
         in_period = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))

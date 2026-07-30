@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
@@ -613,6 +615,36 @@ class AgentRepository:
             ).aggregate(avg_rating=Avg("csat_survey__rating"))["avg_rating"],
         )
 
+    def _get_csat_agents_scope_filter(
+        self, filters: Filters, project: Project
+    ) -> Optional[Q]:
+        """Agents with authorization on the filtered sector/queue, or a closed
+        room there in the selected period. None when no sector/queue filter."""
+        rooms_in_period = Q(rooms__is_active=False)
+        start_date, end_date = self._get_converted_dates(filters, project)
+        if start_date:
+            rooms_in_period &= Q(rooms__ended_at__gte=start_date)
+        if end_date:
+            rooms_in_period &= Q(rooms__ended_at__lte=end_date)
+
+        queues = filters.queues or ([filters.queue] if filters.queue else None)
+        if queues:
+            return Q(
+                project_permissions__queue_authorizations__queue__in=queues
+            ) | (Q(rooms__queue__in=queues) & rooms_in_period)
+
+        sectors = filters.sector or filters.sectors
+        if sectors:
+            return (
+                Q(project_permissions__sector_authorizations__sector__in=sectors)
+                | Q(
+                    project_permissions__queue_authorizations__queue__sector__in=sectors
+                )
+                | (Q(rooms__queue__sector__in=sectors) & rooms_in_period)
+            )
+
+        return None
+
     def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
         agents = User.objects.filter(
             email__in=ProjectPermission.all_objects.filter(project=project).values_list(
@@ -634,33 +666,9 @@ class AgentRepository:
         if filters.agent:
             agents = agents.filter(email=filters.agent)
 
-        # With sector/queue filters: keep agents that have authorization on the
-        # filtered sector/queue OR had a closed room there in the selected period.
-        rooms_in_period = Q(rooms__is_active=False)
-        start_date, end_date = self._get_converted_dates(filters, project)
-        if start_date:
-            rooms_in_period &= Q(rooms__ended_at__gte=start_date)
-        if end_date:
-            rooms_in_period &= Q(rooms__ended_at__lte=end_date)
-
-        if filters.queues:
-            agents = agents.filter(
-                Q(project_permissions__queue_authorizations__queue__in=filters.queues)
-                | (Q(rooms__queue__in=filters.queues) & rooms_in_period)
-            )
-        elif filters.queue:
-            agents = agents.filter(
-                Q(project_permissions__queue_authorizations__queue=filters.queue)
-                | (Q(rooms__queue=filters.queue) & rooms_in_period)
-            )
-        elif filters.sector:
-            agents = agents.filter(
-                Q(project_permissions__sector_authorizations__sector__in=filters.sector)
-                | Q(
-                    project_permissions__queue_authorizations__queue__sector__in=filters.sector
-                )
-                | (Q(rooms__queue__sector__in=filters.sector) & rooms_in_period)
-            )
+        scope_filter = self._get_csat_agents_scope_filter(filters, project)
+        if scope_filter:
+            agents = agents.filter(scope_filter)
 
         return agents.distinct()
 
