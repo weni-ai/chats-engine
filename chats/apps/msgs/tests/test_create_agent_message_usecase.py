@@ -2,7 +2,7 @@ import json
 from datetime import time
 from unittest.mock import PropertyMock, patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
@@ -13,11 +13,29 @@ from chats.apps.msgs.usecases.create_agent_message import (
     CreateAgentMessageUseCase,
     PostCreateAgentMessageUseCase,
     SerializeMessageForWsUseCase,
+    _request_id_cache_key,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+
+
+class FakeRedis:
+    def __init__(self):
+        self.store = {}
+
+    def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.store:
+            return False
+        self.store[key] = value
+        return True
+
+    def get(self, key):
+        return self.store.get(key)
+
+    def delete(self, key):
+        return 1 if self.store.pop(key, None) is not None else 0
 
 
 class TestCreateAgentMessageUseCase(TestCase):
@@ -58,6 +76,21 @@ class TestCreateAgentMessageUseCase(TestCase):
             status=ProjectPermission.STATUS_ONLINE,
             last_seen=timezone.now(),
         )
+        self.fake_redis = FakeRedis()
+        self.redis_patcher = patch(
+            "chats.apps.msgs.usecases.create_agent_message.get_redis_connection",
+            return_value=self.fake_redis,
+        )
+        self.redis_patcher.start()
+
+    def tearDown(self):
+        self.redis_patcher.stop()
+
+    def _payload(self, request_id=None, text="Hello", **extra):
+        data = {"room": str(self.room.uuid), "text": text, **extra}
+        if request_id is not None:
+            data["request_id"] = request_id
+        return data
 
     @patch(
         "chats.apps.msgs.usecases.create_agent_message.calculate_first_response_time_task.delay"
@@ -159,6 +192,65 @@ class TestCreateAgentMessageUseCase(TestCase):
 
         self.assertEqual(message.text, "Hello")
         mock_register_task.assert_called_once()
+
+    @patch(
+        "chats.apps.msgs.usecases.create_agent_message.calculate_first_response_time_task.delay"
+    )
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_execute_same_request_id_returns_existing_message(
+        self, mock_notify_room, mock_first_response_task
+    ):
+        request_id = "idempotent-create-1"
+        first = self.use_case.execute(self.user, self._payload(request_id))
+        second = self.use_case.execute(
+            self.user, self._payload(request_id, text="Different text")
+        )
+
+        self.assertEqual(first.uuid, second.uuid)
+        self.assertEqual(first.text, "Hello")
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 1)
+        mock_notify_room.assert_called_once_with("create", True)
+
+    @patch(
+        "chats.apps.msgs.usecases.create_agent_message.calculate_first_response_time_task.delay"
+    )
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_execute_releases_claim_on_failure_so_retry_succeeds(
+        self, mock_notify_room, mock_first_response_task
+    ):
+        request_id = "idempotent-retry-after-fail"
+        self.room.is_active = False
+        self.room.save(update_fields=["is_active"])
+
+        with self.assertRaises(MessageCreateError) as ctx:
+            self.use_case.execute(self.user, self._payload(request_id))
+
+        self.assertEqual(ctx.exception.error_code, "room_closed")
+
+        Room.objects.filter(pk=self.room.pk).update(is_active=True)
+        self.room.refresh_from_db()
+
+        message = self.use_case.execute(self.user, self._payload(request_id))
+
+        self.assertEqual(message.text, "Hello")
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 1)
+        mock_notify_room.assert_called_once_with("create", True)
+
+    @override_settings(
+        AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_ATTEMPTS=1,
+        AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_INTERVAL_SECONDS=0,
+    )
+    def test_execute_duplicate_in_progress_raises(self):
+        request_id = "idempotent-pending"
+        self.fake_redis.set(
+            _request_id_cache_key(self.user, request_id),
+            "pending",
+        )
+
+        with self.assertRaises(MessageCreateError) as ctx:
+            self.use_case.execute(self.user, self._payload(request_id))
+
+        self.assertEqual(ctx.exception.error_code, "duplicate_in_progress")
 
 
 class TestPostCreateAgentMessageUseCase(TestCase):
