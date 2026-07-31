@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.csat.flows.definitions.flow import (
     CSAT_FLOW_DEFINITION_DATA,
@@ -24,7 +24,7 @@ class TestCSATFlowService(TestCase):
     def setUp(self):
         self.mock_cache_client = Mock(spec=CacheClient)
         self.mock_flows_client = Mock(spec=FlowRESTClient)
-        self.mock_token_generator = Mock(spec=JWTTokenGenerator)
+        self.mock_token_generator = Mock(spec=CSATJWTTokenGenerator)
 
         self.service = CSATFlowService(
             flows_client=self.mock_flows_client,

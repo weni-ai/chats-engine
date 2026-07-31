@@ -181,3 +181,53 @@ class CheckInactivityRoomsScheduleTests(TestCase):
 
         entry = settings.CELERY_BEAT_SCHEDULE["check-inactivity-rooms"]
         self.assertEqual(entry["schedule"]._orig_minute, "*")
+
+
+class CheckInactivityRoomsQueueRoutingTests(TestCase):
+    """
+    Guards the routing of `check_inactivity_rooms` to its dedicated queue so
+    a backlog on the default queue cannot delay the inactivity beat tick.
+    """
+
+    def test_task_is_routed_to_inactivity_queue(self):
+        from django.conf import settings
+
+        routes = getattr(settings, "CELERY_TASK_ROUTES", {})
+        self.assertIn("check_inactivity_rooms", routes)
+        self.assertEqual(
+            routes["check_inactivity_rooms"]["queue"],
+            settings.INACTIVITY_CELERY_QUEUE,
+        )
+
+    def test_beat_schedule_publishes_to_inactivity_queue(self):
+        from django.conf import settings
+
+        entry = settings.CELERY_BEAT_SCHEDULE["check-inactivity-rooms"]
+        self.assertEqual(
+            entry["options"]["queue"], settings.INACTIVITY_CELERY_QUEUE
+        )
+
+    @override_settings(
+        INACTIVITY_CELERY_QUEUE="inactivity",
+        CELERY_TASK_ROUTES={
+            "check_inactivity_rooms": {"queue": "inactivity"},
+        },
+        CELERY_BEAT_SCHEDULE={
+            "check-inactivity-rooms": {
+                "task": "check_inactivity_rooms",
+                "schedule": crontab(minute="*"),
+                "options": {"queue": "inactivity"},
+            },
+        },
+    )
+    def test_routing_and_schedule_use_same_queue_name(self):
+        from django.conf import settings
+
+        route_queue = settings.CELERY_TASK_ROUTES["check_inactivity_rooms"][
+            "queue"
+        ]
+        schedule_queue = settings.CELERY_BEAT_SCHEDULE[
+            "check-inactivity-rooms"
+        ]["options"]["queue"]
+        self.assertEqual(route_queue, schedule_queue)
+        self.assertEqual(route_queue, "inactivity")

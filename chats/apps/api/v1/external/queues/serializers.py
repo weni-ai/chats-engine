@@ -15,8 +15,10 @@ class QueueFlowSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "name",
+            "queue_purpose",
         ]
         extra_kwargs = {
             "uuid": {"help_text": "Unique identifier of the queue"},
             "name": {"help_text": "Display name of the queue"},
+            "queue_purpose": {"help_text": "Description of the queue purpose"},
         }

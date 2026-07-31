@@ -18,8 +18,8 @@ class FeaturePrompt(BaseModel):
     class Meta:
         unique_together = ("feature", "version")
 
-        verbose_name = _("AI Feature Prompt")
-        verbose_name_plural = _("AI Feature Prompts")
+        verbose_name = _("AI feature prompt")
+        verbose_name_plural = _("AI feature prompts")
 
     def __str__(self):
         return f"{self.feature} - {self.version}"

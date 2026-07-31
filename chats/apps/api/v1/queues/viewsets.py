@@ -131,6 +131,7 @@ class QueueViewset(ModelViewSet):
             content = {
                 "uuid": str(instance.uuid),
                 "name": instance.name,
+                "queue_purpose": instance.queue_purpose,
                 "sector_uuid": str(instance.sector.uuid),
                 "project_uuid": str(instance.sector.project.uuid),
             }
@@ -156,6 +157,7 @@ class QueueViewset(ModelViewSet):
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
+            "queue_purpose": instance.queue_purpose,
             "sector_uuid": str(instance.sector.uuid),
         }
 
@@ -378,17 +380,21 @@ class QueueViewset(ModelViewSet):
         project = Project.objects.get(sectors__queues=instance)
         project_admins = project.admins
 
-        combined_permissions = queue_agents.union(sector_agents, project_admins)
+        project_config = project.config if isinstance(project.config, dict) else {}
+        filter_offline_agents = project_config.get("filter_offline_agents", False)
+        filter_moderators = project_config.get("filter_moderators", False)
 
-        if isinstance(project.config, dict) and project.config.get(
-            "filter_offline_agents", False
-        ):
+        if filter_offline_agents:
             online_queue_agents = instance.online_agents
             online_sector_managers = sector.online_managers
-            online_admins = project.online_admins
-            combined_permissions = online_queue_agents.union(
-                online_sector_managers, online_admins
-            )
+            combined_permissions = online_queue_agents.union(online_sector_managers)
+            if not filter_moderators:
+                online_admins = project.online_admins
+                combined_permissions = combined_permissions.union(online_admins)
+        else:
+            combined_permissions = queue_agents.union(sector_agents)
+            if not filter_moderators:
+                combined_permissions = combined_permissions.union(project_admins)
 
         agents_pks = set(combined_permissions.values_list("id", flat=True))
         agents = User.objects.filter(id__in=agents_pks)

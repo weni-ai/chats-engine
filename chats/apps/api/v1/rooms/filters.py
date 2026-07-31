@@ -27,7 +27,7 @@ class RoomFilter(filters.FilterSet):
         field_name="project",
         required=True,
         method="filter_project",
-        help_text=_("Project's UUID"),
+        help_text=_("Project UUID"),
     )
 
     is_active = filters.BooleanFilter(

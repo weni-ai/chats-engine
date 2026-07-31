@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -7,7 +8,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import Filters
 from chats.apps.api.v1.dashboard.service import TimeMetricsService
 from chats.apps.contacts.models import Contact
-from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.models import MetricGoal, RoomMetrics
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -440,3 +441,161 @@ class TimeMetricsServiceTest(TestCase):
 
         self.assertEqual(result["avg_first_response_time"], 300)
         self.assertEqual(result["max_first_response_time"], 400)
+
+
+class TimeMetricsServiceGoalsIntegrationTest(TestCase):
+    """
+    Verifies that `get_time_metrics` exposes the configured goals inline so
+    the front can render widget alerts in the same response. Only active
+    goals are included; metrics without a configured goal stay absent so
+    the front does not have to special-case empty payloads.
+    """
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Goals Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.user = User.objects.create_user(email="agent@test.com")
+        self.contact = Contact.objects.create(name="Contact", email="c@test.com")
+        self.service = TimeMetricsService()
+        self.ff_patch = patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
+
+    def _filters(self, **overrides) -> Filters:
+        defaults = dict(
+            start_date=None,
+            end_date=None,
+            agent=None,
+            sector=None,
+            tag=None,
+            queue=None,
+            user_request=None,
+            project=self.project,
+            is_weni_admin=False,
+        )
+        defaults.update(overrides)
+        return Filters(**defaults)
+
+    def test_response_has_no_goal_keys_when_nothing_configured(self):
+        result = self.service.get_time_metrics(self._filters(), self.project)
+
+        self.assertNotIn("waiting_time_goal", result)
+        self.assertNotIn("first_response_time_goal", result)
+        self.assertNotIn("conversation_duration_goal", result)
+
+    def test_inactive_goal_is_omitted(self):
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_SECOND,
+            is_active=False,
+        )
+
+        result = self.service.get_time_metrics(self._filters(), self.project)
+
+        self.assertNotIn("waiting_time_goal", result)
+
+    def test_feature_flag_off_omits_goals_even_when_configured(self):
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_SECOND,
+        )
+        with patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_metric_goal_alerts_enabled",
+            return_value=False,
+        ):
+            result = self.service.get_time_metrics(self._filters(), self.project)
+
+        self.assertNotIn("waiting_time_goal", result)
+
+    def test_active_goal_appears_with_threshold_value(self):
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_MINUTE,
+            rooms_threshold_count=5,
+        )
+
+        result = self.service.get_time_metrics(self._filters(), self.project)
+
+        goal = result["waiting_time_goal"]
+        self.assertEqual(goal["threshold_seconds"], 300)
+        self.assertEqual(goal["threshold_value"], 5)
+        self.assertEqual(goal["unit"], MetricGoal.UNIT_MINUTE)
+        self.assertEqual(goal["breached_rooms_count"], 0)
+        self.assertFalse(goal["is_breached"])
+
+    def test_breach_count_reflects_real_rooms(self):
+        now = timezone.now()
+        # 3 rooms over the 300s threshold.
+        for i in range(3):
+            room = Room.objects.create(
+                queue=self.queue,
+                contact=Contact.objects.create(
+                    name=f"c-{i}", email=f"c{i}@test.com"
+                ),
+                user=None,
+                is_active=True,
+            )
+            Room.objects.filter(uuid=room.uuid).update(
+                added_to_queue_at=now - timedelta(seconds=400)
+            )
+
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_SECOND,
+            rooms_threshold_count=5,
+        )
+
+        result = self.service.get_time_metrics(self._filters(), self.project)
+
+        goal = result["waiting_time_goal"]
+        self.assertEqual(goal["breached_rooms_count"], 3)
+        # The widget alert is not gated by `rooms_threshold_count` (that
+        # only gates the email notification) — any room breaching is enough.
+        self.assertTrue(goal["is_breached"])
+
+    def test_is_breached_when_count_meets_threshold(self):
+        now = timezone.now()
+        for i in range(5):
+            room = Room.objects.create(
+                queue=self.queue,
+                contact=Contact.objects.create(
+                    name=f"c-{i}", email=f"c{i}@test.com"
+                ),
+                user=None,
+                is_active=True,
+            )
+            Room.objects.filter(uuid=room.uuid).update(
+                added_to_queue_at=now - timedelta(seconds=400)
+            )
+
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+            threshold_seconds=300,
+            unit=MetricGoal.UNIT_SECOND,
+            rooms_threshold_count=5,
+        )
+
+        result = self.service.get_time_metrics(self._filters(), self.project)
+
+        goal = result["waiting_time_goal"]
+        self.assertEqual(goal["breached_rooms_count"], 5)
+        self.assertTrue(goal["is_breached"])

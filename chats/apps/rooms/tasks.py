@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone as dj_timezone
+from django.utils import translation
 from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
@@ -205,20 +206,25 @@ def _process_room_export(report: ReportStatus) -> None:
             f"ReportStatus {report.uuid} has no export types in fields_config"
         )
 
-    data = BuildRoomExportData().execute(report.room, generated_by=report.user.email)
-    files = RenderRoomExport().execute(data, types)
+    language = report.user.language or settings.LANGUAGE_CODE
 
-    if getattr(settings, "REPORTS_SEND_EMAILS", False):
-        SendRoomExportEmail().execute(
-            room=report.room,
-            files=files,
-            recipient_email=report.user.email,
+    with translation.override(language):
+        data = BuildRoomExportData().execute(
+            report.room, generated_by=report.user.email
         )
-    else:
-        logger.info(
-            "REPORTS_SEND_EMAILS disabled; skipping email for room export %s",
-            report.uuid,
-        )
+        files = RenderRoomExport().execute(data, types)
+
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            SendRoomExportEmail().execute(
+                room=report.room,
+                files=files,
+                recipient_email=report.user.email,
+            )
+        else:
+            logger.info(
+                "REPORTS_SEND_EMAILS disabled; skipping email for room export %s",
+                report.uuid,
+            )
 
 
 def _handle_room_export_error(report: ReportStatus, error: Exception) -> None:
@@ -250,11 +256,13 @@ def _handle_room_export_error(report: ReportStatus, error: Exception) -> None:
         settings, "REPORTS_SEND_EMAILS", False
     ):
         try:
-            SendRoomExportEmail().send_failure_notification(
-                room=report.room,
-                recipient_email=report.user.email,
-                error_message=str(error),
-            )
+            language = report.user.language or settings.LANGUAGE_CODE
+            with translation.override(language):
+                SendRoomExportEmail().send_failure_notification(
+                    room=report.room,
+                    recipient_email=report.user.email,
+                    error_message=str(error),
+                )
         except Exception as email_error:
             logger.exception(
                 "Error sending room export failure notification: %s", email_error

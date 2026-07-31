@@ -64,6 +64,7 @@ class BulkQueueCreationUseCase:
         return Queue.objects.create(
             sector=self.sector,
             name=queue_data["name"],
+            queue_purpose=queue_data.get("queue_purpose"),
             config=queue_data.get("config"),
             queue_limit=queue_limit_data.get("limit"),
             # Coerce explicit ``null`` from the serializer (which allows it)
@@ -117,6 +118,7 @@ class BulkQueueCreationUseCase:
         flows_response = FlowRESTClient().create_queue(
             uuid=str(queue.uuid),
             name=queue.name,
+            queue_purpose=queue.queue_purpose,
             sector_uuid=str(self.sector.uuid),
             project_uuid=str(self.project.uuid),
         )

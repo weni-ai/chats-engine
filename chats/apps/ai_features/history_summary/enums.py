@@ -14,10 +14,10 @@ class HistorySummaryFeedbackTags(models.TextChoices):
         "I had to read the full conversation"
     )
     DID_NOT_SPEED_UP_WORKFLOW = "DID_NOT_SPEED_UP_WORKFLOW", _(
-        "Did not speed up the workflow"
+        "Didn't speed up the workflow"
     )
     HARD_TO_UNDERSTAND_LANGUAGE = "HARD_TO_UNDERSTAND_LANGUAGE", _(
-        "Hard to understand language"
+        "Hard to understand the language"
     )
-    DID_NOT_LOAD = "DID_NOT_LOAD", _("Did not load")
+    DID_NOT_LOAD = "DID_NOT_LOAD", _("Didn't load")
     UNCLEAR_INTERFACE = "UNCLEAR_INTERFACE", _("Unclear interface")

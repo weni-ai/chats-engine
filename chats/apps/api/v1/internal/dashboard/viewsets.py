@@ -4,7 +4,12 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+)
 from chats.apps.api.v1.dashboard.dto import (
     get_admin_domains_exclude_filter,
     should_exclude_admin_domains,
@@ -59,7 +64,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = DashboardAgentsSerializer
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [permissions.IsAuthenticated(), ModuleHasPermission()]
 
     @action(
         detail=True,

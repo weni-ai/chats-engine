@@ -11,7 +11,7 @@ from chats.apps.rooms.models import Room
 from chats.apps.csat.services import CSATFlowService
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.cache import CacheClient
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 
 
 @app.task
@@ -21,7 +21,7 @@ def start_csat_flow(room_uuid: str):
     CSATFlowService(
         flows_client=FlowRESTClient(),
         cache_client=CacheClient(),
-        token_generator=JWTTokenGenerator(),
+        token_generator=CSATJWTTokenGenerator(),
     ).start_csat_flow(room)
 
 
@@ -32,7 +32,7 @@ def create_csat_flow(project_uuid: str):
     CSATFlowService(
         flows_client=FlowRESTClient(),
         cache_client=CacheClient(),
-        token_generator=JWTTokenGenerator(),
+        token_generator=CSATJWTTokenGenerator(),
     ).create_csat_flow(project)
 
 
@@ -63,7 +63,7 @@ def update_project_csat_flow_definition(
     CSATFlowService(
         flows_client=FlowRESTClient(),
         cache_client=CacheClient(),
-        token_generator=JWTTokenGenerator(),
+        token_generator=CSATJWTTokenGenerator(),
     ).update_csat_flow_definition(project, definition, version)
 
 

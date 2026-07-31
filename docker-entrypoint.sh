@@ -6,6 +6,7 @@ export CELERY_APP=${CELERY_APP:-"chats"}
 export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 export CELERY_MAX_WORKERS=${CELERY_MAX_WORKERS:-'6'}
+export CELERY_ARCHIVE_CHATS_MAX_WORKERS=${CELERY_ARCHIVE_CHATS_MAX_WORKERS:-'6'}
 export CELERY_BEAT_DATABASE_FILE=${CELERY_BEAT_DATABASE_FILE:-'/tmp/celery_beat_database'}
 export HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT:-"10"}
 
@@ -53,12 +54,16 @@ elif [[ "celery-worker" == "$1" ]]; then
     if [ "${2}" ] ; then
         celery_queue="${2}"
     fi
+    celery_max_workers="${CELERY_MAX_WORKERS}"
+    if [[ "${celery_queue}" == "archive-chats" && -n "${CELERY_ARCHIVE_CHATS_MAX_WORKERS}" ]]; then
+        celery_max_workers="${CELERY_ARCHIVE_CHATS_MAX_WORKERS}"
+    fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec celery \
         -A "${CELERY_APP}" --workdir="${PROJECT_PATH}" worker \
         -Q "${celery_queue}" \
         -O fair \
         -l "${LOG_LEVEL}" \
-        --autoscale=${CELERY_MAX_WORKERS},1
+        --autoscale=${celery_max_workers},1
 elif [[ "healthcheck-celery-worker" == "$1" ]]; then
     celery_queue="celery"
     if [ "${2}" ] ; then

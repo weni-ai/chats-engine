@@ -8,13 +8,13 @@ from chats.core.models import BaseModel, BaseSoftDeleteModel, WebSocketsNotifiab
 
 class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
     subject = models.CharField(
-        _("Subject Text"), max_length=50, blank=False, null=False
+        _("Subject text"), max_length=50, blank=False, null=False
     )
     created_by = models.ForeignKey(
         "accounts.User",
         related_name="discussions",
         on_delete=models.CASCADE,
-        verbose_name=_("Created By"),
+        verbose_name=_("Created by"),
         to_field="email",
     )
     room = models.ForeignKey(

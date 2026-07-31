@@ -2,16 +2,16 @@ from django.conf import settings
 
 from chats.apps.api.authentication.exceptions import InvalidTokenError
 from chats.apps.api.authentication.services.jwt_service import JWTService
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
 from chats.apps.projects.models.models import Project
 
 
-class GenericJWTAuthentication(BaseAuthentication):
+class CSATJWTAuthentication(BaseAuthentication):
     """
-    Authentication class for the JWT token.
+    Authentication class for CSAT webhook JWT tokens.
     """
 
     def authenticate(self, request):
@@ -34,7 +34,7 @@ class GenericJWTAuthentication(BaseAuthentication):
         """
         Authenticate the credentials using the JWT token.
         """
-        token_generator = JWTTokenGenerator()
+        token_generator = CSATJWTTokenGenerator()
         try:
             payload = token_generator.verify_token(token)
             return (None, payload)

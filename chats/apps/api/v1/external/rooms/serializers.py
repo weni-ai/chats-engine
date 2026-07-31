@@ -518,7 +518,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 return room
 
             raise ValidationError(
-                {"detail": _("The contact already have an open room in the project")}
+                {"detail": _("The contact already has an open room in the project")}
             )
 
     def get_queue_and_sector(self, validated_data):
@@ -532,7 +532,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if queue is None and provided_sector_uuid is None:
             raise ValidationError(
-                {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
+                {"detail": _("Can't create a room without queue_uuid or sector_uuid")}
             )
 
         if queue is None:
@@ -541,13 +541,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             ).first()
             if queue is None:
                 raise ValidationError(
-                    {"detail": _("No active queue found for provided sector_uuid")}
+                    {"detail": _("No active queue found for the provided sector_uuid")}
                 )
 
         sector = queue.sector
         if provided_sector_uuid and str(provided_sector_uuid) != str(sector.uuid):
             raise ValidationError(
-                {"detail": _("queue_uuid does not belong to provided sector_uuid")}
+                {"detail": _("queue_uuid doesn't belong to the provided sector_uuid")}
             )
 
         return queue, sector
@@ -577,7 +577,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         # Agent status validation unchanged
         if sector.validate_agent_status() is False:
             raise ValidationError(
-                {"detail": _("Contact cannot be done when agents are offline")}
+                {"detail": _("No chat can start while representatives are offline")}
             )
 
     def check_work_time_weekend(self, sector, created_on):

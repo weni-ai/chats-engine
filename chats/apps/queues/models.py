@@ -31,7 +31,7 @@ User = get_user_model()
 class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     sector = models.ForeignKey(
         "sectors.Sector",
-        verbose_name=_("sector"),
+        verbose_name=_("Department"),
         related_name="queues",
         on_delete=models.CASCADE,
     )
@@ -39,6 +39,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
     default_message = models.TextField(
         _("Default queue message"), null=True, blank=True
     )
+    queue_purpose = models.TextField(_("Queue purpose"), null=True, blank=True)
     queue_limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
     is_queue_limit_active = models.BooleanField(_("Is limit active?"), default=False)
 
@@ -46,8 +47,8 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
     all_objects = QueueManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector Queue")
-        verbose_name_plural = _("Sector Queues")
+        verbose_name = _("Department queue")
+        verbose_name_plural = _("Department queues")
 
         constraints = [
             models.UniqueConstraint(fields=["sector", "name"], name="unique_queue_name")
@@ -98,6 +99,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         return User.objects.filter(
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=self,
+            project_permissions__queue_authorizations__is_deleted=False,
             project_permissions__is_deleted=False,
         )
 
@@ -129,6 +131,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
             "project_permissions__project": self.sector.project,
             "project_permissions__queue_authorizations__queue": self,
             "project_permissions__queue_authorizations__role": 1,
+            "project_permissions__queue_authorizations__is_deleted": False,
         }
 
         # If ping timeout feature is enabled, also filter by last_seen
@@ -327,7 +330,7 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_AGENT, _("agent")),
+        (ROLE_AGENT, _("Representative")),
     ]
 
     queue = models.ForeignKey(
@@ -351,11 +354,13 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     all_objects = QueueAuthorizationManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector Queue Authorization")
-        verbose_name_plural = _("Sector Queues Authorization")
+        verbose_name = _("Department queue authorization")
+        verbose_name_plural = _("Department queue authorizations")
         constraints = [
             models.UniqueConstraint(
-                fields=["queue", "permission"], name="unique_queue_auth"
+                fields=["queue", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_queue_auth",
             )
         ]
 

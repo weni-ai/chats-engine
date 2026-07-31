@@ -919,7 +919,7 @@ class BulkTakeSerializer(serializers.Serializer):
         max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
         if len(value) > max_rooms:
             raise serializers.ValidationError(
-                _("Cannot take more than %(max_rooms)s rooms at once")
+                _("Can't take more than %(max_rooms)s rooms at once")
                 % {"max_rooms": max_rooms}
             )
 
@@ -935,7 +935,7 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in queue"))
+            raise serializers.ValidationError(_("No available rooms found in the queue"))
         attrs["rooms"] = rooms
         return super().validate(attrs)
 
