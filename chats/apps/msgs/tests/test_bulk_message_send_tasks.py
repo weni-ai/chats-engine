@@ -69,6 +69,7 @@ class ProcessBulkMessageSendTaskTests(TestCase):
         self, mock_usecase, mock_delay
     ):
         mock_queryset = MagicMock()
+        mock_queryset.count.return_value = 2
         mock_queryset.values_list.return_value = [
             self.room_one.uuid,
             self.room_two.uuid,
@@ -92,6 +93,7 @@ class ProcessBulkMessageSendTaskTests(TestCase):
     @patch("chats.apps.msgs.tasks.get_bulk_send_rooms_usecase")
     def test_does_not_dispatch_when_no_rooms(self, mock_usecase, mock_delay):
         mock_queryset = MagicMock()
+        mock_queryset.count.return_value = 0
         mock_queryset.values_list.return_value = []
         mock_usecase.execute.return_value = mock_queryset
 
