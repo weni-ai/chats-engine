@@ -188,7 +188,10 @@ def _build_violation_queryset(metric: str, project_uuid: str, cutoff: datetime):
         )
 
     if metric == MetricGoal.METRIC_CONVERSATION_DURATION:
+        # Must match MetricGoalBreachService / TimeMetricsService: only
+        # rooms currently assigned to an agent count as "in conversation".
         return base.filter(
+            user__isnull=False,
             first_user_assigned_at__isnull=False,
             first_user_assigned_at__lte=cutoff,
         )

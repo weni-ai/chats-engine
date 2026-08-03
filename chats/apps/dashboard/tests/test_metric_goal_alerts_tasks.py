@@ -182,7 +182,11 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         self.assertIn("Live Desk", sent.subject)
         self.assertTrue(sent.alternatives)
         self.assertEqual(sent.alternatives[0][1], "text/html")
-        self.assertIn(settings.WENI_DASHBOARD_URL, sent.alternatives[0][0])
+        expected_url = (
+            f"{settings.WENI_DASHBOARD_URL.rstrip('/')}"
+            f"/projects/{self.project.uuid}/insights/"
+        )
+        self.assertIn(expected_url, sent.alternatives[0][0])
 
     def test_continuous_violation_emits_update_action(self):
         _seed_room(self.project, self.queue)

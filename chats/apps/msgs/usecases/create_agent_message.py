@@ -1,9 +1,12 @@
 import json
+import time
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
+from django_redis import get_redis_connection
 from rest_framework import exceptions as drf_exceptions
 
 from chats.apps.api.v1.msgs.serializers import MessageSerializer, MessageWSSerializer
@@ -18,9 +21,133 @@ from chats.apps.msgs.validators.agent_message_create import (
 )
 from chats.apps.rooms.models import Room
 
+REQUEST_ID_PENDING_MARKER = "pending"
+
+
+def _request_id_cache_key(user, request_id: str) -> str:
+    return f"agent_message_create:{user.pk}:{request_id}"
+
+
+def _get_redis_connection_safe():
+    try:
+        return get_redis_connection()
+    except Exception:
+        return None
+
+
+def _decode_redis_value(value):
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value.decode()
+    return str(value)
+
+
+def _claim_request_id(user, request_id: str) -> bool:
+    """SET NX pending. Returns True when this request won the claim.
+
+    Fail-open: if Redis is unavailable, treat as claimed so creation proceeds.
+    """
+    redis_conn = _get_redis_connection_safe()
+    if redis_conn is None:
+        return True
+
+    try:
+        was_set = redis_conn.set(
+            _request_id_cache_key(user, request_id),
+            REQUEST_ID_PENDING_MARKER,
+            nx=True,
+            ex=settings.AGENT_MESSAGE_CREATE_REQUEST_ID_CACHE_TTL,
+        )
+        return bool(was_set)
+    except Exception:
+        return True
+
+
+def _get_request_id_value(user, request_id: str):
+    redis_conn = _get_redis_connection_safe()
+    if redis_conn is None:
+        return None
+
+    try:
+        return _decode_redis_value(
+            redis_conn.get(_request_id_cache_key(user, request_id))
+        )
+    except Exception:
+        return None
+
+
+def _store_request_id_message(user, request_id: str, message_uuid) -> None:
+    redis_conn = _get_redis_connection_safe()
+    if redis_conn is None:
+        return
+
+    try:
+        redis_conn.set(
+            _request_id_cache_key(user, request_id),
+            str(message_uuid),
+            ex=settings.AGENT_MESSAGE_CREATE_REQUEST_ID_CACHE_TTL,
+        )
+    except Exception:
+        pass
+
+
+def _release_request_id(user, request_id: str) -> None:
+    redis_conn = _get_redis_connection_safe()
+    if redis_conn is None:
+        return
+
+    try:
+        redis_conn.delete(_request_id_cache_key(user, request_id))
+    except Exception:
+        pass
+
+
+def _resolve_existing_message(user, request_id: str) -> ChatMessage:
+    value = _get_request_id_value(user, request_id)
+
+    if value and value != REQUEST_ID_PENDING_MARKER:
+        message = ChatMessage.objects.filter(uuid=value).first()
+        if message is not None:
+            return message
+
+    for _attempt in range(settings.AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_ATTEMPTS):
+        time.sleep(settings.AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_INTERVAL_SECONDS)
+        value = _get_request_id_value(user, request_id)
+        if value and value != REQUEST_ID_PENDING_MARKER:
+            message = ChatMessage.objects.filter(uuid=value).first()
+            if message is not None:
+                return message
+
+    raise MessageCreateError(
+        "duplicate_in_progress",
+        _("A message with this request_id is already being created"),
+    )
+
 
 class CreateAgentMessageUseCase:
     def execute(self, user, data: dict) -> ChatMessage:
+        request_id = data.get("request_id")
+        claimed = False
+
+        if request_id:
+            claimed = _claim_request_id(user, request_id)
+            if not claimed:
+                return _resolve_existing_message(user, request_id)
+
+        try:
+            message = self._create_message(user, data)
+        except Exception:
+            if request_id and claimed:
+                _release_request_id(user, request_id)
+            raise
+
+        if request_id and claimed:
+            _store_request_id_message(user, request_id, message.uuid)
+
+        return message
+
+    def _create_message(self, user, data: dict) -> ChatMessage:
         room_uuid = data.get("room")
         if not room_uuid:
             raise MessageCreateError("validation_error", _("Room is required"))

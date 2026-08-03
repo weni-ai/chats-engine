@@ -56,7 +56,7 @@ def map_save_validation_error(
     message = first_serializer_error(detail)
     normalized = message.lower()
 
-    if "closed rooms cannot receive messages" in normalized:
+    if "closed rooms can't receive messages" in normalized:
         return MessageCreateError("room_closed", message)
     if "24h" in normalized:
         return MessageCreateError("message_window_expired", message)

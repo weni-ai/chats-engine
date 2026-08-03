@@ -237,6 +237,44 @@ class AgentMessageCreateWebSocketTestCase(AgentConsumerTestCase):
 
         await communicator.disconnect()
 
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    async def test_message_create_same_request_id_is_idempotent(self, mock_notify_room):
+        from chats.apps.msgs.models import Message
+        from chats.apps.msgs.tests.test_create_agent_message_usecase import FakeRedis
+
+        fake_redis = FakeRedis()
+        with patch(
+            "chats.apps.msgs.usecases.create_agent_message.get_redis_connection",
+            return_value=fake_redis,
+        ):
+            communicator = await self._connect()
+            request_id = "tmp-test-idempotent"
+            payload = {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Hello once",
+                },
+            }
+
+            await communicator.send_json_to(payload)
+            first = await communicator.receive_json_from()
+            self.assertEqual(first["action"], "msg.create.success")
+
+            await communicator.send_json_to(payload)
+            second = await communicator.receive_json_from()
+            self.assertEqual(second["action"], "msg.create.success")
+
+            self.assertEqual(first["content"]["uuid"], second["content"]["uuid"])
+            self.assertEqual(first["content"]["request_id"], request_id)
+            self.assertEqual(second["content"]["request_id"], request_id)
+            self.assertEqual(Message.objects.filter(room=self.room).count(), 1)
+            mock_notify_room.assert_called_once_with("create", True)
+
+            await communicator.disconnect()
+
 
 class PingTimeoutUnitTestCase(TestCase):
     """Unit tests for ping timeout logic"""

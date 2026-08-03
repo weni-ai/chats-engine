@@ -207,6 +207,35 @@ class DetectViolationsTestCase(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].violating_count, 1)
 
+    def test_conversation_duration_ignores_rooms_without_current_agent(self):
+        """Unassigned rooms with first_user_assigned_at must not count.
+
+        Matches MetricGoalBreachService / the dashboard widget, which only
+        treat rooms currently assigned to an agent as in conversation.
+        """
+        user = User.objects.create_user(email="cd-agent2@example.com")
+        self.project.permissions.create(user=user, role=1)
+        MetricGoal.objects.create(
+            project=self.project,
+            metric=MetricGoal.METRIC_CONVERSATION_DURATION,
+            threshold_seconds=60,
+            rooms_threshold_count=1,
+        )
+        assigned = _build_active_room(
+            self.project, self.queue, user=user, age_seconds=300
+        )
+        # Previously assigned, now back in queue (no current agent).
+        unassigned = _build_active_room(
+            self.project, self.queue, user=user, age_seconds=400
+        )
+        Room.objects.filter(pk=unassigned.pk).update(user=None)
+
+        results = detect_violations(MetricGoal.METRIC_CONVERSATION_DURATION)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].violating_count, 1)
+        self.assertEqual(assigned.user_id, user.email)
+
 
 class ProcessViolationsTestCase(TestCase):
     def setUp(self):
