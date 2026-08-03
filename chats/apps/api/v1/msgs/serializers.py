@@ -72,6 +72,62 @@ TODO: Refactor these serializers into less classes
 """
 
 
+class ReplyToSerializer(serializers.Serializer):
+    """Write payload for agent replies to a contact message."""
+
+    uuid = serializers.UUIDField()
+
+
+def _resolve_external_id_for_reply(room, message_uuid: str) -> str:
+    """Resolve the WhatsApp/external id of the message being replied to.
+
+    Prefer ``Message.external_id``; fall back to ``ChatMessageReplyIndex``.
+    Scoped to ``room`` so a foreign message uuid cannot be cited.
+    """
+    try:
+        original = ChatMessage.objects.get(uuid=message_uuid, room=room)
+    except ChatMessage.DoesNotExist as exc:
+        raise serializers.ValidationError(
+            {"reply_to": {"uuid": "Message not found in this room"}}
+        ) from exc
+
+    if original.external_id:
+        return original.external_id
+
+    index = (
+        ChatMessageReplyIndex.objects.filter(message=original)
+        .order_by("-created_on")
+        .first()
+    )
+    if index and index.external_id:
+        return index.external_id
+
+    raise serializers.ValidationError(
+        {"reply_to": {"uuid": "Message has no external_id"}}
+    )
+
+
+def _apply_reply_to_metadata(attrs: dict) -> dict:
+    """Pop write-only ``reply_to`` and persist it as ``metadata.context.id``."""
+    reply_to = attrs.pop("reply_to", None)
+    if not reply_to:
+        return attrs
+
+    room = attrs.get("room")
+    if room is None:
+        raise serializers.ValidationError(
+            {"reply_to": "Room is required when replying to a message"}
+        )
+
+    external_id = _resolve_external_id_for_reply(room, reply_to["uuid"])
+    metadata = dict(attrs.get("metadata") or {})
+    context = dict(metadata.get("context") or {})
+    context["id"] = external_id
+    metadata["context"] = context
+    attrs["metadata"] = metadata
+    return attrs
+
+
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     transcription = serializers.SerializerMethodField(read_only=True)
@@ -226,6 +282,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, default=""
     )
     metadata = serializers.JSONField(required=False, allow_null=True)
+    reply_to = ReplyToSerializer(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = ChatMessage
@@ -239,6 +296,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "seen",
             "created_on",
             "metadata",
+            "reply_to",
         ]
         read_only_fields = [
             "uuid",
@@ -256,6 +314,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             if uid is None:
                 raise serializers.ValidationError({"user_email": "not found"})
             attrs["user_id"] = email.lower()
+        attrs = _apply_reply_to_metadata(attrs)
         return super().validate(attrs)
 
     def create(self, validated_data):
@@ -334,6 +393,7 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "metadata",
             "replied_message",
+            "reply_to",
             "is_read",
             "is_delivered",
             "internal_note",
@@ -442,7 +502,16 @@ class MessageSerializer(BaseMessageSerializer):
 
 
 class MessageWSSerializer(MessageSerializer):
-    pass
+    """WS/callback serializer. Adds outbound ``reply_to`` for VCS/Flows."""
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        metadata = instance.metadata or {}
+        context = metadata.get("context") or {}
+        external_id = context.get("id")
+        if external_id:
+            data["reply_to"] = {"external_id": external_id}
+        return data
 
 
 class ChatCompletionSerializer(serializers.ModelSerializer):
