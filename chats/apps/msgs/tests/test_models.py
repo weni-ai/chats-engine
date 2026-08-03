@@ -110,6 +110,17 @@ class TestMessageModel(TestCase):
         serialized_data = msg.serialized_ws_data
         self.assertIn("metadata", serialized_data)
         self.assertEqual(serialized_data["metadata"], metadata)
+        self.assertEqual(
+            serialized_data["reply_to"],
+            {"external_id": "123e4567-e89b-12d3-a456-426614174000"},
+        )
+
+    def test_message_serialized_data_omits_reply_to_without_context_id(self):
+        msg = Message.objects.create(room=self.room, text="no reply")
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertNotIn("reply_to", serialized_data)
 
     def test_message_with_empty_context_values(self):
         """

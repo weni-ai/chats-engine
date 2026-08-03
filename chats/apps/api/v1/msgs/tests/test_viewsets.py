@@ -1,5 +1,6 @@
+import json
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -8,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -326,3 +328,176 @@ class TestMessageViewsetCreate(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ai_text_improvement", response.data)
+
+
+class TestMessageViewsetReplyTo(APITestCase):
+    """Agent outbound reply: reply_to.uuid → metadata.context.id → callback reply_to."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.contact = Contact.objects.create(
+            name="Test Contact", email="contact@test.com"
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            email="agent@test.com", password="testpass123"
+        )
+        self.room.user = self.user
+        self.room.save(update_fields=["user"])
+        self.client.force_authenticate(user=self.user)
+
+        self.contact_message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Contact question",
+            external_id="wamid.external-msg-987654",
+        )
+
+    @patch("chats.apps.rooms.models.Room.base_notification")
+    @patch("chats.apps.msgs.models.get_request_session_with_retries")
+    def test_create_with_reply_to_persists_metadata_and_callback(
+        self, mock_get_session, _mock_notify
+    ):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_session = Mock()
+        mock_session.post.return_value = mock_response
+        mock_get_session.return_value = mock_session
+
+        self.room.callback_url = "https://example.com/webhook"
+        self.room.save(update_fields=["callback_url"])
+
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Agent reply",
+            "reply_to": {"uuid": str(self.contact_message.uuid)},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = Message.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(
+            created.metadata["context"]["id"], "wamid.external-msg-987654"
+        )
+
+        mock_session.post.assert_called_once()
+        payload = json.loads(mock_session.post.call_args[1]["data"])
+        self.assertEqual(payload["type"], "msg.create")
+        self.assertEqual(
+            payload["content"]["reply_to"],
+            {"external_id": "wamid.external-msg-987654"},
+        )
+
+    def test_create_without_reply_to_has_no_context_id(self):
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Plain agent message",
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = Message.objects.get(uuid=response.data["uuid"])
+        self.assertNotIn("context", created.metadata or {})
+        self.assertNotIn("reply_to", response.data)
+
+    def test_create_with_reply_to_unknown_uuid_returns_400(self):
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Agent reply",
+            "reply_to": {"uuid": "00000000-0000-0000-0000-000000000001"},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reply_to", response.data)
+
+    def test_create_with_reply_to_message_without_external_id_returns_400(self):
+        message_without_external = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="No external id yet",
+        )
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Agent reply",
+            "reply_to": {"uuid": str(message_without_external.uuid)},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reply_to", response.data)
+
+    def test_create_with_reply_to_resolves_external_id_from_reply_index(self):
+        message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Indexed only",
+        )
+        ChatMessageReplyIndex.objects.create(
+            external_id="wamid.from-index-only",
+            message=message,
+        )
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Agent reply",
+            "reply_to": {"uuid": str(message.uuid)},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = Message.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(
+            created.metadata["context"]["id"], "wamid.from-index-only"
+        )
+
+    def test_create_with_reply_to_other_room_returns_400(self):
+        other_room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            is_active=True,
+        )
+        other_message = Message.objects.create(
+            room=other_room,
+            contact=self.contact,
+            text="Other room",
+            external_id="wamid.other-room",
+        )
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Agent reply",
+            "reply_to": {"uuid": str(other_message.uuid)},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reply_to", response.data)
