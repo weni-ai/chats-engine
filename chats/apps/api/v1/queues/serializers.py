@@ -67,6 +67,7 @@ class QueueSerializer(AuditableModelSerializer):
             "config",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
             "sector",
         ]
 
@@ -166,6 +167,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
             "uuid",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
             "agents",
             "created_on",
             "sector_name",
