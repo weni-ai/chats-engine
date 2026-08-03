@@ -385,6 +385,63 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
         )
 
+    @with_project_permission()
+    def test_create_queue_with_bond_flows_queue(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertTrue(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_create_queue_without_bond_flows_queue_defaults_to_false(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertFalse(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_update_queue_with_bond_flows_queue(self):
+        self.assertFalse(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": True},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        self.queue.refresh_from_db()
+        self.assertTrue(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+
 
 class QueueTransferAgentsTests(APITestCase):
     def setUp(self):
