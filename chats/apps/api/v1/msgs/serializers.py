@@ -1,5 +1,6 @@
 import io
 import logging
+from typing import Optional
 
 import magic
 from django.conf import settings
@@ -7,22 +8,153 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
-from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.api.v1.contacts.serializers import ContactSerializer
-from chats.apps.msgs.models import ChatMessageReplyIndex
-from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
-from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageStatusChoices,
     ImprovedUserMessageTypeChoices,
 )
-from chats.apps.rooms.models import RoomNote
 from chats.apps.ai_features.improve_user_message.tasks import (
     register_message_improvement_task,
 )
+from chats.apps.api.core.serializers import CommaSeparatedListField
+from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendMessage,
+    BulkMessageSendMessageStatus,
+    ChatMessageReplyIndex,
+)
+from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
+from chats.apps.rooms.models import RoomNote
 
 LOGGER = logging.getLogger(__name__)
+
+BULK_SEND_ROOM_STATUS_CHOICES = ("waiting", "ongoing")
+
+
+class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    status = CommaSeparatedListField(
+        child=serializers.ChoiceField(choices=BULK_SEND_ROOM_STATUS_CHOICES),
+        required=True,
+        allow_empty=False,
+    )
+    queues = CommaSeparatedListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    agents = CommaSeparatedListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+
+
+def get_message_bulk_message_data(message: ChatMessage) -> Optional[dict]:
+    """
+    Build the ``bulk_message`` payload for a message, if it was sent via bulk send.
+
+    Returns ``{"sent_by": {"email": ..., "name": ...}}`` for the bulk requester,
+    or ``None`` when the message was not part of a bulk send.
+    """
+    try:
+        link = message.bulk_message_send_message
+    except BulkMessageSendMessage.DoesNotExist:
+        return None
+
+    if link is None:
+        return None
+
+    user = link.bulk_message_send.user
+    return {
+        "sent_by": {
+            "email": user.email,
+            "name": user.full_name,
+        }
+    }
+
+
+class BulkSendMessagesSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    status = serializers.ListField(
+        child=serializers.ChoiceField(choices=BulkMessageSendRoomStatus.choices),
+        required=True,
+        allow_empty=False,
+    )
+    project = serializers.UUIDField(required=True)
+    queues = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
+    agents = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
+
+
+class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
+    sent_at = serializers.DateTimeField(source="created_on", read_only=True)
+
+    class Meta:
+        model = BulkMessageSend
+        fields = ["uuid", "text", "sent_at"]
+
+
+class BulkSendHistoryQueryParamsSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    sender = serializers.EmailField(required=False)
+    status = serializers.ChoiceField(
+        choices=BulkMessageSendMessageStatus.choices,
+        required=False,
+    )
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError(
+                "start_date must be before or equal to end_date"
+            )
+
+        return attrs
+
+
+class BulkSendHistorySerializer(serializers.ModelSerializer):
+    contact = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
+    sent_by = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(
+        source="created_on", format="%Y-%m-%d", read_only=True
+    )
+
+    class Meta:
+        model = BulkMessageSendMessage
+        fields = ["contact", "queue", "sent_by", "date", "status"]
+
+    def get_contact(self, obj: BulkMessageSendMessage) -> dict:
+        contact = obj.room.contact
+        return {"name": contact.name if contact else None}
+
+    def get_queue(self, obj: BulkMessageSendMessage) -> dict:
+        queue = obj.room.queue
+        return {"name": queue.name if queue else None}
+
+    def get_sent_by(self, obj: BulkMessageSendMessage) -> dict:
+        return {"name": obj.bulk_message_send.user.name}
 
 
 def _resolve_reply_index(message: ChatMessage, replied_id: str):
@@ -37,9 +169,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     collision between rooms/projects from surfacing a foreign message.
     """
 
-    exact_match = ChatMessageReplyIndex.objects.filter(
-        external_id=replied_id
-    ).first()
+    exact_match = ChatMessageReplyIndex.objects.filter(external_id=replied_id).first()
     if exact_match is not None:
         return exact_match
 
@@ -48,9 +178,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
         return None
 
     try:
-        project_uuid = str(message.room.project_uuid or "") or str(
-            message.project.uuid
-        )
+        project_uuid = str(message.room.project_uuid or "") or str(message.project.uuid)
     except Exception:
         project_uuid = ""
 
@@ -316,6 +444,7 @@ class MessageSerializer(BaseMessageSerializer):
     media = MessageMediaSimpleSerializer(many=True, required=False)
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
+    bulk_message = serializers.SerializerMethodField(read_only=True)
     ai_text_improvement = AITextImprovementSerializer(
         write_only=True, required=False, allow_null=True
     )
@@ -340,12 +469,14 @@ class MessageSerializer(BaseMessageSerializer):
             "is_automatic_message",
             "automatic_message_type",
             "ai_text_improvement",
+            "bulk_message",
         ]
         read_only_fields = [
             "uuid",
             "user",
             "created_on",
             "contact",
+            "bulk_message",
         ]
 
     def create(self, validated_data):
@@ -439,6 +570,9 @@ class MessageSerializer(BaseMessageSerializer):
                 for media in note.medias.all()
             ],
         }
+
+    def get_bulk_message(self, obj):
+        return get_message_bulk_message_data(obj)
 
 
 class MessageWSSerializer(MessageSerializer):

@@ -24,6 +24,17 @@ class AutomaticMessageType(models.TextChoices):
     INACTIVE_CLOSE = "inactive_close", _("Inactive close")
 
 
+class BulkMessageSendStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    FINISHED = "FINISHED", _("Finished")
+
+
+class BulkMessageSendMessageStatus(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    FAILED = "FAILED", _("Failed")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -489,3 +500,98 @@ class AutomaticMessage(BaseModel):
 
     def __str__(self):
         return f"{self.room.uuid} - {self.message.uuid}"
+
+
+class BulkMessageSend(BaseModel):
+    """
+    Metadata for a bulk message send request.
+
+    Stores who requested the send, the message text, the project scope, and a
+    snapshot of the status/queue/agent filters applied when the request was created.
+    Actual message delivery is handled asynchronously in a later step.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="bulk_message_sends",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="bulk_message_sends",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    filter_snapshot = models.JSONField(
+        _("filter snapshot"),
+        default=dict,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkMessageSendStatus.choices,
+        default=BulkMessageSendStatus.PENDING,
+    )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk message send")
+        verbose_name_plural = _("Bulk message sends")
+
+    def __str__(self):
+        return f"{self.uuid} - {self.status}"
+
+
+class BulkMessageSendMessage(BaseModel):
+    """
+    Tracks the outcome of sending a bulk message to a single room.
+
+    On success, ``message`` points to the delivered ``Message``. On failure,
+    ``message`` is null and ``errors`` stores the failure reason/traceback.
+    One row per room attempt; many rows per bulk send.
+    """
+
+    bulk_message_send = models.ForeignKey(
+        BulkMessageSend,
+        related_name="bulk_messages",
+        verbose_name=_("bulk message send"),
+        on_delete=models.CASCADE,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="bulk_message_send_messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    message = models.OneToOneField(
+        Message,
+        related_name="bulk_message_send_message",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkMessageSendMessageStatus.choices,
+    )
+    errors = models.JSONField(
+        _("errors"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk message send message")
+        verbose_name_plural = _("Bulk message send messages")
+
+    def __str__(self):
+        return f"{self.bulk_message_send.uuid} - {self.room.uuid} - {self.status}"

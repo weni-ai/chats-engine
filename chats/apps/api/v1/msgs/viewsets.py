@@ -1,10 +1,18 @@
+import logging
+from datetime import timedelta
+
+from django.conf import settings
+from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -20,13 +28,41 @@ from chats.apps.api.v1.msgs.permissions import (
     RestrictOfflineAgents,
 )
 from chats.apps.api.v1.msgs.serializers import (
+    BulkSendHistoryQueryParamsSerializer,
+    BulkSendHistorySerializer,
+    BulkSendMessagesSerializer,
+    BulkSendRecentHistorySerializer,
+    BulkSendRoomsCountQueryParamsSerializer,
     MessageAndMediaSerializer,
     MessageMediaSerializer,
     MessageSerializer,
 )
 from chats.apps.msgs.usecases.create_agent_message import PostCreateAgentMessageUseCase
+from chats.apps.api.v1.permissions import (
+    ProjectBodyFieldIsAdmin,
+    ProjectQueryFieldIsAdmin,
+)
+from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
+from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
+from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
+from chats.apps.rooms.usecases.get_rooms_count_for_send_bulk_msgs import (
+    GetRoomsCountForSendBulkMsgsUseCase,
+)
+
+logger = logging.getLogger(__name__)
+
+BULK_SEND_RECENT_HISTORY_LIMIT = 100
 
 
 class MessageViewset(
@@ -43,6 +79,7 @@ class MessageViewset(
         "internal_note",
         "internal_note__user",
         "automatic_message",
+        "bulk_message_send_message__bulk_message_send__user",
     ).prefetch_related("medias", "internal_note__medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
@@ -121,6 +158,126 @@ class MessageViewset(
         return build_media_download_response(
             media, log_context="MessageViewset.download"
         )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_path="bulk-send",
+        permission_classes=[IsAuthenticated, ProjectBodyFieldIsAdmin],
+    )
+    def bulk_send(self, request, *args, **kwargs):
+        serializer = BulkSendMessagesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        bulk_send = StartBulkSendMessagesUseCase().execute(
+            user_email=request.user.email,
+            text=data["text"],
+            project_uuid=data["project"],
+            statuses=data["status"],
+            queues=data.get("queues") or None,
+            agents=data.get("agents") or None,
+        )
+
+        return Response(
+            {"status": "PROCESSING", "uuid": str(bulk_send.uuid)},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/has-past-messages",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_has_past_messages(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project")
+        cache_key = f"bulk_send:has_past_messages:{project_uuid}"
+
+        if cache.get(cache_key) is not None:
+            return Response({"status": True})
+
+        has_past = BulkMessageSend.objects.filter(project__uuid=project_uuid).exists()
+
+        if has_past:
+            cache.set(
+                cache_key,
+                True,
+                settings.BULK_SEND_HAS_PAST_MESSAGES_CACHE_TTL,
+            )
+
+        return Response({"status": has_past})
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/recent-history",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_recent_history(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project")
+        window_start = timezone.now() - timedelta(
+            minutes=settings.BULK_SEND_RECENT_HISTORY_WINDOW_MINUTES
+        )
+
+        queryset = BulkMessageSend.objects.filter(
+            project__uuid=project_uuid,
+            created_on__gte=window_start,
+        ).order_by("-created_on")
+
+        results = list(queryset[: BULK_SEND_RECENT_HISTORY_LIMIT + 1])
+        if len(results) > BULK_SEND_RECENT_HISTORY_LIMIT:
+            logger.info(
+                "Bulk send recent history for project %s exceeded %s records; "
+                "returning the last %s",
+                project_uuid,
+                len(results),
+                BULK_SEND_RECENT_HISTORY_LIMIT,
+            )
+            results = results[:BULK_SEND_RECENT_HISTORY_LIMIT]
+
+        return Response(
+            {"results": BulkSendRecentHistorySerializer(results, many=True).data}
+        )
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/history",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_history(self, request, *args, **kwargs):
+        query_serializer = BulkSendHistoryQueryParamsSerializer(
+            data=request.query_params
+        )
+        query_serializer.is_valid(raise_exception=True)
+        params = query_serializer.validated_data
+
+        project_uuid = request.query_params.get("project")
+        queryset = GetBulkSendHistoryUseCase().execute(project_uuid, params)
+
+        paginator = LimitOffsetPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = BulkSendHistorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/rooms",
+        permission_classes=[IsAuthenticated, ProjectQueryIsAdmin],
+    )
+    def bulk_send_rooms(self, request, *args, **kwargs):
+        params = BulkSendRoomsCountQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        count = GetRoomsCountForSendBulkMsgsUseCase().execute(
+            project_uuid=params.validated_data["project"],
+            statuses=params.validated_data["status"],
+            queues=params.validated_data.get("queues") or None,
+            agents=params.validated_data.get("agents") or None,
+        )
+        return Response({"count": count}, status=status.HTTP_200_OK)
 
 
 class MessageMediaViewset(
