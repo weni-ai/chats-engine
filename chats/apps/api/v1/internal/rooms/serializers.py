@@ -9,7 +9,10 @@ from chats.apps.dashboard.models import MetricGoal, RoomMetrics
 
 # Maps each MetricGoal metric to the serializer method used to compute the
 # equivalent per-room value, so `goals_metrics` can reuse the exact same
-# figures already shown in `duration` / `waiting_time` / `first_response_time`.
+# figures already shown in `duration` / `queue_time` / `first_response_time`.
+# Waiting-time goals mirror MetricGoalBreachService: for rooms still in the
+# queue they compare against `queue_time` (now - added_to_queue_at), not
+# RoomMetrics.waiting_time (which stays 0 until an agent is assigned).
 _GOAL_METRIC_TO_OUTPUT_KEY = {
     MetricGoal.METRIC_WAITING_TIME: "awaiting_time",
     MetricGoal.METRIC_FIRST_RESPONSE_TIME: "first_response_time",
@@ -165,7 +168,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             return {}
 
         value_getters = {
-            MetricGoal.METRIC_WAITING_TIME: self.get_waiting_time,
+            MetricGoal.METRIC_WAITING_TIME: self.get_queue_time,
             MetricGoal.METRIC_FIRST_RESPONSE_TIME: self.get_first_response_time,
             MetricGoal.METRIC_CONVERSATION_DURATION: self.get_duration,
         }

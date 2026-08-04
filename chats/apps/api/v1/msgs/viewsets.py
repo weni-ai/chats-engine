@@ -32,6 +32,7 @@ from chats.apps.api.v1.msgs.serializers import (
     BulkSendHistorySerializer,
     BulkSendMessagesSerializer,
     BulkSendRecentHistorySerializer,
+    BulkSendRoomsCountQueryParamsSerializer,
     MessageAndMediaSerializer,
     MessageMediaSerializer,
     MessageSerializer,
@@ -44,7 +45,16 @@ from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
-from chats.apps.msgs.usecases.start_bulk_send_messages import StartBulkSendMessagesUseCase
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
+from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
+from chats.apps.rooms.usecases.get_rooms_count_for_send_bulk_msgs import (
+    GetRoomsCountForSendBulkMsgsUseCase,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +285,24 @@ class MessageViewset(
         page = paginator.paginate_queryset(queryset, request, view=self)
         serializer = BulkSendHistorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/rooms",
+        permission_classes=[IsAuthenticated, ProjectQueryIsAdmin],
+    )
+    def bulk_send_rooms(self, request, *args, **kwargs):
+        params = BulkSendRoomsCountQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        count = GetRoomsCountForSendBulkMsgsUseCase().execute(
+            project_uuid=params.validated_data["project"],
+            statuses=params.validated_data["status"],
+            queues=params.validated_data.get("queues") or None,
+            agents=params.validated_data.get("agents") or None,
+        )
+        return Response({"count": count}, status=status.HTTP_200_OK)
 
 
 class MessageMediaViewset(
