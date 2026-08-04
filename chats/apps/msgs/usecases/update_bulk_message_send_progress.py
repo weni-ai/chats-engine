@@ -14,6 +14,8 @@ from chats.utils.websockets import send_channels_group
 
 logger = logging.getLogger(__name__)
 
+PERCENTAGE_MULTIPLIER = 100
+
 
 class UpdateBulkMessageSendProgressUseCase:
     """
@@ -22,7 +24,11 @@ class UpdateBulkMessageSendProgressUseCase:
     """
 
     def execute(self, bulk_send_uuid: UUID) -> Optional[dict]:
-        bulk_send = BulkMessageSend.objects.filter(uuid=bulk_send_uuid).first()
+        bulk_send = (
+            BulkMessageSend.objects.select_related("user", "project")
+            .filter(uuid=bulk_send_uuid)
+            .first()
+        )
         if not bulk_send:
             logger.info(
                 "[UpdateBulkMessageSendProgressUseCase] BulkMessageSend not found "
@@ -47,7 +53,9 @@ class UpdateBulkMessageSendProgressUseCase:
         total_to_send = bulk_send.rooms_qty or 0
 
         if total_to_send > 0:
-            percentage = round((processed / total_to_send) * 100, 2)
+            percentage = round(
+                (processed / total_to_send) * PERCENTAGE_MULTIPLIER, 2
+            )
         else:
             percentage = 0.0
 
