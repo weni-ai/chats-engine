@@ -3,11 +3,15 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+    MetricGoalAlertConsumer,
+)
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard import tasks as dashboard_tasks
 from chats.apps.dashboard.models import MetricGoal
@@ -133,13 +137,30 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             self.mock_send_group.called,
             "Expected at least one WebSocket broadcast",
         )
-        first_call = self.mock_send_group.call_args_list[0]
+        actions = {
+            call.kwargs["action"]: call
+            for call in self.mock_send_group.call_args_list
+        }
+        self.assertIn("metric_goal.violated", actions)
+        violated_call = actions["metric_goal.violated"]
         self.assertEqual(
-            first_call.kwargs["group_name"],
-            f"metric_goal_alerts:{self.project.uuid}",
+            violated_call.kwargs["group_name"],
+            MetricGoalAlertConsumer.project_group_name(str(self.project.uuid)),
         )
-        self.assertEqual(first_call.kwargs["action"], "metric_goal.violated")
-        self.assertEqual(first_call.kwargs["content"]["transition"], "new")
+        self.assertEqual(violated_call.kwargs["content"]["transition"], "new")
+
+        self.assertIn("metric_goal.alert", actions)
+        alert_call = actions["metric_goal.alert"]
+        self.assertEqual(
+            alert_call.kwargs["group_name"],
+            MetricGoalAlertConsumer.group_name_for(
+                str(self.project.uuid), self.recipient.email
+            ),
+        )
+        self.assertIn(
+            self.recipient.email.lower(),
+            alert_call.kwargs["content"]["recipients"],
+        )
 
         self.assertTrue(mock_delay.called)
         kwargs = mock_delay.call_args.kwargs
@@ -158,7 +179,14 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
         self.assertIn(self.recipient.email, sent.to)
-        self.assertIn(self.project.name, sent.subject)
+        self.assertIn("Live Desk", sent.subject)
+        self.assertTrue(sent.alternatives)
+        self.assertEqual(sent.alternatives[0][1], "text/html")
+        expected_url = (
+            f"{settings.WENI_DASHBOARD_URL.rstrip('/')}"
+            f"/projects/{self.project.uuid}/insights/"
+        )
+        self.assertIn(expected_url, sent.alternatives[0][0])
 
     def test_continuous_violation_emits_update_action(self):
         _seed_room(self.project, self.queue)
@@ -170,10 +198,10 @@ class CheckMetricGoalViolationsTaskTestCase(TestCase):
             dashboard_tasks.check_metric_goal_violations()
 
         actions = [
-            call.kwargs["action"]
-            for call in self.mock_send_group.call_args_list
+            call.kwargs["action"] for call in self.mock_send_group.call_args_list
         ]
         self.assertIn("metric_goal.update", actions)
+        self.assertNotIn("metric_goal.alert", actions)
         self.assertNotIn("metric_goal.violated", actions)
 
     def test_send_metric_goal_email_skips_when_disabled(self):
@@ -211,6 +239,4 @@ class MetricGoalCeleryQueueRoutingTests(TestCase):
         from django.conf import settings
 
         entry = settings.CELERY_BEAT_SCHEDULE["check-metric-goal-violations"]
-        self.assertEqual(
-            entry["options"]["queue"], settings.RISK_ALERT_CELERY_QUEUE
-        )
+        self.assertEqual(entry["options"]["queue"], settings.RISK_ALERT_CELERY_QUEUE)
