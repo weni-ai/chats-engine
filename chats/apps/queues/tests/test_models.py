@@ -415,6 +415,16 @@ class QueueAuthorizationSoftDeleteTestCase(QueueSetUpMixin, TestCase):
 
         self.assertEqual(self.queue.agent_count, 1)
 
+    def test_agents_excludes_soft_deleted_authorization(self):
+        self.assertIn(self.agent, self.queue.agents)
+        self.assertIn(self.agent_2, self.queue.agents)
+
+        self.agent_auth.delete()
+
+        agents = list(self.queue.agents)
+        self.assertNotIn(self.agent, agents)
+        self.assertIn(self.agent_2, agents)
+
 
 class TestQueueOnlineAgents(TestCase):
     def setUp(self):

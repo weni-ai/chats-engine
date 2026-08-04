@@ -99,6 +99,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         return User.objects.filter(
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=self,
+            project_permissions__queue_authorizations__is_deleted=False,
             project_permissions__is_deleted=False,
         )
 
@@ -130,6 +131,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
             "project_permissions__project": self.sector.project,
             "project_permissions__queue_authorizations__queue": self,
             "project_permissions__queue_authorizations__role": 1,
+            "project_permissions__queue_authorizations__is_deleted": False,
         }
 
         # If ping timeout feature is enabled, also filter by last_seen

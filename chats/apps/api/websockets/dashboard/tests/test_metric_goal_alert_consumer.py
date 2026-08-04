@@ -6,21 +6,22 @@ from unittest.mock import patch
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.test import TestCase, override_settings
+from django.test import TransactionTestCase, override_settings
 
 from chats.apps.accounts.authentication.channels.middleware import TokenAuthMiddleware
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+    MetricGoalAlertConsumer,
+)
 from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 @override_settings(
-    CHANNEL_LAYERS={
-        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-    }
+    CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 )
-class MetricGoalAlertConsumerTestCase(TestCase):
+class MetricGoalAlertConsumerTestCase(TransactionTestCase):
     def setUp(self):
         self.application = TokenAuthMiddleware(URLRouter(websocket_urlpatterns))
 
@@ -74,9 +75,7 @@ class MetricGoalAlertConsumerTestCase(TestCase):
         self.addCleanup(self.ff_patch.stop)
 
     def _ws_url(self, project_uuid, token):
-        return (
-            f"/ws/dashboard/metric-goals?project={project_uuid}&Token={token}"
-        )
+        return f"/ws/dashboard/metric-goals?project={project_uuid}&Token={token}"
 
     async def test_rejects_without_token(self):
         comm = WebsocketCommunicator(
@@ -128,7 +127,7 @@ class MetricGoalAlertConsumerTestCase(TestCase):
         self.assertTrue(connected)
         await comm.disconnect()
 
-    async def test_receives_broadcast_for_own_project(self):
+    async def test_receives_project_broadcast_violated(self):
         comm = WebsocketCommunicator(
             self.application,
             self._ws_url(self.project.uuid, self.admin_token.key),
@@ -138,11 +137,13 @@ class MetricGoalAlertConsumerTestCase(TestCase):
 
         layer = get_channel_layer()
         await layer.group_send(
-            f"metric_goal_alerts:{self.project.uuid}",
+            MetricGoalAlertConsumer.project_group_name(str(self.project.uuid)),
             {
                 "type": "metric_goal_violated",
                 "action": "metric_goal.violated",
-                "content": json.dumps({"project_uuid": str(self.project.uuid)}),
+                "content": json.dumps(
+                    {"project_uuid": str(self.project.uuid)}
+                ),
             },
         )
         message = await comm.receive_json_from(timeout=2)
@@ -150,6 +151,65 @@ class MetricGoalAlertConsumerTestCase(TestCase):
         self.assertEqual(
             message["content"]["project_uuid"], str(self.project.uuid)
         )
+        await comm.disconnect()
+
+    async def test_receives_broadcast_for_own_user_group(self):
+        comm = WebsocketCommunicator(
+            self.application,
+            self._ws_url(self.project.uuid, self.admin_token.key),
+        )
+        connected, _ = await comm.connect()
+        self.assertTrue(connected)
+
+        layer = get_channel_layer()
+        await layer.group_send(
+            MetricGoalAlertConsumer.group_name_for(
+                str(self.project.uuid), self.admin.email
+            ),
+            {
+                "type": "metric_goal_alert",
+                "action": "metric_goal.alert",
+                "content": json.dumps(
+                    {
+                        "project_uuid": str(self.project.uuid),
+                        "recipients": [self.admin.email.lower()],
+                    }
+                ),
+            },
+        )
+        message = await comm.receive_json_from(timeout=2)
+        self.assertEqual(message["type"], "metric_goal.alert")
+        self.assertEqual(
+            message["content"]["project_uuid"], str(self.project.uuid)
+        )
+        await comm.disconnect()
+
+    async def test_does_not_receive_broadcast_for_other_user(self):
+        """Toast socket only reaches the recipient's own group."""
+        comm = WebsocketCommunicator(
+            self.application,
+            self._ws_url(self.project.uuid, self.admin_token.key),
+        )
+        connected, _ = await comm.connect()
+        self.assertTrue(connected)
+
+        layer = get_channel_layer()
+        await layer.group_send(
+            MetricGoalAlertConsumer.group_name_for(
+                str(self.project.uuid), self.manager.email
+            ),
+            {
+                "type": "metric_goal_alert",
+                "action": "metric_goal.alert",
+                "content": json.dumps(
+                    {
+                        "project_uuid": str(self.project.uuid),
+                        "recipients": [self.manager.email.lower()],
+                    }
+                ),
+            },
+        )
+        self.assertTrue(await comm.receive_nothing(timeout=0.5))
         await comm.disconnect()
 
     async def test_does_not_receive_broadcast_for_other_project(self):
@@ -162,7 +222,9 @@ class MetricGoalAlertConsumerTestCase(TestCase):
 
         layer = get_channel_layer()
         await layer.group_send(
-            f"metric_goal_alerts:{self.other_project.uuid}",
+            MetricGoalAlertConsumer.project_group_name(
+                str(self.other_project.uuid)
+            ),
             {
                 "type": "metric_goal_violated",
                 "action": "metric_goal.violated",
