@@ -11,7 +11,12 @@ from chats.apps.api.core.serializers import CommaSeparatedListField
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.choices import BulkMessageSendRoomStatus
-from chats.apps.msgs.models import BulkMessageSend, ChatMessageReplyIndex
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendMessage,
+    BulkMessageSendMessageStatus,
+    ChatMessageReplyIndex,
+)
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
@@ -80,6 +85,51 @@ class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = BulkMessageSend
         fields = ["uuid", "text", "sent_at"]
+
+
+class BulkSendHistoryQueryParamsSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    sender = serializers.EmailField(required=False)
+    status = serializers.ChoiceField(
+        choices=BulkMessageSendMessageStatus.choices,
+        required=False,
+    )
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError(
+                "start_date must be before or equal to end_date"
+            )
+
+        return attrs
+
+
+class BulkSendHistorySerializer(serializers.ModelSerializer):
+    contact = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
+    sent_by = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(
+        source="created_on", format="%Y-%m-%d", read_only=True
+    )
+
+    class Meta:
+        model = BulkMessageSendMessage
+        fields = ["contact", "queue", "sent_by", "date", "status"]
+
+    def get_contact(self, obj: BulkMessageSendMessage) -> dict:
+        contact = obj.room.contact
+        return {"name": contact.name if contact else None}
+
+    def get_queue(self, obj: BulkMessageSendMessage) -> dict:
+        queue = obj.room.queue
+        return {"name": queue.name if queue else None}
+
+    def get_sent_by(self, obj: BulkMessageSendMessage) -> dict:
+        return {"name": obj.bulk_message_send.user.name}
 
 
 def _resolve_reply_index(message: ChatMessage, replied_id: str):

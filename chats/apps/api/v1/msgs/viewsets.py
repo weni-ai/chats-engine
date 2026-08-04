@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -27,6 +28,8 @@ from chats.apps.api.v1.msgs.permissions import (
     RestrictOfflineAgents,
 )
 from chats.apps.api.v1.msgs.serializers import (
+    BulkSendHistoryQueryParamsSerializer,
+    BulkSendHistorySerializer,
     BulkSendMessagesSerializer,
     BulkSendRecentHistorySerializer,
     BulkSendRoomsCountQueryParamsSerializer,
@@ -41,6 +44,10 @@ from chats.apps.api.v1.permissions import (
 from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
 from chats.apps.msgs.usecases.start_bulk_send_messages import (
     StartBulkSendMessagesUseCase,
 )
@@ -257,6 +264,27 @@ class MessageViewset(
         return Response(
             {"results": BulkSendRecentHistorySerializer(results, many=True).data}
         )
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/history",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_history(self, request, *args, **kwargs):
+        query_serializer = BulkSendHistoryQueryParamsSerializer(
+            data=request.query_params
+        )
+        query_serializer.is_valid(raise_exception=True)
+        params = query_serializer.validated_data
+
+        project_uuid = request.query_params.get("project")
+        queryset = GetBulkSendHistoryUseCase().execute(project_uuid, params)
+
+        paginator = LimitOffsetPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = BulkSendHistorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     @action(
         detail=False,
