@@ -137,9 +137,7 @@ class BulkSendHistorySerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
     sent_by = serializers.SerializerMethodField()
-    date = serializers.DateTimeField(
-        source="created_on", format="%Y-%m-%d", read_only=True
-    )
+    date = serializers.DateTimeField(source="created_on", read_only=True)
 
     class Meta:
         model = BulkMessageSendMessage

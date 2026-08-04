@@ -6,6 +6,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.fields import DateTimeField
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
@@ -824,7 +825,7 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
                 "contact": {"name": "Eduardo"},
                 "queue": {"name": "Pokedex"},
                 "sent_by": {"name": "Kallil"},
-                "date": bulk_message.created_on.date().isoformat(),
+                "date": DateTimeField().to_representation(bulk_message.created_on),
                 "status": BulkMessageSendMessageStatus.FAILED,
             },
         )
@@ -875,11 +876,11 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
         self.assertEqual(set(contact_names), {"Matching Start", "Matching End"})
         self.assertEqual(
             response.data["results"][0]["date"],
-            matching_end.created_on.date().isoformat(),
+            DateTimeField().to_representation(matching_end.created_on),
         )
         self.assertEqual(
             response.data["results"][1]["date"],
-            matching_start.created_on.date().isoformat(),
+            DateTimeField().to_representation(matching_start.created_on),
         )
 
     @with_project_permission()
