@@ -1,8 +1,12 @@
+import logging
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
@@ -24,6 +28,7 @@ from chats.apps.api.v1.msgs.permissions import (
 )
 from chats.apps.api.v1.msgs.serializers import (
     BulkSendMessagesSerializer,
+    BulkSendRecentHistorySerializer,
     BulkSendRoomsCountQueryParamsSerializer,
     MessageAndMediaSerializer,
     MessageMediaSerializer,
@@ -43,6 +48,10 @@ from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
 from chats.apps.rooms.usecases.get_rooms_count_for_send_bulk_msgs import (
     GetRoomsCountForSendBulkMsgsUseCase,
 )
+
+logger = logging.getLogger(__name__)
+
+BULK_SEND_RECENT_HISTORY_LIMIT = 100
 
 
 class MessageViewset(
@@ -216,6 +225,38 @@ class MessageViewset(
             )
 
         return Response({"status": has_past})
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="bulk-send/recent-history",
+        permission_classes=[IsAuthenticated, ProjectQueryFieldIsAdmin],
+    )
+    def bulk_send_recent_history(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project")
+        window_start = timezone.now() - timedelta(
+            minutes=settings.BULK_SEND_RECENT_HISTORY_WINDOW_MINUTES
+        )
+
+        queryset = BulkMessageSend.objects.filter(
+            project__uuid=project_uuid,
+            created_on__gte=window_start,
+        ).order_by("-created_on")
+
+        results = list(queryset[: BULK_SEND_RECENT_HISTORY_LIMIT + 1])
+        if len(results) > BULK_SEND_RECENT_HISTORY_LIMIT:
+            logger.info(
+                "Bulk send recent history for project %s exceeded %s records; "
+                "returning the last %s",
+                project_uuid,
+                len(results),
+                BULK_SEND_RECENT_HISTORY_LIMIT,
+            )
+            results = results[:BULK_SEND_RECENT_HISTORY_LIMIT]
+
+        return Response(
+            {"results": BulkSendRecentHistorySerializer(results, many=True).data}
+        )
 
     @action(
         detail=False,
