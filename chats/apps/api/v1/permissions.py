@@ -389,3 +389,30 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
             user=request.user,
             role=ProjectPermission.ROLE_ADMIN,
         ).exists()
+
+
+class ProjectQueryIsAdmin(permissions.BasePermission):
+    """
+    Requires the user to be a project admin for the ``project`` query param.
+    Uses GetPermission so ``project`` resolves the same way as other project-scoped endpoints.
+    """
+
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+
+        if not request.query_params.get("project"):
+            raise ValidationError(
+                {"project": ["This field is required"]}, code="required"
+            )
+
+        try:
+            permission = GetPermission(request).permission
+        except (AttributeError, ProjectPermission.DoesNotExist, ObjectDoesNotExist):
+            return False
+
+        if permission is None:
+            return False
+
+        request._cached_project_permission = permission
+        return permission.is_admin
