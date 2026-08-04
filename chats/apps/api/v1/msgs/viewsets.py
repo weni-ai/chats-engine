@@ -48,12 +48,6 @@ from chats.apps.msgs.usecases.start_bulk_send_messages import (
     StartBulkSendMessagesUseCase,
 )
 from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
-from chats.apps.msgs.usecases.start_bulk_send_messages import (
-    StartBulkSendMessagesUseCase,
-)
-from chats.apps.msgs.usecases.start_bulk_send_messages import (
-    StartBulkSendMessagesUseCase,
-)
 from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
 from chats.apps.rooms.usecases.get_rooms_count_for_send_bulk_msgs import (
     GetRoomsCountForSendBulkMsgsUseCase,
