@@ -44,6 +44,9 @@ from chats.apps.api.v1.permissions import (
 from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.usecases.start_bulk_send_messages import (
+    StartBulkSendMessagesUseCase,
+)
 from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
 from chats.apps.msgs.usecases.start_bulk_send_messages import (
     StartBulkSendMessagesUseCase,
@@ -75,6 +78,7 @@ class MessageViewset(
         "internal_note",
         "internal_note__user",
         "automatic_message",
+        "bulk_message_send_message__bulk_message_send__user",
     ).prefetch_related("medias", "internal_note__medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
