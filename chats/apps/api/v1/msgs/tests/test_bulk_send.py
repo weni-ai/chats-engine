@@ -830,33 +830,56 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
         )
 
     @with_project_permission()
-    def test_filters_by_date(self) -> None:
+    def test_filters_by_date_range(self) -> None:
         """
-        Test that the date filter returns only matching rows.
+        Test that the date range filter returns only matching rows.
         """
-        matching = self._create_bulk_message(
+        self._create_bulk_message(
             user=self.user,
             project=self.project,
             queue=self.queue,
-            contact_name="Matching",
+            contact_name="Before Range",
+            created_on=datetime(2026, 8, 31, 12, 0, tzinfo=dt_timezone.utc),
+        )
+        matching_start = self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Matching Start",
             created_on=datetime(2026, 9, 1, 12, 0, tzinfo=dt_timezone.utc),
+        )
+        matching_end = self._create_bulk_message(
+            user=self.user,
+            project=self.project,
+            queue=self.queue,
+            contact_name="Matching End",
+            created_on=datetime(2026, 9, 2, 12, 0, tzinfo=dt_timezone.utc),
         )
         self._create_bulk_message(
             user=self.user,
             project=self.project,
             queue=self.queue,
-            contact_name="Other Day",
-            created_on=datetime(2026, 9, 2, 12, 0, tzinfo=dt_timezone.utc),
+            contact_name="After Range",
+            created_on=datetime(2026, 9, 3, 12, 0, tzinfo=dt_timezone.utc),
         )
 
-        response = self.history(project=str(self.project.uuid), date="2026-09-01")
+        response = self.history(
+            project=str(self.project.uuid),
+            start_date="2026-09-01",
+            end_date="2026-09-02",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["results"][0]["contact"]["name"], "Matching")
+        self.assertEqual(response.data["count"], 2)
+        contact_names = [item["contact"]["name"] for item in response.data["results"]]
+        self.assertEqual(set(contact_names), {"Matching Start", "Matching End"})
         self.assertEqual(
             response.data["results"][0]["date"],
-            matching.created_on.date().isoformat(),
+            matching_end.created_on.date().isoformat(),
+        )
+        self.assertEqual(
+            response.data["results"][1]["date"],
+            matching_start.created_on.date().isoformat(),
         )
 
     @with_project_permission()
@@ -927,7 +950,7 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
     @with_project_permission()
     def test_filters_by_combined_params(self) -> None:
         """
-        Test that date, sender, and status filters can be combined.
+        Test that date range, sender, and status filters can be combined.
         """
         self._create_bulk_message(
             user=self.user,
@@ -956,7 +979,8 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
 
         response = self.history(
             project=str(self.project.uuid),
-            date="2026-09-01",
+            start_date="2026-09-01",
+            end_date="2026-09-01",
             sender=self.user.email,
             status=BulkMessageSendMessageStatus.SUCCESS,
         )
@@ -982,6 +1006,19 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["results"], [])
+
+    @with_project_permission()
+    def test_rejects_invalid_date_range(self) -> None:
+        """
+        Test that start_date after end_date returns 400.
+        """
+        response = self.history(
+            project=str(self.project.uuid),
+            start_date="2026-09-02",
+            end_date="2026-09-01",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @with_project_permission()
     def test_rejects_invalid_status(self) -> None:
