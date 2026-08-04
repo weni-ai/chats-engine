@@ -442,6 +442,109 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.queue.refresh_from_db()
         self.assertFalse(self.queue.bond_flows_queue)
 
+    @with_project_permission()
+    def test_create_queue_with_selected_flows(self):
+        flow_uuids = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+                "selected_flows": flow_uuids,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), flow_uuids)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, flow_uuids)
+
+    @with_project_permission()
+    def test_create_queue_with_bond_flows_queue_false_clears_selected_flows(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": False,
+                "selected_flows": ["11111111-1111-1111-1111-111111111111"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_create_queue_without_selected_flows_defaults_to_empty_list(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_update_queue_replaces_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+            "33333333-3333-3333-3333-333333333333",
+        ]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        updated_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "bond_flows_queue": True,
+                "selected_flows": updated_flows,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), updated_flows)
+
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.selected_flows, updated_flows)
+
+    @with_project_permission()
+    def test_update_queue_disabling_bond_flows_queue_clears_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = ["11111111-1111-1111-1111-111111111111"]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+        self.assertEqual(self.queue.selected_flows, [])
+
 
 class QueueTransferAgentsTests(APITestCase):
     def setUp(self):
