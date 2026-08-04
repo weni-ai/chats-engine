@@ -113,12 +113,24 @@ class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
 
 
 class BulkSendHistoryQueryParamsSerializer(serializers.Serializer):
-    date = serializers.DateField(required=False)
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
     sender = serializers.EmailField(required=False)
     status = serializers.ChoiceField(
         choices=BulkMessageSendMessageStatus.choices,
         required=False,
     )
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError(
+                "start_date must be before or equal to end_date"
+            )
+
+        return attrs
 
 
 class BulkSendHistorySerializer(serializers.ModelSerializer):

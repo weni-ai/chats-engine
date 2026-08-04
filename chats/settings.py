@@ -605,6 +605,7 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 REPORTS_SCHEDULE_SECONDS = env.float("REPORTS_SCHEDULE_SECONDS", default=20.0)
 ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
 ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
+FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS = 300.0
 
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
@@ -634,7 +635,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "finish-stale-bulk-message-sends": {
         "task": "finish_stale_bulk_message_sends",
-        "schedule": 300.0,
+        "schedule": FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS,
     },
 }
 

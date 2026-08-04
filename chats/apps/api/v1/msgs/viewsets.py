@@ -3,7 +3,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -42,7 +41,7 @@ from chats.apps.api.v1.permissions import (
     ProjectBodyFieldIsAdmin,
     ProjectQueryFieldIsAdmin,
 )
-from chats.apps.msgs.models import BulkMessageSend, BulkMessageSendMessage
+from chats.apps.msgs.models import BulkMessageSend
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.usecases.start_bulk_send_messages import (
@@ -52,6 +51,7 @@ from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
 from chats.apps.rooms.usecases.get_rooms_count_for_send_bulk_msgs import (
     GetRoomsCountForSendBulkMsgsUseCase,
 )
+from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -265,24 +265,7 @@ class MessageViewset(
         params = query_serializer.validated_data
 
         project_uuid = request.query_params.get("project")
-        queryset = (
-            BulkMessageSendMessage.objects.filter(
-                bulk_message_send__project__uuid=project_uuid
-            )
-            .select_related(
-                "room__contact",
-                "room__queue",
-                "bulk_message_send__user",
-            )
-            .order_by("-created_on")
-        )
-
-        if "date" in params:
-            queryset = queryset.filter(created_on__date=params["date"])
-        if "sender" in params:
-            queryset = queryset.filter(bulk_message_send__user__email=params["sender"])
-        if "status" in params:
-            queryset = queryset.filter(status=params["status"])
+        queryset = GetBulkSendHistoryUseCase().execute(project_uuid, params)
 
         paginator = LimitOffsetPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
