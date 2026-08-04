@@ -283,8 +283,10 @@ class MessageViewset(
             .order_by("-created_on")
         )
 
-        if "date" in params:
-            queryset = queryset.filter(created_on__date=params["date"])
+        if "start_date" in params:
+            queryset = queryset.filter(created_on__date__gte=params["start_date"])
+        if "end_date" in params:
+            queryset = queryset.filter(created_on__date__lte=params["end_date"])
         if "sender" in params:
             queryset = queryset.filter(bulk_message_send__user__email=params["sender"])
         if "status" in params:
