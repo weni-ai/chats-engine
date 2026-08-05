@@ -150,6 +150,33 @@ class SectorAuthorizationSoftDeleteTestCase(TestCase):
             self.sector.manager_authorizations.filter(pk=self.sector_auth.pk).exists()
         )
 
+    def test_managers_excludes_soft_deleted_authorization(self):
+        self.assertEqual(self.sector.managers.count(), 2)
+
+        self.sector_auth.delete()
+
+        self.assertEqual(self.sector.managers.count(), 1)
+        self.assertFalse(self.sector.managers.filter(pk=self.manager.pk).exists())
+        self.assertTrue(self.sector.managers.filter(pk=self.manager_2.pk).exists())
+
+    def test_online_managers_excludes_soft_deleted_authorization(self):
+        self.manager_permission.status = "ONLINE"
+        self.manager_permission.save(update_fields=["status"])
+        self.manager_2_permission.status = "ONLINE"
+        self.manager_2_permission.save(update_fields=["status"])
+
+        self.assertEqual(self.sector.online_managers.count(), 2)
+
+        self.sector_auth.delete()
+
+        self.assertEqual(self.sector.online_managers.count(), 1)
+        self.assertFalse(
+            self.sector.online_managers.filter(pk=self.manager.pk).exists()
+        )
+        self.assertTrue(
+            self.sector.online_managers.filter(pk=self.manager_2.pk).exists()
+        )
+
     def test_recreate_after_soft_delete_should_not_violate_uniqueness(self):
         self.sector_auth.delete()
 

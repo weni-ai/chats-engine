@@ -211,6 +211,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     def managers(self):
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
@@ -219,6 +220,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
             project_permissions__status="ONLINE",
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
