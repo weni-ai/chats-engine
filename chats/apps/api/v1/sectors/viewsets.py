@@ -483,7 +483,10 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         instance.notify_user("destroy")
-        super().perform_destroy(instance)
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
+        )
+        instance.delete()
 
 
 class SectorHolidayViewSet(viewsets.ModelViewSet):

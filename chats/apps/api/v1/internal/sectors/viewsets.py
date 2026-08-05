@@ -93,9 +93,16 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
         serializer.save(modified_by=self.request.user)
         serializer.instance.notify_user("update")
 
+    def destroy(self, request, *args, **kwargs):
+        self.perform_destroy(self.get_object())
+        return Response({"is_deleted": True}, status.HTTP_200_OK)
+
     def perform_destroy(self, instance):
         instance.notify_user("destroy")
-        super().perform_destroy(instance)
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
+        )
+        instance.delete()
 
 
 class SectorTagsViewset(viewsets.ModelViewSet):
