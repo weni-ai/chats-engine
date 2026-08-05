@@ -1740,6 +1740,44 @@ class AgentRepositoryTestCase(TestCase):
         self.assertEqual(agents_by_email["authorized@test.com"].rooms_count, 0)
         self.assertEqual(agents_by_email["had_room@test.com"].rooms_count, 1)
 
+    def test_get_agents_csat_score_reviews_not_inflated_by_multi_queue_auth(self):
+        """JOIN on multiple queue auths must not inflate reviews/rooms_count."""
+        queue2 = Queue.objects.create(name="Second Queue", sector=self.sector)
+
+        utc_tz = pytz.timezone("UTC")
+        in_period = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))
+
+        user = User.objects.create(
+            email="multi_auth@test.com", first_name="Multi", last_name="Auth"
+        )
+        permission = ProjectPermission.objects.create(
+            user=user, project=self.project, role=2
+        )
+        QueueAuthorization.objects.create(permission=permission, queue=self.queue)
+        QueueAuthorization.objects.create(permission=permission, queue=queue2)
+
+        room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=in_period,
+            user=user,
+        )
+        CSATSurvey.objects.create(room=room, rating=5, answered_on=in_period)
+
+        filters = Filters(
+            queues=[self.queue.uuid, queue2.uuid],
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+        _, agents_csat = self.repository.get_agents_csat_score(filters, self.project)
+
+        agent = next(a for a in agents_csat if a.email == "multi_auth@test.com")
+        self.assertEqual(agent.rooms_count, 1)
+        self.assertEqual(agent.reviews, 1)
+        self.assertEqual(agent.avg_rating, 5.0)
+
     def test_get_agents_csat_score_without_sector_queue_keeps_all_agents(self):
         user1 = User.objects.create(
             email="agent_a@test.com", first_name="Agent", last_name="A"

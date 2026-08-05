@@ -712,7 +712,7 @@ class AgentRepository:
             ),
             reviews=Count(
                 "rooms__csat_survey__uuid",
-                distinct=False,
+                distinct=True,
                 filter=Q(**csat_reviews_query),
             ),
             avg_rating=Coalesce(
