@@ -163,3 +163,107 @@ class SectorTagTests(APITestCase):
         tags_uuids = [result.get("uuid") for result in results]
 
         self.assertIn(str(tag.uuid), tags_uuids)
+
+    def list_sector_tags(self, token, **params):
+        url = reverse("sectortag-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        return self.client.get(url, data=params)
+
+    def test_list_sector_tags_with_search(self):
+        """
+        Verify if the list endpoint filters sector tags by name using search.
+        """
+        self.sector.tags.create(name="tagzinha")
+        self.sector.tags.create(name="outra")
+
+        response = self.list_sector_tags(
+            self.manager_token.key,
+            sector=self.sector.pk,
+            search="tagzi",
+        )
+
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+        self.assertEqual(results[0].get("name"), "tagzinha")
+
+    def test_list_sector_tags_with_search_is_case_insensitive(self):
+        """
+        Verify if search matches tag names regardless of letter case.
+        """
+        self.sector.tags.create(name="Tagzinha")
+
+        response = self.list_sector_tags(
+            self.manager_token.key,
+            sector=self.sector.pk,
+            search="TAGZINHA",
+        )
+
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+        self.assertEqual(results[0].get("name"), "Tagzinha")
+
+    def test_list_sector_tags_with_search_no_results(self):
+        """
+        Verify if search returns an empty list when no tag name matches.
+        """
+        response = self.list_sector_tags(
+            self.manager_token.key,
+            sector=self.sector.pk,
+            search="inexistente",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 0)
+        self.assertEqual(response.json().get("results"), [])
+
+    def test_list_sector_tags_with_search_multiple_results(self):
+        """
+        Verify if search returns all tags whose name contains the given text.
+        """
+        response = self.list_sector_tags(
+            self.manager_token.key,
+            sector=self.sector.pk,
+            search="tag",
+        )
+
+        results = response.json().get("results")
+        names = [result.get("name") for result in results]
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 2)
+        self.assertEqual(names, ["tag 1", "tag 2"])
+
+    def test_list_sector_tags_with_search_and_queue(self):
+        """
+        Verify if search works together with the queue filter.
+        """
+        self.sector.tags.create(name="tagzinha")
+        self.sector.tags.create(name="outra")
+        queue_uuid = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
+
+        response = self.list_sector_tags(
+            self.agent_token.key,
+            queue=queue_uuid,
+            search="tagzi",
+        )
+
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+        self.assertEqual(results[0].get("name"), "tagzinha")
+
+    def test_list_sector_tags_without_search_returns_all(self):
+        """
+        Verify if omitting search keeps the previous list behavior.
+        """
+        self.sector.tags.create(name="tagzinha")
+
+        response = self.list_sector_tags(
+            self.manager_token.key,
+            sector=self.sector.pk,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 3)
