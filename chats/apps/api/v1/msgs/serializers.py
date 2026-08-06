@@ -8,7 +8,6 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
-from chats.apps.api.core.serializers import CommaSeparatedListField
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageStatusChoices,
     ImprovedUserMessageTypeChoices,
@@ -16,6 +15,7 @@ from chats.apps.ai_features.improve_user_message.choices import (
 from chats.apps.ai_features.improve_user_message.tasks import (
     register_message_improvement_task,
 )
+from chats.apps.api.core.serializers import CommaSeparatedListField
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.choices import BulkMessageSendRoomStatus
@@ -137,9 +137,7 @@ class BulkSendHistorySerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
     sent_by = serializers.SerializerMethodField()
-    date = serializers.DateTimeField(
-        source="created_on", format="%Y-%m-%d", read_only=True
-    )
+    date = serializers.DateTimeField(source="created_on", read_only=True)
 
     class Meta:
         model = BulkMessageSendMessage

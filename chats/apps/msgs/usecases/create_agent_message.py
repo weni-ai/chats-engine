@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 
 from django.conf import settings
@@ -20,6 +21,8 @@ from chats.apps.msgs.validators.agent_message_create import (
     validate_agent_can_create_message,
 )
 from chats.apps.rooms.models import Room
+
+logger = logging.getLogger(__name__)
 
 REQUEST_ID_PENDING_MARKER = "pending"
 
@@ -61,6 +64,7 @@ def _claim_request_id(user, request_id: str) -> bool:
         )
         return bool(was_set)
     except Exception:
+        logger.warning("Redis unavailable for request_id claim", exc_info=True)
         return True
 
 
@@ -89,7 +93,7 @@ def _store_request_id_message(user, request_id: str, message_uuid) -> None:
             ex=settings.AGENT_MESSAGE_CREATE_REQUEST_ID_CACHE_TTL,
         )
     except Exception:
-        pass
+        logger.warning("Failed to store request_id in Redis", exc_info=True)
 
 
 def _release_request_id(user, request_id: str) -> None:

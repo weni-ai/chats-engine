@@ -1266,6 +1266,13 @@ class CSATRepositoryTest(TestCase):
         self.repository = CSATRepository()
 
         self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
 
     def test_get_csat_ratings(self):

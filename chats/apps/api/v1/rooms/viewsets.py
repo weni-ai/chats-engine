@@ -179,11 +179,6 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
-        # Evaluated once per request (see `list`); fallback to None so the
-        # serializer falls back to per-room evaluation in other actions.
-        context["inactivity_feature_active"] = getattr(
-            self, "inactivity_feature_active", None
-        )
         pinned_ids = getattr(self, "_pinned_ids_context", None)
         if pinned_ids is not None:
             context["pinned_ids"] = pinned_ids

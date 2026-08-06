@@ -599,7 +599,6 @@ class InactivityBatchLimitTests(TestCase):
     """
 
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -699,7 +698,6 @@ class InactivityMetricsEnqueueTests(TestCase):
     """
 
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",

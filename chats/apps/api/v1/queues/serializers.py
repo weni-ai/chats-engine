@@ -14,24 +14,6 @@ User = get_user_model()
 MAX_INT_32 = 2**31 - 1
 
 
-def validate_queue_purpose_feature_flag(request, project, queue_purpose):
-    if queue_purpose in (None, ""):
-        return
-
-    if not request or not getattr(request, "user", None):
-        return
-
-    if not is_feature_active(
-        settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
-        request.user.email,
-        str(project.uuid),
-    ):
-        raise serializers.ValidationError(
-            {"detail": _("Queue purpose feature is not active.")},
-            code="queue_purpose_feature_flag_is_off",
-        )
-
-
 class QueueLimitSerializer(serializers.Serializer):
     limit = serializers.IntegerField(
         required=False, allow_null=True, min_value=0, max_value=MAX_INT_32
@@ -114,25 +96,10 @@ class QueueSerializer(AuditableModelSerializer):
         sector = source.get("sector")
         return sector.project if sector else None
 
-    def _validate_queue_purpose(self, data):
-        if "queue_purpose" not in (self.initial_data or {}):
-            return
-
-        queue_purpose = data.get(
-            "queue_purpose", self.initial_data.get("queue_purpose")
-        )
-        project = self._get_audit_project(data=data)
-        request = self.context.get("request")
-
-        if project:
-            validate_queue_purpose_feature_flag(request, project, queue_purpose)
-
     def validate(self, data):
         """
         Check if queue already exist in sector.
         """
-        self._validate_queue_purpose(data)
-
         name = data.get("name")
         if name:
             if name == "":
@@ -181,16 +148,6 @@ class QueueUpdateSerializer(AuditableModelSerializer):
         extra_kwargs = {field: {"required": False} for field in fields}
 
     def validate(self, data):
-        if "queue_purpose" in (self.initial_data or {}) and self.instance:
-            queue_purpose = data.get(
-                "queue_purpose", self.initial_data.get("queue_purpose")
-            )
-            validate_queue_purpose_feature_flag(
-                self.context.get("request"),
-                self.instance.sector.project,
-                queue_purpose,
-            )
-
         return apply_selected_flows(self, data)
 
 
@@ -404,35 +361,5 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                     "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing_names)}."
                 }
             )
-
-        if request:
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                request.user.email,
-                str(sector.project.uuid),
-            )
-            is_queue_purpose_feature_active = is_feature_active(
-                settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
-                request.user.email,
-                str(sector.project.uuid),
-            )
-            for queue_data in queues:
-                queue_limit = queue_data.get("queue_limit")
-                if (
-                    queue_limit
-                    and not is_queue_limit_feature_active
-                    and queue_limit.get("is_active") is True
-                ):
-                    raise serializers.ValidationError(
-                        {"detail": _("Queue limit feature is not active.")},
-                        code="queue_limit_feature_flag_is_off",
-                    )
-
-                queue_purpose = queue_data.get("queue_purpose")
-                if queue_purpose and not is_queue_purpose_feature_active:
-                    raise serializers.ValidationError(
-                        {"detail": _("Queue purpose feature is not active.")},
-                        code="queue_purpose_feature_flag_is_off",
-                    )
 
         return data
