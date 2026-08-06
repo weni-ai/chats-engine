@@ -2,9 +2,11 @@ import logging
 
 import sentry_sdk
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.utils import create_reply_index
 from chats.apps.msgs.models import Message, MessageMedia
+from chats.core.sentry import is_expected_validation_error
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,20 @@ class SetMsgExternalIdUseCase:
                             extra={"msg_uuid": str(msg_uuid)},
                         )
                         return
+        except ValidationError as error:
+            # Business rules (closed room / 24h window) — log only.
+            if is_expected_validation_error(error):
+                logger.warning(
+                    "SetMsgExternalIdUseCase: expected validation failure",
+                    extra={"msg_uuid": str(msg_uuid), "detail": str(error)},
+                )
+                return
+            logger.exception(
+                "SetMsgExternalIdUseCase: unexpected ValidationError",
+                extra={"msg_uuid": str(msg_uuid)},
+            )
+            sentry_sdk.capture_exception(error)
+            return
         except Exception as error:
             # Bug #1 observability: any unexpected error (DB integrity,
             # connection issues, etc.) used to be silently swallowed by a
