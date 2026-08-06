@@ -2,7 +2,6 @@ import json
 import logging
 
 import requests
-import sentry_sdk
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -185,19 +184,17 @@ class Message(BaseModelWithManualCreatedOn):
                         f"Message ID: {self.pk}, "
                         f"HTTP {response.status_code}: {response.text[:200]}"
                     )
-                    logger.error(error_msg)
-
-                    sentry_sdk.capture_message(
-                        error_msg,
-                        level="error",
-                        extras={
-                            "message_uuid": self.pk,
-                            "room_uuid": self.room.uuid,
-                            "callback_url": self.room.callback_url,
-                            "status_code": response.status_code,
-                            "response_text": response.text[:500],
-                        },
-                    )
+                    log_extra = {
+                        "message_uuid": str(self.pk),
+                        "room_uuid": str(self.room.uuid),
+                        "callback_url": self.room.callback_url,
+                        "status_code": response.status_code,
+                    }
+                    # Partner callback failures are expected noise — log only.
+                    if 400 <= response.status_code < 500:
+                        logger.warning(error_msg, extra=log_extra)
+                    else:
+                        logger.error(error_msg, extra=log_extra)
 
             except Exception as error:
                 error_msg = (
@@ -205,13 +202,11 @@ class Message(BaseModelWithManualCreatedOn):
                     f"Message ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                logger.error(error_msg)
-
-                sentry_sdk.capture_exception(
-                    error,
-                    extras={
-                        "message_uuid": self.pk,
-                        "room_uuid": self.room.uuid,
+                logger.error(
+                    error_msg,
+                    extra={
+                        "message_uuid": str(self.pk),
+                        "room_uuid": str(self.room.uuid),
                         "callback_url": self.room.callback_url,
                     },
                 )
@@ -376,20 +371,18 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                         f"MessageMedia ID: {self.pk}, "
                         f"HTTP {response.status_code}: {response.text[:200]}"
                     )
-                    logger.error(error_msg)
-
-                    sentry_sdk.capture_message(
-                        error_msg,
-                        level="error",
-                        extras={
-                            "media_uuid": self.pk,
-                            "message_uuid": self.message.pk,
-                            "room_uuid": self.message.room.uuid,
-                            "callback_url": self.message.room.callback_url,
-                            "status_code": response.status_code,
-                            "response_text": response.text[:500],
-                        },
-                    )
+                    log_extra = {
+                        "media_uuid": str(self.pk),
+                        "message_uuid": str(self.message.pk),
+                        "room_uuid": str(self.message.room.uuid),
+                        "callback_url": self.message.room.callback_url,
+                        "status_code": response.status_code,
+                    }
+                    # Partner callback failures are expected noise — log only.
+                    if 400 <= response.status_code < 500:
+                        logger.warning(error_msg, extra=log_extra)
+                    else:
+                        logger.error(error_msg, extra=log_extra)
 
             except Exception as error:
                 error_msg = (
@@ -397,14 +390,12 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                     f"MessageMedia ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                logger.error(error_msg)
-
-                sentry_sdk.capture_exception(
-                    error,
-                    extras={
-                        "media_uuid": self.pk,
-                        "message_uuid": self.message.pk,
-                        "room_uuid": self.message.room.uuid,
+                logger.error(
+                    error_msg,
+                    extra={
+                        "media_uuid": str(self.pk),
+                        "message_uuid": str(self.message.pk),
+                        "room_uuid": str(self.message.room.uuid),
                         "callback_url": self.message.room.callback_url,
                     },
                 )
