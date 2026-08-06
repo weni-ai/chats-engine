@@ -10,14 +10,9 @@ from chats.apps.ai_features.improve_user_message.usecases import (
     ImproveUserMessageUseCase,
 )
 from chats.apps.ai_features.models import FeaturePrompt
-from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.apps.projects.models import Project
 
 
-@patch(
-    "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-    return_value=True,
-)
 class ImproveUserMessageUseCaseTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -31,7 +26,7 @@ class ImproveUserMessageUseCaseTests(TestCase):
             integration_client_factory=self.mock_factory
         )
 
-    def test_returns_improved_text(self, _mock_ff):
+    def test_returns_improved_text(self):
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -49,7 +44,7 @@ class ImproveUserMessageUseCaseTests(TestCase):
 
         self.assertEqual(result, "hello world")
 
-    def test_delegates_to_service_with_correct_params(self, _mock_ff):
+    def test_delegates_to_service_with_correct_params(self):
         FeaturePrompt.objects.create(
             feature="clarity",
             model="test-model",
@@ -68,17 +63,7 @@ class ImproveUserMessageUseCaseTests(TestCase):
         self.mock_factory.get_client_class.assert_called_once_with("bedrock")
         self.mock_client_instance.generate_text.assert_called_once()
 
-    def test_raises_feature_flag_inactive_error(self, mock_ff):
-        mock_ff.return_value = False
-
-        with self.assertRaises(FeatureFlagInactiveError):
-            self.use_case.execute(
-                text="hello",
-                improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
-                project=self.project,
-            )
-
-    def test_raises_value_error_when_prompt_missing(self, _mock_ff):
+    def test_raises_value_error_when_prompt_missing(self):
         with self.assertRaises(ValueError):
             self.use_case.execute(
                 text="hello",
@@ -86,7 +71,7 @@ class ImproveUserMessageUseCaseTests(TestCase):
                 project=self.project,
             )
 
-    def test_works_for_all_improvement_types(self, _mock_ff):
+    def test_works_for_all_improvement_types(self):
         self.mock_client_instance.generate_text.return_value = "improved"
 
         for choice in ImprovedUserMessageTypeChoices:
@@ -113,8 +98,15 @@ class ImproveUserMessageUseCaseTests(TestCase):
             )
             self.assertEqual(result, "improved")
 
-    def test_uses_default_factory_when_none_provided(self, _mock_ff):
+    def test_uses_default_factory_when_none_provided(self):
+        from chats.apps.ai_features.integrations.factories import (
+            AIModelPlatformClientFactory,
+        )
+
         use_case = ImproveUserMessageUseCase()
+        self.assertIs(
+            use_case.integration_client_factory, AIModelPlatformClientFactory
+        )
 
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
@@ -124,14 +116,12 @@ class ImproveUserMessageUseCaseTests(TestCase):
             version=1,
         )
 
-        with patch(
-            "chats.apps.ai_features.improve_user_message.usecases.AIModelPlatformClientFactory"
-        ) as mock_default_factory:
+        with patch.object(
+            use_case.integration_client_factory, "get_client_class"
+        ) as mock_get_client_class:
             mock_client = MagicMock()
             mock_client.generate_text.return_value = "fixed"
-            mock_default_factory.get_client_class.return_value = MagicMock(
-                return_value=mock_client
-            )
+            mock_get_client_class.return_value = MagicMock(return_value=mock_client)
 
             result = use_case.execute(
                 text="broken text",
@@ -140,4 +130,4 @@ class ImproveUserMessageUseCaseTests(TestCase):
             )
 
             self.assertEqual(result, "fixed")
-            mock_default_factory.get_client_class.assert_called_once_with("bedrock")
+            mock_get_client_class.assert_called_once_with("bedrock")
