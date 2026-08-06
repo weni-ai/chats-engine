@@ -60,6 +60,9 @@ from chats.apps.projects.models import (
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.usecases.filter_flows_by_queue import (
+    filter_flows_by_user_queues,
+)
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
@@ -287,6 +290,7 @@ class ProjectViewset(
         flow_list = FlowRESTClient().list_flows(
             project, cursor=cursor, verify_chats_tag=verify_chats_tag
         )
+        flow_list = filter_flows_by_user_queues(flow_list, project, request.user)
 
         return Response(flow_list, status.HTTP_200_OK)
 

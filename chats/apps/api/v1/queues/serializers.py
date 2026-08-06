@@ -46,6 +46,35 @@ class QueueLimitSerializer(serializers.Serializer):
         return data
 
 
+def apply_selected_flows(serializer, data):
+    """
+    Sync selected_flows with bond_flows_queue.
+
+    The frontend always sends the full desired list (replace, not append).
+    When the feature is disabled, selected_flows must be an empty list.
+    """
+    initial = serializer.initial_data or {}
+    instance = serializer.instance
+
+    bond = data.get(
+        "bond_flows_queue",
+        getattr(instance, "bond_flows_queue", False) if instance else False,
+    )
+
+    if not bond:
+        if "bond_flows_queue" in initial or "selected_flows" in initial or instance is None:
+            data["selected_flows"] = []
+        return data
+
+    if "selected_flows" in initial:
+        flows = data.get("selected_flows") or []
+        data["selected_flows"] = [str(flow_uuid) for flow_uuid in flows]
+    elif instance is None:
+        data.setdefault("selected_flows", [])
+
+    return data
+
+
 class QueueSerializer(AuditableModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
@@ -53,6 +82,10 @@ class QueueSerializer(AuditableModelSerializer):
         source="sector.required_tags", read_only=True
     )
     queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
 
     class Meta:
         model = Queue
@@ -67,6 +100,8 @@ class QueueSerializer(AuditableModelSerializer):
             "config",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "sector",
         ]
 
@@ -124,7 +159,7 @@ class QueueSerializer(AuditableModelSerializer):
             if "limit" in queue_limit:
                 data["queue_limit"] = queue_limit.get("limit")
 
-        return data
+        return apply_selected_flows(self, data)
 
 
 class QueueSimpleSerializer(serializers.ModelSerializer):
@@ -134,6 +169,11 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
 
 
 class QueueUpdateSerializer(AuditableModelSerializer):
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
+
     class Meta:
         model = Queue
         fields = "__all__"
@@ -151,7 +191,7 @@ class QueueUpdateSerializer(AuditableModelSerializer):
                 queue_purpose,
             )
 
-        return data
+        return apply_selected_flows(self, data)
 
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
@@ -166,6 +206,8 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
             "uuid",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "agents",
             "created_on",
             "sector_name",

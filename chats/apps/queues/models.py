@@ -46,6 +46,8 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
     queue_purpose = models.TextField(_("Queue purpose"), null=True, blank=True)
     queue_limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
     is_queue_limit_active = models.BooleanField(_("Is limit active?"), default=False)
+    bond_flows_queue = models.BooleanField(_("Bond flows queue"), default=False)
+    selected_flows = models.JSONField(_("Selected flows"), default=list, blank=True)
 
     objects = QueueManager()
     all_objects = QueueManager(include_deleted=True)

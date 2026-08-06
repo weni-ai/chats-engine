@@ -160,3 +160,41 @@ class ChangeTicketerTests(TestCase):
 
         with self.assertRaises(FlowsChangeTicketerError):
             client.change_ticketer(self.project, ["t-1"], "ticketer-1")
+
+
+@override_settings(FLOWS_API_URL="https://flows.test")
+class FlowExistsTests(TestCase):
+    def setUp(self):
+        self.project = _build_project()
+        self.flow_uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_true_when_flow_is_in_results(self, mock_retry):
+        mock_retry.return_value = _build_response(
+            200,
+            {"results": [{"uuid": self.flow_uuid, "name": "Flow A"}]},
+        )
+
+        self.assertTrue(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
+        self.assertEqual(
+            mock_retry.call_args.kwargs["url"],
+            f"https://flows.test/api/v2/flows.json?uuid={self.flow_uuid}",
+        )
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_false_when_results_are_empty(self, mock_retry):
+        mock_retry.return_value = _build_response(200, {"results": []})
+
+        self.assertFalse(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_false_on_404(self, mock_retry):
+        mock_retry.return_value = _build_response(404)
+
+        self.assertFalse(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_true_on_unexpected_status_to_avoid_pruning(self, mock_retry):
+        mock_retry.return_value = _build_response(500)
+
+        self.assertTrue(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
