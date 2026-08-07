@@ -799,9 +799,6 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
-)
 WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
     "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
 )
@@ -938,14 +935,6 @@ VTEX_INTERNAL_DOMAINS = env.list(
     "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
 )
 
-# Queue Limit
-QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
-    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
-)
-QUEUE_PURPOSE_FEATURE_FLAG_KEY = env.str(
-    "QUEUE_PURPOSE_FEATURE_FLAG_KEY", default="weniChatsQueuePurpose"
-)
-
 # Bulk Queue Create Settings
 QUEUE_BULK_CREATE_MAX_ITEMS = env.int("QUEUE_BULK_CREATE_MAX_ITEMS", default=50)
 QUEUE_BULK_CREATE_FEATURE_FLAG_KEY = env.str(
@@ -975,22 +964,10 @@ AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY = env.str(
     default="weniChatsAgentCapacityRecheck",
 )
 
-# Improve User Message
-IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
-    default="weniChatsAITextImprovement",
-)
-
 # Agents Management (Quick Agent Setup)
 AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
-)
-
-# Inactivity Timeout
-WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
-    "WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY",
-    default="weniChatsInactivityTimeout",
 )
 
 # Metric Goal Alerts (risk alerts)
