@@ -168,3 +168,16 @@ def finish_stale_bulk_message_sends():
         updated,
     )
     return updated
+
+
+@shared_task
+def process_bulk_quick_message_send(bulk_send_uuid: UUID):
+    """
+    Process a bulk quick-message send asynchronously.
+
+    Fan-out and per-room delivery will be implemented in a follow-up.
+    """
+    logger.info(
+        f"[process_bulk_quick_message_send] Processing bulk quick message send "
+        f"with UUID {bulk_send_uuid}"
+    )

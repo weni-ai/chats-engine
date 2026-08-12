@@ -35,6 +35,12 @@ class BulkMessageSendMessageStatus(models.TextChoices):
     FAILED = "FAILED", _("Failed")
 
 
+class BulkQuickMessageSendStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    FINISHED = "FINISHED", _("Finished")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -595,3 +601,54 @@ class BulkMessageSendMessage(BaseModel):
 
     def __str__(self):
         return f"{self.bulk_message_send.uuid} - {self.room.uuid} - {self.status}"
+
+
+class BulkQuickMessageSend(BaseModel):
+    """
+    Metadata for a bulk quick-message send request.
+
+    Stores who requested the send, the message text, the project scope, and
+    the contact targeting applied when the request was created.
+
+    ``contacts`` is ``null`` when the send targets all ongoing rooms of the
+    requesting attendant in the project. A list of contact UUID strings
+    narrows the send to those contacts. Actual message delivery is handled
+    asynchronously in a later step.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    contacts = models.JSONField(
+        _("contacts"),
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkQuickMessageSendStatus.choices,
+        default=BulkQuickMessageSendStatus.PENDING,
+    )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk quick message send")
+        verbose_name_plural = _("Bulk quick message sends")
+
+    def __str__(self):
+        return f"{self.uuid} - {self.status}"
