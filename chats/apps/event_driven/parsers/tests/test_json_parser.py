@@ -5,6 +5,16 @@ from chats.apps.event_driven.parsers.json_parser import JSONParser
 
 
 class JSONParserTestCase(TestCase):
+    def test_parse_empty_stream_raises_parse_error(self):
+        with self.assertRaises(ParseError) as context:
+            JSONParser().parse(b"")
+
+        self.assertIn("stream cannot be empty", str(context.exception))
+
+    def test_parse_none_stream_raises_parse_error(self):
+        with self.assertRaises(ParseError):
+            JSONParser().parse(None)
+
     def test_parse_invalid_stream_format(self):
         stream = b"abcd"
 
