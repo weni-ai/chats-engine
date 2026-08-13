@@ -14,6 +14,16 @@ from chats.apps.rooms.models import Room
 logger = logging.getLogger(__name__)
 
 
+def _schedule_progress_update(bulk_send_uuid):
+    from chats.apps.msgs.tasks import update_bulk_quick_message_send_progress
+
+    transaction.on_commit(
+        lambda uuid=bulk_send_uuid: update_bulk_quick_message_send_progress.delay(
+            uuid
+        )
+    )
+
+
 class SendBulkQuickMessageToRoomUseCase:
     """
     Creates and delivers a bulk quick-message send to a single room.
@@ -67,7 +77,7 @@ class SendBulkQuickMessageToRoomUseCase:
                 )
                 room.update_last_message(message=message, user=message.user)
                 transaction.on_commit(lambda: message.notify_room("create", True))
-                # TODO: update bulk quick message send progress
+                _schedule_progress_update(bulk_send.uuid)
 
                 logger.info(
                     f"[SendBulkQuickMessageToRoomUseCase] Sent bulk quick message "
@@ -111,5 +121,5 @@ class SendBulkQuickMessageToRoomUseCase:
                 "traceback": traceback_text,
             },
         )
-        # TODO: update bulk quick message send progress
+        _schedule_progress_update(bulk_send.uuid)
         return bulk_message
