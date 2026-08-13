@@ -67,9 +67,7 @@ class FilterFlowsByUserQueuesTestCase(TestCase):
         )
         self._authorize_queue(queue)
 
-        result = filter_flows_by_user_queues(
-            catalog_copy(), self.project, self.user
-        )
+        result = filter_flows_by_user_queues(catalog_copy(), self.project, self.user)
 
         self.assertEqual(len(result["results"]), 3)
 
@@ -88,9 +86,7 @@ class FilterFlowsByUserQueuesTestCase(TestCase):
         )
         self._authorize_queue(queue_1)
 
-        result = filter_flows_by_user_queues(
-            catalog_copy(), self.project, self.user
-        )
+        result = filter_flows_by_user_queues(catalog_copy(), self.project, self.user)
 
         self.assertEqual(
             [flow["uuid"] for flow in result["results"]],
@@ -113,9 +109,7 @@ class FilterFlowsByUserQueuesTestCase(TestCase):
         self._authorize_queue(queue_1)
         self._authorize_queue(queue_2)
 
-        result = filter_flows_by_user_queues(
-            catalog_copy(), self.project, self.user
-        )
+        result = filter_flows_by_user_queues(catalog_copy(), self.project, self.user)
 
         self.assertEqual(
             [flow["uuid"] for flow in result["results"]],
@@ -174,9 +168,7 @@ class FilterFlowsByUserQueuesTestCase(TestCase):
             selected_flows=[FLOW_A],
         )
 
-        result = filter_flows_by_user_queues(
-            catalog_copy(), self.project, self.user
-        )
+        result = filter_flows_by_user_queues(catalog_copy(), self.project, self.user)
 
         self.assertEqual(
             [flow["uuid"] for flow in result["results"]],
@@ -346,7 +338,10 @@ class ListFlowsFilterIntegrationTestCase(APITestCase):
             work_start="09:00",
             work_end="18:00",
         )
-        self.url = reverse("project-flows", kwargs={"uuid": str(self.project.uuid)})
+        self.url = (
+            reverse("project-detail", kwargs={"uuid": str(self.project.uuid)})
+            + "list_flows/"
+        )
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
 
     @patch(
@@ -428,9 +423,7 @@ class ListFlowsFilterIntegrationTestCase(APITestCase):
             "results": [{"uuid": FLOW_A, "name": "Flow A"}],
         },
     )
-    def test_list_flows_prunes_deleted_selected_flow(
-        self, mock_list, mock_flow_exists
-    ):
+    def test_list_flows_prunes_deleted_selected_flow(self, mock_list, mock_flow_exists):
         queue = Queue.objects.create(
             name="Queue 1",
             sector=self.sector,

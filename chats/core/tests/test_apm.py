@@ -49,10 +49,6 @@ class ApmConfigurationTestCase(TestCase):
             APM_SERVER_URL="http://localhost:8200",
         )
         script = """
-import django
-
-django.setup()
-
 from django.conf import settings
 
 assert settings.USE_APM is True
