@@ -16,6 +16,7 @@ from chats.apps.assisted_sales.serializers import (
 )
 from chats.apps.assisted_sales.usecases import (
     CreateCopilotIntegrationUseCase,
+    RemoveCopilotIntegrationUseCase,
     UpdateCopilotIntegrationUseCase,
 )
 from chats.apps.projects.models import ProjectPermission
@@ -135,3 +136,38 @@ class CopilotProjectUpdateView(APIView):
             CopilotIntegrationResponseSerializer(integration).data,
             status=status.HTTP_200_OK,
         )
+
+
+class CopilotProjectRemoveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, uuid):
+        try:
+            integration = CopilotIntegration.objects.select_related("project").get(
+                Q(uuid=uuid) | Q(copilot_project_uuid=uuid)
+            )
+        except CopilotIntegration.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=integration.project
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            RemoveCopilotIntegrationUseCase().execute(integration=integration)
+        except CopilotConnectError as exc:
+            return Response(
+                {"status_code": exc.status_code, "error": exc.error},
+                status=exc.status_code
+                if 400 <= exc.status_code < 600
+                else status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({"status": 200}, status=status.HTTP_200_OK)
