@@ -517,7 +517,9 @@ class QueueViewset(ModelViewSet):
         if project:
             query_params["queue__sector__project"] = project
 
-        queue_permissions = QueueAuthorization.objects.filter(**query_params)
+        queue_permissions = QueueAuthorization.objects.filter(
+            **query_params
+        ).select_related("queue", "queue__sector")
         serializer_data = queue_serializers.QueueAuthorizationSerializer(
             queue_permissions, many=True
         )
