@@ -66,3 +66,14 @@ class CopilotConnectClientTests(TestCase):
 
         mock_put.assert_called_once()
         self.assertEqual(data["uuid"], "new-uuid")
+
+    @override_settings(
+        CONNECT_COPILOT_REMOVE_URL="https://connect.example.com/copilot/{uuid}"
+    )
+    @patch("chats.apps.assisted_sales.clients.requests.delete")
+    def test_remove_copilot_project(self, mock_delete, _mock_token):
+        mock_delete.return_value = MagicMock(ok=True)
+
+        self.client_rest.remove_copilot_project("copilot-uuid")
+
+        mock_delete.assert_called_once()

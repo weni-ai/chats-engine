@@ -122,3 +122,12 @@ class UpdateCopilotIntegrationUseCase:
             integration.copilot_created_on = created_on
         integration.save()
         return integration
+
+
+class RemoveCopilotIntegrationUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, integration: CopilotIntegration) -> None:
+        self.client.remove_copilot_project(str(integration.copilot_project_uuid))
+        integration.delete()
