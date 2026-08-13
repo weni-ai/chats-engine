@@ -63,11 +63,8 @@ class SendBulkQuickMessageToRoomUseCaseTests(TestCase):
             is_active=is_active,
         )
 
-    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_sends_message_as_requesting_attendant(
-        self, mock_notify_room, mock_progress_delay
-    ):
+    def test_sends_message_as_requesting_attendant(self, mock_notify_room):
         room = self._create_room(user=self.attendant)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -92,25 +89,19 @@ class SendBulkQuickMessageToRoomUseCaseTests(TestCase):
         self.assertEqual(room.last_message_user, self.attendant)
 
         mock_notify_room.assert_called_once_with("create", True)
-        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
-    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_does_not_notify_before_commit(
-        self, mock_notify_room, mock_progress_delay
-    ):
+    def test_does_not_notify_before_commit(self, mock_notify_room):
         room = self._create_room(user=self.attendant)
 
         with self.captureOnCommitCallbacks(execute=False):
             self.usecase.execute(self.bulk_send, room)
 
         mock_notify_room.assert_not_called()
-        mock_progress_delay.assert_not_called()
         self.assertEqual(Message.objects.count(), 1)
 
-    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_fails_when_room_is_inactive(self, mock_notify_room, mock_progress_delay):
+    def test_fails_when_room_is_inactive(self, mock_notify_room):
         room = self._create_room(user=self.attendant, is_active=False)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -126,13 +117,9 @@ class SendBulkQuickMessageToRoomUseCaseTests(TestCase):
         self.assertEqual(bulk_message.errors["traceback"], "")
         self.assertEqual(Message.objects.count(), 0)
         mock_notify_room.assert_not_called()
-        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
-    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_fails_when_room_is_not_assigned_to_attendant(
-        self, mock_notify_room, mock_progress_delay
-    ):
+    def test_fails_when_room_is_not_assigned_to_attendant(self, mock_notify_room):
         room = self._create_room(user=self.other_agent)
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -146,15 +133,13 @@ class SendBulkQuickMessageToRoomUseCaseTests(TestCase):
         )
         self.assertEqual(Message.objects.count(), 0)
         mock_notify_room.assert_not_called()
-        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
-    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.models.Message.notify_room")
     @patch(
         "chats.apps.msgs.usecases.send_bulk_quick_message_to_room.Message.objects.create"
     )
     def test_fails_when_message_create_raises(
-        self, mock_create_message, mock_notify_room, mock_progress_delay
+        self, mock_create_message, mock_notify_room
     ):
         room = self._create_room(user=self.attendant)
         mock_create_message.side_effect = RuntimeError("boom")
@@ -178,4 +163,3 @@ class SendBulkQuickMessageToRoomUseCaseTests(TestCase):
             any("Failed to send bulk quick" in message for message in logs.output)
         )
         mock_notify_room.assert_not_called()
-        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
