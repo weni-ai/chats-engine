@@ -365,12 +365,14 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "seen",
             "created_on",
             "metadata",
+            "external_id",
         ]
         read_only_fields = [
             "uuid",
             "user",
             "created_on",
             "contact",
+            "external_id",
         ]
 
     def validate(self, attrs):
@@ -468,6 +470,7 @@ class MessageSerializer(BaseMessageSerializer):
             "automatic_message_type",
             "ai_text_improvement",
             "bulk_message",
+            "external_id",
         ]
         read_only_fields = [
             "uuid",
@@ -475,6 +478,7 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "contact",
             "bulk_message",
+            "external_id",
         ]
 
     def create(self, validated_data):
