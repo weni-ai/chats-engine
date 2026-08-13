@@ -77,3 +77,18 @@ class CopilotConnectClientTests(TestCase):
         self.client_rest.remove_copilot_project("copilot-uuid")
 
         mock_delete.assert_called_once()
+
+    @override_settings(
+        CONNECT_COPILOT_LIST_URL="https://connect.example.com/org/{org_uuid}/copilot"
+    )
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_copilot_projects(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(
+            ok=True,
+            json=lambda: [{"uuid": "abc", "name": "copilot", "assigned_agents": 3}],
+        )
+
+        data = self.client_rest.list_copilot_projects("org-uuid", name="copilot")
+
+        mock_get.assert_called_once()
+        self.assertEqual(data[0]["name"], "copilot")
