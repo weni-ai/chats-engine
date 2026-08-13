@@ -622,6 +622,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "finish_stale_bulk_message_sends",
         "schedule": FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS,
     },
+    "finish-stale-bulk-quick-message-sends": {
+        "task": "finish_stale_bulk_quick_message_sends",
+        "schedule": FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS,
+    },
 }
 
 METRIC_GOAL_STATE_TTL_SECONDS = env.int(

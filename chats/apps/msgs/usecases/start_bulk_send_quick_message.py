@@ -21,7 +21,8 @@ class StartBulkSendQuickMessageUseCase:
     ``contacts`` is stored as ``None`` when the send targets all ongoing rooms
     of the requesting attendant in the project. A list of contact UUIDs
     (including an empty list) is stored as UUID strings. Room filtering and
-    message delivery are handled by a later async task.
+    message delivery are handled asynchronously by
+    ``process_bulk_quick_message_send``.
     """
 
     def execute(
