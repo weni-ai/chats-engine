@@ -53,3 +53,29 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
         if not obj.connected_by:
             return ""
         return obj.connected_by.name or obj.connected_by.email
+
+
+class CopilotLinkedProjectSerializer(CopilotIntegrationResponseSerializer):
+    project_uuid = serializers.UUIDField(source="copilot_project_uuid", read_only=True)
+    connect_by = serializers.SerializerMethodField()
+
+    class Meta(CopilotIntegrationResponseSerializer.Meta):
+        fields = [
+            "name",
+            "assigned_agents",
+            "created_on",
+            "connected_on",
+            "uuid",
+            "project_uuid",
+            "connect_by",
+        ]
+
+    def get_connect_by(self, obj: CopilotIntegration):
+        return self.get_connected_by(obj)
+
+
+class CopilotExistingProjectSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    assigned_agents = serializers.IntegerField()
+    uuid = serializers.UUIDField()
+    project_uuid = serializers.UUIDField()

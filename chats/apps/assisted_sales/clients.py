@@ -124,17 +124,53 @@ class CopilotConnectClient(InternalAuthentication):
             return 0
 
         data = self._parse_json(response)
+        if not isinstance(data, dict):
+            return 0
         return int(data.get("assigned_agents", data.get("count", 0)) or 0)
 
-    def _parse_json(self, response) -> dict:
+    def list_copilot_projects(self, org_uuid: str, name: str = None) -> list:
+        url = settings.CONNECT_COPILOT_LIST_URL
+        if not url:
+            return None
+
+        request_url = url.format(org_uuid=org_uuid, uuid=org_uuid)
+        params = {"org_uuid": org_uuid}
+        if name:
+            params["name"] = name
+
+        try:
+            response = requests.get(
+                url=request_url,
+                headers=self.headers,
+                params=params,
+                timeout=15,
+            )
+        except requests.RequestException as exc:
+            logger.exception("Failed to list copilot projects on Connect")
+            raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+
+        if not response.ok:
+            raise CopilotConnectError(
+                status_code=response.status_code,
+                error=self._parse_error(response),
+            )
+
+        data = self._parse_json(response)
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("results") or data.get("projects") or data.get("data") or []
+        return []
+
+    def _parse_json(self, response):
         try:
             data = response.json()
         except ValueError:
             return {}
-        return data if isinstance(data, dict) else {}
+        return data
 
     def _parse_error(self, response):
         data = self._parse_json(response)
-        if data.get("error") not in (None, {}):
+        if isinstance(data, dict) and data.get("error") not in (None, {}):
             return data.get("error")
         return response.text or "Connect request failed"
