@@ -193,3 +193,63 @@ class CopilotProjectUpdateViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CopilotProjectRemoveViewTests(APITestCase):
+    def setUp(self):
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=uuid4(),
+            name="copilot",
+            assigned_agents=2,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/remove/{self.integration.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_remove_copilot_integration(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"status": 200})
+        self.assertFalse(
+            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
+        )
+        mock_client.remove_copilot_project.assert_called_once()
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_remove_fails_when_connect_fails(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.remove_copilot_project.side_effect = CopilotConnectError(
+            status_code=502, error="Connect unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertTrue(
+            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
+        )
+
+    def test_remove_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(
+            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
+        )
