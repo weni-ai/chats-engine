@@ -290,7 +290,12 @@ class ProjectViewset(
         flow_list = FlowRESTClient().list_flows(
             project, cursor=cursor, verify_chats_tag=verify_chats_tag
         )
-        flow_list = filter_flows_by_user_queues(flow_list, project, request.user)
+        flow_list = filter_flows_by_user_queues(
+            flow_list,
+            project,
+            request.user,
+            queue_uuid=request.query_params.get("queue") or None,
+        )
 
         return Response(flow_list, status.HTTP_200_OK)
 
