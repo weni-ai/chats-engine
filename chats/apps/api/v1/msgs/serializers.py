@@ -104,6 +104,18 @@ class BulkSendMessagesSerializer(serializers.Serializer):
     )
 
 
+class BulkSendQuickMessageSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    project = serializers.UUIDField(required=True)
+    contacts = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=None,
+    )
+
+
 class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
     sent_at = serializers.DateTimeField(source="created_on", read_only=True)
 
