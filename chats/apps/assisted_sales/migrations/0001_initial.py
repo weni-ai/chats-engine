@@ -12,8 +12,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("projects", "0036_alter_agentstatuslog_options_and_more"),
-        ("sectors", "0029_sectorauthorization_is_deleted_and_more"),
+        ("projects", "0001_initial"),
+        ("sectors", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
