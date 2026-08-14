@@ -660,6 +660,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                                 content_type=media_data["content_type"],
                                 media_url=media_data["url"],
                                 message=message,
+                                room=message.room,
                             )
                         )
 
