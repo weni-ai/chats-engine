@@ -20,24 +20,6 @@ from chats.apps.rooms.usecases.inactivity import (
 from chats.apps.sectors.models import Sector
 
 
-def _enable_inactivity_feature_flag(test_case: TestCase) -> None:
-    """
-    Helper: enables the `weniChatsInactivityTimeout` feature flag for the
-    duration of a test case. The flag is evaluated through
-    `is_feature_active_for_attributes` inside the inactivity usecase and
-    `Room.notify_inactivity`; both are patched here.
-    """
-    patchers = [
-        patch(
-            "chats.apps.rooms.usecases.inactivity.is_feature_active_for_attributes",
-            return_value=True,
-        ),
-    ]
-    for p in patchers:
-        p.start()
-        test_case.addCleanup(p.stop)
-
-
 def _enabled_inactivity_config(
     *, message_timeout_time=600, close_room_timeout_time=60, close_enabled=True
 ):
@@ -53,7 +35,6 @@ def _enabled_inactivity_config(
 
 class InactivityWarnTests(TestCase):
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -190,7 +171,6 @@ class InactivityWarnTests(TestCase):
 
 class InactivityCloseTests(TestCase):
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -392,7 +372,6 @@ class InactivityCloseTests(TestCase):
 
 class InactivityResetTests(TestCase):
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -553,7 +532,6 @@ class RoomNotifyInactivityTests(TestCase):
     """
 
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -619,7 +597,6 @@ class InactivityBatchLimitTests(TestCase):
     """
 
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -719,7 +696,6 @@ class InactivityMetricsEnqueueTests(TestCase):
     """
 
     def setUp(self):
-        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",

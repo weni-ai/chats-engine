@@ -38,6 +38,7 @@ class MessageViewSetV2(
             "internal_note",
             "internal_note__user",
             "automatic_message",
+            "bulk_message_send_message__bulk_message_send__user",
         ).prefetch_related("medias", "internal_note__medias")
 
     def get_paginated_response(self, data):
