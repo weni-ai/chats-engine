@@ -19,6 +19,11 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
+from chats.apps.msgs.exceptions import MessageCreateError
+from chats.apps.msgs.usecases.create_agent_message import (
+    CreateAgentMessageUseCase,
+    SerializeMessageForWsUseCase,
+)
 from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
@@ -46,6 +51,7 @@ LAST_SEEN_UPDATE_INTERVAL_SECONDS = getattr(
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     CONSUMER_TYPE = "agent"
+    ALLOWED_METHODS = frozenset({"join", "exit", "list_groups", "message_create"})
     """
     Agent side of the chat
     """
@@ -192,8 +198,27 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         if command_name == "notify":
             await self.notify(payload["content"])
         elif command_name == "method":
-            command = getattr(self, payload["action"])
-            await command(payload["content"])
+            action = payload.get("action")
+            if action not in self.ALLOWED_METHODS:
+                logger.warning(
+                    "Rejected disallowed WebSocket method action %s for user %s",
+                    action,
+                    getattr(self.user, "email", "unknown"),
+                )
+                await self.send_json(
+                    {
+                        "type": "notify",
+                        "action": "method.error",
+                        "content": {
+                            "error_code": "method_not_allowed",
+                            "error_message": f"Unknown action: {action}",
+                        },
+                    }
+                )
+                return
+
+            command = getattr(self, action)
+            await command(payload.get("content", {}))
         elif command_name == "ping":
             self.last_ping = timezone.now()
             if await self.is_ping_timeout_feature_enabled():
@@ -235,6 +260,60 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 "content": {"groups": self.added_groups},
             }
         )
+
+    async def message_create(self, content):
+        if not isinstance(content, dict):
+            content = {}
+
+        request_id = content.get("request_id")
+        if not request_id:
+            await self._send_message_create_error(
+                request_id=None,
+                error_code="validation_error",
+                error_message="request_id is required",
+            )
+            return
+
+        try:
+            message_data = await self._message_create_sync(content)
+        except MessageCreateError as error:
+            await self._send_message_create_error(
+                request_id=request_id,
+                error_code=error.error_code,
+                error_message=str(error.error_message),
+            )
+            return
+
+        await self.send_json(
+            {
+                "type": "notify",
+                "action": "msg.create.success",
+                "content": {"request_id": request_id, **message_data},
+            }
+        )
+
+    async def _send_message_create_error(
+        self, request_id, error_code: str, error_message: str
+    ):
+        content = {
+            "error_code": error_code,
+            "error_message": error_message,
+        }
+        if request_id is not None:
+            content["request_id"] = request_id
+
+        await self.send_json(
+            {
+                "type": "notify",
+                "action": "msg.create.error",
+                "content": content,
+            }
+        )
+
+    @database_sync_to_async
+    def _message_create_sync(self, content):
+        message = CreateAgentMessageUseCase().execute(self.user, content)
+        return SerializeMessageForWsUseCase().execute(message)
 
     async def join(self, event):
         if event.get("content"):

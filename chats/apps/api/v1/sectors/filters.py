@@ -82,6 +82,13 @@ class SectorTagFilter(filters.FilterSet):
         help_text=_("Queue UUID"),
     )
 
+    search = filters.CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        required=False,
+        help_text=_("Tag name"),
+    )
+
     def filter_sector(self, queryset, name, value):
         try:
             sector = Sector.objects.get(uuid=value, is_deleted=False)
