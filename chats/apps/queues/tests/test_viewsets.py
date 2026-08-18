@@ -1,12 +1,12 @@
 import uuid
-from django.conf import settings
+from unittest.mock import MagicMock, patch
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
-from django.test import override_settings
 from rest_framework.response import Response
-from unittest.mock import patch, MagicMock
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -17,11 +17,10 @@ from chats.apps.projects.models.models import (
     CustomStatusType,
     ProjectPermission,
 )
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-
-from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class QueueTests(APITestCase):
@@ -320,9 +319,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(self.queue.queue_limit, None)
         self.assertEqual(self.queue.is_queue_limit_active, False)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue_with_queue_purpose(self, mock_is_feature_active):
+    def test_create_queue_with_queue_purpose(self):
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -334,30 +332,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data.get("queue_purpose"), "Atendimento comercial")
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
     @with_project_permission()
-    def test_create_queue_with_queue_purpose_when_feature_flag_off_returns_400(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
-            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
-        )
-        response = self.create_queue(
-            {
-                "name": "Testing",
-                "sector": str(self.sector.pk),
-                "queue_purpose": "Atendimento comercial",
-            }
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
-        )
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
-    @with_project_permission()
-    def test_update_queue_with_queue_purpose(self, mock_is_feature_active):
+    def test_update_queue_with_queue_purpose(self):
         response = self.update_queue(
             self.queue.pk,
             {"queue_purpose": "Suporte técnico"},
@@ -366,24 +342,6 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.queue.refresh_from_db()
         self.assertEqual(self.queue.queue_purpose, "Suporte técnico")
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
-    @with_project_permission()
-    def test_update_queue_with_queue_purpose_when_feature_flag_off_returns_400(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
-            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
-        )
-        response = self.update_queue(
-            self.queue.pk,
-            {"queue_purpose": "Suporte técnico"},
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
-        )
 
     @with_project_permission()
     def test_create_queue_with_bond_flows_queue(self):
@@ -1093,9 +1051,7 @@ class QueueTransferAgentsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         target_emails = {online_agent.email, paused_agent.email, offline_agent.email}
-        filtered = [
-            item for item in response.data if item["email"] in target_emails
-        ]
+        filtered = [item for item in response.data if item["email"] in target_emails]
         ordered_emails = [item["email"] for item in filtered]
 
         self.assertEqual(
@@ -1144,7 +1100,6 @@ class QueueTransferAgentsTests(APITestCase):
 
 
 class QueueEndAllChatsTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -1259,7 +1214,6 @@ class QueueEndAllChatsTests(APITestCase):
 
 
 class QueueTransferOnDeleteTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
