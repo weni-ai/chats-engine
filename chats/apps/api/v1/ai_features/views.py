@@ -16,7 +16,6 @@ from chats.apps.api.v1.ai_features.serializers import (
     AITextImprovementRequestSerializer,
 )
 from chats.apps.api.v1.ai_features.throttling import AITextImprovementThrottle
-from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.core.mixins import LanguageViewMixin
 
 logger = logging.getLogger(__name__)
@@ -60,11 +59,6 @@ class AITextImprovementView(APIView):
                 text=serializer.validated_data["text"],
                 improvement_type=serializer.validated_data["type"],
                 project=project,
-            )
-        except FeatureFlagInactiveError:
-            return Response(
-                {"detail": _("Feature not available for this project.")},
-                status=status.HTTP_403_FORBIDDEN,
             )
         except ValueError:
             logger.exception("Error generating improved message")
