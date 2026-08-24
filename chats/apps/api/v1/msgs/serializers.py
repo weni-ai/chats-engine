@@ -545,30 +545,32 @@ class MessageSerializer(BaseMessageSerializer):
     def create(self, validated_data):
         ai_text_improvement = validated_data.pop("ai_text_improvement", None)
         medias_to_attach = validated_data.pop("_media_to_attach", [])
-        msg = super().create(validated_data)
 
-        if medias_to_attach:
-            media_ids = [media.pk for media in medias_to_attach]
-            updated = MessageMedia.objects.filter(
-                pk__in=media_ids, message__isnull=True, room_id=msg.room_id
-            ).update(message=msg)
-            if updated != len(media_ids):
-                raise serializers.ValidationError(
-                    {"media": _("Media is already attached to a message")}
-                )
+        with transaction.atomic():
+            msg = super().create(validated_data)
 
-        if ai_text_improvement:
-            transaction.on_commit(
-                lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
-                    "type"
-                ], status=ai_text_improvement["status"]: (
-                    register_message_improvement_task.delay(
-                        message_uuid=message_uuid,
-                        improvement_type=improvement_type,
-                        status=status,
+            if medias_to_attach:
+                media_ids = [media.pk for media in medias_to_attach]
+                updated = MessageMedia.objects.filter(
+                    pk__in=media_ids, message__isnull=True, room_id=msg.room_id
+                ).update(message=msg)
+                if updated != len(media_ids):
+                    raise serializers.ValidationError(
+                        {"media": _("Media is already attached to a message")}
+                    )
+
+            if ai_text_improvement:
+                transaction.on_commit(
+                    lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
+                        "type"
+                    ], status=ai_text_improvement["status"]: (
+                        register_message_improvement_task.delay(
+                            message_uuid=message_uuid,
+                            improvement_type=improvement_type,
+                            status=status,
+                        )
                     )
                 )
-            )
 
         return msg
 
