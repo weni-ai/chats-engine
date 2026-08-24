@@ -90,6 +90,52 @@ class RoomsCountByQueueResponseSerializer(serializers.Serializer):
     sectors = SectorRoomsCountSerializer(many=True)
 
 
+class LastMessageSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(allow_null=True)
+    text = serializers.CharField(allow_blank=True)
+    created_on = serializers.DateTimeField(allow_null=True)
+    user = serializers.EmailField(allow_null=True)
+    contact = serializers.UUIDField(allow_null=True)
+    media = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    bulk_message = serializers.JSONField(allow_null=True)
+
+    @classmethod
+    def from_room(cls, room: Room, *, missing_as_empty: bool = False):
+        if not room.last_message_id:
+            if missing_as_empty:
+                return cls(
+                    {
+                        "uuid": None,
+                        "text": "",
+                        "created_on": None,
+                        "user": None,
+                        "contact": None,
+                        "media": [],
+                        "bulk_message": None,
+                    }
+                ).data
+            return None
+
+        metadata = room.last_message_metadata or {}
+        return cls(
+            {
+                "uuid": room.last_message_id,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": (
+                    room.last_message_user.email if room.last_message_user else None
+                ),
+                "contact": (
+                    room.last_message_contact.uuid
+                    if room.last_message_contact
+                    else None
+                ),
+                "media": room.last_message_media or [],
+                "bulk_message": metadata.get("bulk_message"),
+            }
+        ).data
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)
@@ -197,22 +243,7 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.get_is_waiting()
 
     def get_last_message(self, room: Room):
-        if room.last_message_id:
-            return {
-                "uuid": room.last_message.uuid,
-                "text": room.last_message_text or "",
-                "created_on": room.last_interaction,
-                "user": (
-                    room.last_message_user.email if room.last_message_user else None
-                ),
-                "contact": (
-                    room.last_message_contact.uuid
-                    if room.last_message_contact
-                    else None
-                ),
-                "media": room.last_message_media or [],
-            }
-        return None
+        return LastMessageSerializer.from_room(room)
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
@@ -327,29 +358,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_last_message(self, room: Room):
-        if room.last_message_id:
-            return {
-                "uuid": room.last_message.uuid,
-                "text": room.last_message_text or "",
-                "created_on": room.last_interaction,
-                "user": (
-                    room.last_message_user.email if room.last_message_user else None
-                ),
-                "contact": (
-                    room.last_message_contact.uuid
-                    if room.last_message_contact
-                    else None
-                ),
-                "media": room.last_message_media or [],
-            }
-        return {
-            "uuid": None,
-            "text": "",
-            "created_on": None,
-            "user": None,
-            "contact": None,
-            "media": [],
-        }
+        return LastMessageSerializer.from_room(room, missing_as_empty=True)
 
     def get_is_pinned(self, room: Room) -> bool:
         pinned_ids = self.context.get("pinned_ids")
