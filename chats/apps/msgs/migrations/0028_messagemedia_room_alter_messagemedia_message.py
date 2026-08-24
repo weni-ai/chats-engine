@@ -7,19 +7,33 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('rooms', '0039_rooms_violation_indexes'),
-        ('msgs', '0027_bulkmessagesend_rooms_qty'),
+        ("rooms", "0040_room_last_message_metadata"),
+        ("msgs", "0027_bulkmessagesend_rooms_qty"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='messagemedia',
-            name='room',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='medias', to='rooms.room', verbose_name='Room'),
+            model_name="messagemedia",
+            name="room",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="medias",
+                to="rooms.room",
+                verbose_name="Room",
+            ),
         ),
         migrations.AlterField(
-            model_name='messagemedia',
-            name='message',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='medias', to='msgs.message', verbose_name='Message'),
+            model_name="messagemedia",
+            name="message",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="medias",
+                to="msgs.message",
+                verbose_name="Message",
+            ),
         ),
     ]
