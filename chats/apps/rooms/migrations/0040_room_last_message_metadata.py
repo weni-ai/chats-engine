@@ -6,13 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('rooms', '0039_rooms_violation_indexes'),
+        ("rooms", "0039_alter_roomnote_options_alter_roompin_options_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='room',
-            name='last_message_metadata',
-            field=models.JSONField(blank=True, null=True, verbose_name='Last message metadata'),
+            model_name="room",
+            name="last_message_metadata",
+            field=models.JSONField(
+                blank=True, null=True, verbose_name="Last message metadata"
+            ),
         ),
     ]
