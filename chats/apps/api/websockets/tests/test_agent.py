@@ -98,6 +98,43 @@ class AgentMessageCreateWebSocketTestCase(AgentConsumerTestCase):
 
         await communicator.disconnect()
 
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    async def test_message_create_with_media(self, mock_notify_room):
+        from chats.apps.msgs.models import MessageMedia
+
+        media = MessageMedia.objects.create(
+            room=self.room,
+            message=None,
+            content_type="image/png",
+            media_url="https://example.com/image.png",
+        )
+        communicator = await self._connect()
+        request_id = "tmp-test-media"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Olá, como posso ajudar?",
+                    "media": [str(media.uuid)],
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.success")
+        self.assertEqual(response["content"]["request_id"], request_id)
+        self.assertEqual(response["content"]["text"], "Olá, como posso ajudar?")
+
+        media.refresh_from_db()
+        self.assertEqual(str(media.message_id), response["content"]["uuid"])
+        mock_notify_room.assert_called_once_with("create", True)
+
+        await communicator.disconnect()
+
     async def test_message_create_permission_denied(self):
         other_user, _ = create_user_and_token(nickname="other-agent")
         self.room.user = other_user

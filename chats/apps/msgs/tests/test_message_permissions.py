@@ -189,7 +189,7 @@ class TestMessageMediaPermission(TestCase):
         request = self.factory.get("/api/v1/msgs/media/1/")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        obj = mock.Mock(message=mock.Mock(room=self.room))
+        obj = mock.Mock(room=self.room)
 
         result = self.permission.has_object_permission(request, None, obj)
         self.assertTrue(result)
