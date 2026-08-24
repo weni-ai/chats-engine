@@ -29,10 +29,23 @@ class NexusRESTClient(InternalAuthentication):
         response = session.get(url=url, headers=self.headers, timeout=10)
         return response
 
-    def patch_human_support(
-        self, project_uuid: str, data: dict
-    ) -> requests.Response:
+    def patch_human_support(self, project_uuid: str, data: dict) -> requests.Response:
         url = f"{self.base_url}/api/{project_uuid}/human-support"
         session = self._get_session()
         response = session.patch(url=url, headers=self.headers, json=data, timeout=10)
         return response
+
+    def get_projects_agents(self, project_uuids) -> requests.Response:
+        if isinstance(project_uuids, (list, tuple)):
+            uuids = ",".join(str(uuid) for uuid in project_uuids)
+        else:
+            uuids = str(project_uuids)
+
+        url = f"{self.base_url}/api/v2/projects/agents"
+        session = self._get_session()
+        return session.get(
+            url=url,
+            headers=self.headers,
+            params={"project_uuids": uuids},
+            timeout=15,
+        )
