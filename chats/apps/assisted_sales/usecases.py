@@ -131,3 +131,69 @@ class RemoveCopilotIntegrationUseCase:
     def execute(self, *, integration: CopilotIntegration) -> None:
         self.client.remove_copilot_project(str(integration.copilot_project_uuid))
         integration.delete()
+
+
+class GetLinkedCopilotUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, project: Project, sector: Sector = None) -> CopilotIntegration:
+        queryset = CopilotIntegration.objects.filter(project=project)
+        if sector:
+            queryset = queryset.filter(sector=sector)
+        else:
+            queryset = queryset.filter(sector__isnull=True)
+            if not queryset.exists():
+                queryset = CopilotIntegration.objects.filter(project=project)
+
+        integration = queryset.select_related("connected_by").first()
+        if not integration:
+            raise CopilotIntegration.DoesNotExist()
+
+        assigned_agents = self.client.get_assigned_agents(
+            str(integration.copilot_project_uuid)
+        )
+        if assigned_agents != integration.assigned_agents:
+            integration.assigned_agents = assigned_agents
+            integration.save(update_fields=["assigned_agents", "modified_on"])
+        return integration
+
+
+class ListExistingCopilotsUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, org_uuid: str, name: str = None) -> list:
+        connect_projects = self.client.list_copilot_projects(org_uuid, name=name)
+        if connect_projects is not None:
+            return [
+                self._from_connect(item)
+                for item in connect_projects
+                if item.get("uuid") or item.get("project_uuid")
+            ]
+
+        queryset = CopilotIntegration.objects.filter(project__org=str(org_uuid))
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+        queryset = queryset.order_by("name")
+        return [self._from_integration(item) for item in queryset]
+
+    def _from_connect(self, item: dict) -> dict:
+        copilot_uuid = item.get("uuid") or item.get("project_uuid")
+        return {
+            "name": item.get("name") or "",
+            "assigned_agents": int(
+                item.get("assigned_agents", item.get("count", 0)) or 0
+            ),
+            "uuid": copilot_uuid,
+            "project_uuid": item.get("project_uuid") or copilot_uuid,
+        }
+
+    def _from_integration(self, integration: CopilotIntegration) -> dict:
+        copilot_uuid = str(integration.copilot_project_uuid)
+        return {
+            "name": integration.name,
+            "assigned_agents": integration.assigned_agents,
+            "uuid": copilot_uuid,
+            "project_uuid": copilot_uuid,
+        }

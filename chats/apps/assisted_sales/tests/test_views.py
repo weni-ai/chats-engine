@@ -13,7 +13,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 
 @override_settings(
     CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
     WENI_WEBCHAT_HOST="https://flows.weni.ai",
     WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
 )
@@ -119,7 +119,7 @@ class CopilotProjectCreateViewTests(APITestCase):
 
 @override_settings(
     CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
 )
 class CopilotProjectUpdateViewTests(APITestCase):
     def setUp(self):
@@ -253,3 +253,100 @@ class CopilotProjectRemoveViewTests(APITestCase):
         self.assertTrue(
             CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
         )
+
+
+class CopilotLinkedProjectViewTests(APITestCase):
+    def setUp(self):
+        self.user, self.token = create_user_and_token("edu")
+        self.user.first_name = "edu"
+        self.user.save(update_fields=["first_name"])
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            assigned_agents=2,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/linked_project/{self.project.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_get_linked_copilot_project(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_assigned_agents.return_value = 5
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "Projeto copilot teste")
+        self.assertEqual(response.data["assigned_agents"], 5)
+        self.assertEqual(response.data["connect_by"], "edu")
+        self.assertEqual(str(response.data["uuid"]), str(self.integration.uuid))
+        self.assertEqual(str(response.data["project_uuid"]), str(self.copilot_uuid))
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.assigned_agents, 5)
+
+    def test_get_linked_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CopilotExistingProjectsViewTests(APITestCase):
+    def setUp(self):
+        self.user, self.token = create_user_and_token("edu")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            assigned_agents=5,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/list_existing_projects/{self.org_uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @override_settings(CONNECT_COPILOT_LIST_URL="")
+    def test_list_existing_from_local_integrations(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["name"], "Projeto copilot teste")
+        self.assertEqual(response.data[0]["assigned_agents"], 5)
+        self.assertEqual(str(response.data[0]["uuid"]), str(self.copilot_uuid))
+
+    @override_settings(CONNECT_COPILOT_LIST_URL="")
+    def test_list_existing_filters_by_name(self):
+        response = self.client.get(self.url, {"name": "inexistente"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_list_existing_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

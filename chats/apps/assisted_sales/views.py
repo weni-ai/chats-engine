@@ -10,16 +10,21 @@ from chats.apps.assisted_sales.exceptions import (
 )
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.assisted_sales.serializers import (
+    CopilotExistingProjectSerializer,
     CopilotIntegrationResponseSerializer,
+    CopilotLinkedProjectSerializer,
     CreateCopilotIntegrationSerializer,
     UpdateCopilotIntegrationSerializer,
 )
 from chats.apps.assisted_sales.usecases import (
     CreateCopilotIntegrationUseCase,
+    GetLinkedCopilotUseCase,
+    ListExistingCopilotsUseCase,
     RemoveCopilotIntegrationUseCase,
     UpdateCopilotIntegrationUseCase,
 )
-from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.sectors.models import Sector
 
 
 class CopilotProjectCreateView(APIView):
@@ -171,3 +176,81 @@ class CopilotProjectRemoveView(APIView):
             )
 
         return Response({"status": 200}, status=status.HTTP_200_OK)
+
+
+class CopilotLinkedProjectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_uuid):
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        sector = None
+        sector_uuid = request.query_params.get("sector")
+        if sector_uuid:
+            try:
+                sector = Sector.objects.get(uuid=sector_uuid, project=project)
+            except Sector.DoesNotExist:
+                return Response(
+                    {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        try:
+            integration = GetLinkedCopilotUseCase().execute(
+                project=project, sector=sector
+            )
+        except CopilotIntegration.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            CopilotLinkedProjectSerializer(integration).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CopilotExistingProjectsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, org_uuid):
+        if not ProjectPermission.objects.filter(
+            user=request.user, project__org=str(org_uuid)
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            projects = ListExistingCopilotsUseCase().execute(
+                org_uuid=str(org_uuid),
+                name=request.query_params.get("name") or None,
+            )
+        except CopilotConnectError as exc:
+            return Response(
+                {"status_code": exc.status_code, "error": exc.error},
+                status=exc.status_code
+                if 400 <= exc.status_code < 600
+                else status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(
+            CopilotExistingProjectSerializer(projects, many=True).data,
+            status=status.HTTP_200_OK,
+        )

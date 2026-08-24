@@ -23,6 +23,8 @@ from chats.apps.api.v1.dashboard.viewsets import (
 )
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
 from chats.apps.assisted_sales.views import (
+    CopilotExistingProjectsView,
+    CopilotLinkedProjectView,
     CopilotProjectCreateView,
     CopilotProjectRemoveView,
     CopilotProjectUpdateView,
@@ -116,6 +118,16 @@ urlpatterns = [
         "project/copilot/remove/<uuid:uuid>",
         CopilotProjectRemoveView.as_view(),
         name="copilot_project_remove",
+    ),
+    path(
+        "project/copilot/linked_project/<uuid:project_uuid>",
+        CopilotLinkedProjectView.as_view(),
+        name="copilot_linked_project",
+    ),
+    path(
+        "project/copilot/list_existing_projects/<uuid:org_uuid>",
+        CopilotExistingProjectsView.as_view(),
+        name="copilot_list_existing_projects",
     ),
     path(
         "project/<uuid:project_uuid>/all_agents/",
