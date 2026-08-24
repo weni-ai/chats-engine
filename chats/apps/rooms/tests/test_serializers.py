@@ -346,4 +346,3 @@ class TestLastMessageSerializerBulkMessage(TestCase):
             data["last_message"]["bulk_message"]["sent_by"]["email"],
             "requester@test.com",
         )
-
