@@ -488,9 +488,7 @@ class TestMessageMediaViewsetCreateSetsRoom(APITestCase):
 
         from chats.apps.msgs.models import Message
 
-        self.message = Message.objects.create(
-            room=self.room, user=self.user, text=""
-        )
+        self.message = Message.objects.create(room=self.room, user=self.user, text="")
 
     def _create_test_image(self):
         file_content = BytesIO()
@@ -526,4 +524,3 @@ class TestMessageMediaViewsetCreateSetsRoom(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         media = MessageMedia.objects.get(message=self.message)
         self.assertEqual(media.room_id, self.room.uuid)
-
