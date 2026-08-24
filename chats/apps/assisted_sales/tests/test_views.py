@@ -13,7 +13,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 
 @override_settings(
     CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
     WENI_WEBCHAT_HOST="https://flows.weni.ai",
     WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
 )
@@ -119,7 +119,7 @@ class CopilotProjectCreateViewTests(APITestCase):
 
 @override_settings(
     CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
 )
 class CopilotProjectUpdateViewTests(APITestCase):
     def setUp(self):
