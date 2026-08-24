@@ -22,9 +22,9 @@ class ExternalRoomMetricsFilter(filters.FilterSet):
         required=False,
         method="filter_secondary_project",
     )
-    tag = filters.CharFilter(
+    tag_name = filters.CharFilter(
         required=False,
-        method="filter_tag",
+        method="filter_tag_name",
         help_text="Tag name. Use with sector when the same name exists in more than one sector.",
     )
 
@@ -39,7 +39,7 @@ class ExternalRoomMetricsFilter(filters.FilterSet):
             "created_on__gte",
             "ended_at__lte",
             "ended_at__gte",
-            "tag",
+            "tag_name",
         ]
 
     def filter_external_ids(self, queryset, name, value):
@@ -50,7 +50,7 @@ class ExternalRoomMetricsFilter(filters.FilterSet):
     def filter_secondary_project(self, queryset, name, value):
         return queryset.filter(queue__sector__secondary_project__uuid=value)
 
-    def filter_tag(self, queryset, name, value):
+    def filter_tag_name(self, queryset, name, value):
         lookup = {"tags__name": value}
         sector = self.data.get("sector")
         if sector:

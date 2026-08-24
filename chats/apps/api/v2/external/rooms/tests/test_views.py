@@ -94,7 +94,7 @@ class TestExternalRoomMetrics(BaseTestExternalRoomMetrics):
         response = self.list_rooms_metrics(
             {
                 "sector": str(self.sector.uuid),
-                "tag": "Atraso na Entrega",
+                "tag_name": "Atraso na Entrega",
             }
         )
 
