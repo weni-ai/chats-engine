@@ -4,11 +4,12 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-
+from chats.apps.accounts.models import User
 from chats.apps.api.v1.rooms.serializers import (
     AddOrRemoveTagFromRoomSerializer,
     AddRoomTagSerializer,
     ListRoomSerializer,
+    RoomSerializer,
     _get_room_inactivity_timeout_time,
 )
 from chats.apps.contacts.models import Contact
@@ -18,6 +19,7 @@ from chats.apps.sectors.constants import (
     get_default_inactivity_timeout,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -252,3 +254,98 @@ class TestListRoomSerializerInactivityFields(TestCase):
         # important part is that reading the sector's `inactivity_timeout`
         # adds zero queries on top of the existing select_related JOINs.
         self.assertLessEqual(len(ctx.captured_queries), 1 + 5)
+
+
+class TestLastMessageSerializerBulkMessage(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test")
+        self.sector = Sector.objects.create(
+            name="test",
+            project=self.project,
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="test", sector=self.sector)
+        self.contact = Contact.objects.create(name="John")
+        self.user = User.objects.create(
+            email="agent@test.com",
+            first_name="Agent",
+            last_name="User",
+        )
+        self.room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.user
+        )
+        self.bulk_metadata = {
+            "bulk_message": {
+                "sent_by": {
+                    "email": "requester@test.com",
+                    "name": "Requester User",
+                }
+            }
+        }
+
+    def _set_last_message(self, metadata=None):
+        message = Message.objects.create(
+            room=self.room, text="Bulk hello", user=self.user
+        )
+        self.room.update_last_message(
+            message=message, user=self.user, metadata=metadata
+        )
+        self.room.refresh_from_db()
+        return message
+
+    def test_list_serializer_includes_bulk_message_from_metadata(self):
+        message = self._set_last_message(metadata=self.bulk_metadata)
+
+        data = ListRoomSerializer(self.room).data
+        last_message = data["last_message"]
+
+        self.assertEqual(str(last_message["uuid"]), str(message.uuid))
+        self.assertEqual(last_message["text"], "Bulk hello")
+        self.assertEqual(
+            last_message["bulk_message"],
+            self.bulk_metadata["bulk_message"],
+        )
+
+    def test_detail_serializer_includes_bulk_message_from_metadata(self):
+        self._set_last_message(metadata=self.bulk_metadata)
+
+        data = RoomSerializer(self.room).data
+
+        self.assertEqual(
+            data["last_message"]["bulk_message"],
+            self.bulk_metadata["bulk_message"],
+        )
+
+    def test_bulk_message_is_none_when_metadata_is_missing(self):
+        self._set_last_message(metadata=None)
+
+        data = ListRoomSerializer(self.room).data
+
+        self.assertIsNone(data["last_message"]["bulk_message"])
+
+    def test_list_serializer_empty_last_message_includes_bulk_message_none(self):
+        data = ListRoomSerializer(self.room).data
+
+        self.assertIsNone(data["last_message"]["uuid"])
+        self.assertEqual(data["last_message"]["text"], "")
+        self.assertIsNone(data["last_message"]["bulk_message"])
+
+    def test_detail_serializer_returns_none_when_no_last_message(self):
+        data = RoomSerializer(self.room).data
+
+        self.assertIsNone(data["last_message"])
+
+    def test_serializing_last_message_does_not_query_bulk_send_tables(self):
+        self._set_last_message(metadata=self.bulk_metadata)
+
+        with CaptureQueriesContext(connection) as ctx:
+            data = ListRoomSerializer(self.room).data
+
+        sql = " ".join(query["sql"] for query in ctx.captured_queries).lower()
+        self.assertNotIn("bulk_message_send", sql)
+        self.assertEqual(
+            data["last_message"]["bulk_message"]["sent_by"]["email"],
+            "requester@test.com",
+        )

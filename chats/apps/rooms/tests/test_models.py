@@ -669,6 +669,52 @@ class TestUpdateLastMessage(APITestCase):
         self.assertEqual(self.room.last_message, message_2)
         self.assertEqual(self.room.last_message_text, "Automatic warning")
 
+    def test_update_last_message_stores_metadata(self):
+        message = Message.objects.create(
+            room=self.room, text="Bulk hello", user=self.user
+        )
+        metadata = {
+            "bulk_message": {
+                "sent_by": {
+                    "email": "requester@test.com",
+                    "name": "Requester User",
+                }
+            }
+        }
+
+        self.room.update_last_message(
+            message=message, user=self.user, metadata=metadata
+        )
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message_metadata, metadata)
+
+    def test_update_last_message_clears_metadata_when_omitted(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="Bulk hello", user=self.user
+        )
+        self.room.update_last_message(
+            message=message_1,
+            user=self.user,
+            metadata={
+                "bulk_message": {
+                    "sent_by": {
+                        "email": "requester@test.com",
+                        "name": "Requester User",
+                    }
+                }
+            },
+        )
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Agent reply", user=self.user
+        )
+        self.room.update_last_message(message=message_2, user=self.user)
+        self.room.refresh_from_db()
+
+        self.assertIsNone(self.room.last_message_metadata)
+        self.assertEqual(self.room.last_message, message_2)
+
 
 class TestOnNewMessage(APITestCase):
     def setUp(self):
@@ -765,3 +811,32 @@ class TestOnNewMessage(APITestCase):
 
         self.assertEqual(self.room.unread_messages_count, 0)
         self.assertEqual(self.room.last_message_text, "Message without unread")
+
+    def test_on_new_message_clears_last_message_metadata(self):
+        user = User.objects.create(email="agent@test.com")
+        agent_message = Message.objects.create(
+            room=self.room, text="Bulk hello", user=user
+        )
+        self.room.update_last_message(
+            message=agent_message,
+            user=user,
+            metadata={
+                "bulk_message": {
+                    "sent_by": {
+                        "email": "requester@test.com",
+                        "name": "Requester User",
+                    }
+                }
+            },
+        )
+        self.room.refresh_from_db()
+        self.assertIsNotNone(self.room.last_message_metadata)
+
+        contact_message = Message.objects.create(
+            room=self.room, text="Contact reply", contact=self.contact
+        )
+        self.room.on_new_message(message=contact_message, contact=self.contact)
+        self.room.refresh_from_db()
+
+        self.assertIsNone(self.room.last_message_metadata)
+        self.assertEqual(self.room.last_message, contact_message)

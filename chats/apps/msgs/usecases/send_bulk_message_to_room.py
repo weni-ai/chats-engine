@@ -75,7 +75,18 @@ class SendBulkMessageToRoomUseCase:
                     message=message,
                     status=BulkMessageSendMessageStatus.SUCCESS,
                 )
-                room.update_last_message(message=message, user=message.user)
+                room.update_last_message(
+                    message=message,
+                    user=message.user,
+                    metadata={
+                        "bulk_message": {
+                            "sent_by": {
+                                "email": bulk_send.user.email,
+                                "name": bulk_send.user.full_name,
+                            }
+                        }
+                    },
+                )
                 transaction.on_commit(lambda: message.notify_room("create", True))
                 _schedule_progress_update(bulk_send.uuid)
 
