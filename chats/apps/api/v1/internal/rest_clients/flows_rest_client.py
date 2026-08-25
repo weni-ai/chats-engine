@@ -290,6 +290,41 @@ class FlowRESTClient(
             ]
         return flows
 
+    def flow_exists(self, project, flow_uuid: str) -> bool:
+        """
+        Check whether a flow UUID still exists in Flows.
+
+        Returns True on transient/unexpected errors so callers do not prune
+        valid links when Flows is temporarily unavailable.
+        """
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/flows.json?uuid={flow_uuid}",
+        )
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return False
+        if response.status_code != status.HTTP_200_OK:
+            LOGGER.warning(
+                "Unexpected status checking flow %s existence: %s",
+                flow_uuid,
+                response.status_code,
+            )
+            return True
+        try:
+            data = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from flow_exists: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            return True
+
+        results = data.get("results") or []
+        return any(str(flow.get("uuid", "")) == str(flow_uuid) for flow in results)
+
     def retrieve_flow_definitions(self, project, flow_uuid, dependencies="all"):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,

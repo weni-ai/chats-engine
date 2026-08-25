@@ -805,7 +805,7 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
     @with_project_permission()
     def test_returns_history_item_shape(self) -> None:
         """
-        Test that history items return contact, queue, sent_by, date, and status.
+        Test that history items return contact, queue, sent_by, date, status, and message.
         """
         bulk_message = self._create_bulk_message(
             user=self.user,
@@ -827,6 +827,7 @@ class TestBulkSendHistoryViewSetAsAuthenticatedUser(BaseBulkSendHistoryViewSetTe
                 "sent_by": {"name": "Kallil"},
                 "date": DateTimeField().to_representation(bulk_message.created_on),
                 "status": BulkMessageSendMessageStatus.FAILED,
+                "message": "Bulk hello",
             },
         )
 
