@@ -138,10 +138,11 @@ class BulkSendHistorySerializer(serializers.ModelSerializer):
     queue = serializers.SerializerMethodField()
     sent_by = serializers.SerializerMethodField()
     date = serializers.DateTimeField(source="created_on", read_only=True)
+    message = serializers.CharField(source="bulk_message_send.text", read_only=True)
 
     class Meta:
         model = BulkMessageSendMessage
-        fields = ["contact", "queue", "sent_by", "date", "status"]
+        fields = ["contact", "queue", "sent_by", "date", "status", "message"]
 
     def get_contact(self, obj: BulkMessageSendMessage) -> dict:
         contact = obj.room.contact
