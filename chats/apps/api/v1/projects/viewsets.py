@@ -16,11 +16,11 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.authentication.classes import JWTAuthentication
 from chats.apps.api.authentication.permissions import (
     IsAuthenticatedOrHasInternalJWT,
 )
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
 from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
@@ -60,9 +60,7 @@ from chats.apps.projects.models import (
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
-from chats.apps.queues.usecases.filter_flows_by_queue import (
-    filter_flows_by_user_queues,
-)
+from chats.apps.queues.usecases.filter_flows_by_queue import filter_flows_by_user_queues
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )

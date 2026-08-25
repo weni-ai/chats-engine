@@ -35,6 +35,17 @@ class BulkMessageSendMessageStatus(models.TextChoices):
     FAILED = "FAILED", _("Failed")
 
 
+class BulkQuickMessageSendStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    FINISHED = "FINISHED", _("Finished")
+
+
+class BulkQuickMessageSendMessageStatus(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    FAILED = "FAILED", _("Failed")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -629,3 +640,104 @@ class BulkMessageSendMessage(BaseModel):
 
     def __str__(self):
         return f"{self.bulk_message_send.uuid} - {self.room.uuid} - {self.status}"
+
+
+class BulkQuickMessageSend(BaseModel):
+    """
+    Metadata for a bulk quick-message send request.
+
+    Stores who requested the send, the message text, the project scope, and
+    the contact targeting applied when the request was created.
+
+    ``contacts`` is ``null`` when the send targets all ongoing rooms of the
+    requesting attendant in the project. A list of contact UUID strings
+    narrows the send to those contacts. Actual message delivery is handled
+    asynchronously by ``process_bulk_quick_message_send``.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    contacts = models.JSONField(
+        _("contacts"),
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkQuickMessageSendStatus.choices,
+        default=BulkQuickMessageSendStatus.PENDING,
+    )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk quick message send")
+        verbose_name_plural = _("Bulk quick message sends")
+
+    def __str__(self):
+        return f"{self.uuid} - {self.status}"
+
+
+class BulkQuickMessageSendMessage(BaseModel):
+    """
+    Tracks the outcome of sending a bulk quick message to a single room.
+
+    On success, ``message`` points to the delivered ``Message``. On failure,
+    ``message`` is null and ``errors`` stores the failure reason/traceback.
+    One row per room attempt; many rows per bulk quick-message send.
+    """
+
+    bulk_quick_message_send = models.ForeignKey(
+        BulkQuickMessageSend,
+        related_name="bulk_quick_messages",
+        verbose_name=_("bulk quick message send"),
+        on_delete=models.CASCADE,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="bulk_quick_message_send_messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    message = models.OneToOneField(
+        Message,
+        related_name="bulk_quick_message_send_message",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkQuickMessageSendMessageStatus.choices,
+    )
+    errors = models.JSONField(
+        _("errors"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk quick message send message")
+        verbose_name_plural = _("Bulk quick message send messages")
+
+    def __str__(self):
+        return (
+            f"{self.bulk_quick_message_send.uuid} - {self.room.uuid} - {self.status}"
+        )

@@ -1,11 +1,12 @@
 import uuid
+from unittest.mock import MagicMock, patch
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
-from django.test import override_settings
 from rest_framework.response import Response
-from unittest.mock import patch, MagicMock
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
@@ -15,10 +16,9 @@ from chats.apps.projects.models.models import (
     CustomStatusType,
     ProjectPermission,
 )
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
-
-from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class QueueTests(APITestCase):
@@ -1049,9 +1049,7 @@ class QueueTransferAgentsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         target_emails = {online_agent.email, paused_agent.email, offline_agent.email}
-        filtered = [
-            item for item in response.data if item["email"] in target_emails
-        ]
+        filtered = [item for item in response.data if item["email"] in target_emails]
         ordered_emails = [item["email"] for item in filtered]
 
         self.assertEqual(
@@ -1100,7 +1098,6 @@ class QueueTransferAgentsTests(APITestCase):
 
 
 class QueueEndAllChatsTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -1215,7 +1212,6 @@ class QueueEndAllChatsTests(APITestCase):
 
 
 class QueueTransferOnDeleteTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(

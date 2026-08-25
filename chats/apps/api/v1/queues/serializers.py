@@ -44,7 +44,11 @@ def apply_selected_flows(serializer, data):
     )
 
     if not bond:
-        if "bond_flows_queue" in initial or "selected_flows" in initial or instance is None:
+        if (
+            "bond_flows_queue" in initial
+            or "selected_flows" in initial
+            or instance is None
+        ):
             data["selected_flows"] = []
         return data
 
