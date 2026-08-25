@@ -1,3 +1,126 @@
+# 3.73.5
+# Add
+  - Queue bonding with Flows, including selected flows, listing verification, and related filters
+
+# 3.73.4
+# Add
+  - Tag filter in the external rooms endpoint
+
+# 3.73.3
+# Refactor
+  - Unused feature flag gates for inactivity, queue purpose/limit, and AI text improvement
+
+# 3.73.2
+# Add
+  - Tag search
+
+# 3.73.1
+# Add
+  - Soft delete support to SectorAuthorization
+# Fix
+  - Sector and queue filters for the CSAT widget
+
+# 3.73.0
+# Add
+  - Message creation via WebSocket
+# Fix
+  - Bulk send history date handling
+
+# 3.72.0
+# Add
+  - Bulk send messages with room count, history, progress, and message metadata
+
+# 3.71.7
+# Fix
+  - Risk alert rearm on room-threshold crossings and toast scoped to email recipients
+  - Export link URL
+
+# 3.71.6
+# Add
+  - Config to exclude moderators from the transfer agents list
+
+# 3.71.5
+# Fix
+  - Soft-deleted queue authorizations excluded from agent retrieval
+
+# 3.71.4
+# Fix
+  - UUID removed from metric goal serializer
+  - Risk alert email template
+  - Waiting time field used in risk alert calculation
+
+# 3.71.3
+# Add
+  - Logging for project connection status updates
+
+# 3.71.2
+# Fix
+  - Room lookup when listing notes
+
+# 3.71.1
+# Add
+  - Risk alert tasks routed to dedicated Celery queue
+
+# 3.71.0
+# Add
+  - Metric goal alerts with CRUD, risk and inactivity alerts on time metrics, WebSocket notifications, and email alerts behind feature flag
+
+# 3.70.5
+# Fix
+  - User, queue, and sector filters in dashboard reports
+# Add
+  - Email-based agent filtering in dashboard reports
+
+# 3.70.4
+# Add
+  - Configurable Celery worker concurrency for the archive chats queue
+
+# 3.70.3
+# Add
+  - Keyset pagination and configurable page size for archived message processing
+
+# 3.70.2
+# Add
+  - Weni EDA dependency and updated Weni Commons and feature flags packages
+
+# 3.70.1
+# Fix
+  - Queue migration branches merged to prevent migration conflicts
+
+# 3.70.0
+# Add
+  - CSAT ratings and comments in room history for project administrators
+  - Queue purpose field with feature flag support and Flows synchronization
+  - Dedicated Celery queues for inactivity and risk alert tasks
+
+# 3.69.0
+# Add
+  - CSAT-specific JWT authentication
+  - Romanian localization
+# Fix
+  - English, Spanish, and Brazilian Portuguese translations
+
+# 3.68.10
+# Fix
+  - Queue authorization uniqueness constraint for soft-deleted records
+
+# 3.68.9
+# Fix
+  - Spanish and Brazilian Portuguese room export email subject translations
+
+# 3.68.8
+# Fix
+  - Room exports and email notifications generated in the user's language
+
+# 3.68.7
+# Add
+  - Room export email templates and notifications
+  - Configurable archive chats schedule
+  - JWT authentication for additional internal endpoints
+# Fix
+  - Pinned room pagination and ordering
+  - Flow template retrieval to skip stale templates and support multiple variables
+
 # 3.68.6
 # Add
   - Media download endpoint for message attachments
