@@ -1,36 +1,34 @@
 from django.db.models import Count, Exists, OuterRef, Q, Subquery
-
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
+from chats.apps.accounts.models import User
 from chats.apps.api.authentication.classes import JWTAuthentication
 from chats.apps.api.authentication.permissions import (
     HasInternalAuthenticationPermission,
 )
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.dashboard.dto import (
     get_admin_domains_exclude_filter,
     should_exclude_admin_domains,
 )
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
-    DashboardCustomAgentStatusSerializer,
     DashboardCSATRatingsSerializer,
     DashboardCSATScoreByAgentsSerializer,
     DashboardCSATScoreGeneralSerializer,
+    DashboardCustomAgentStatusSerializer,
     DashboardCustomStatusSerializer,
 )
+from chats.apps.api.v1.internal.dashboard.service import AgentsService, CSATService
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
-from chats.apps.accounts.models import User
-from chats.apps.api.pagination import CustomCursorPagination
-
-from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.api.v1.internal.dashboard.service import AgentsService, CSATService
-from chats.apps.core.filters import get_filters_from_query_params
 
 
 def _build_status_filter(status_list):
@@ -101,9 +99,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         has_filter = False
         combined_q = Q()
 
-        status_filter = _build_status_filter(
-            request.query_params.getlist("status")
-        )
+        status_filter = _build_status_filter(request.query_params.getlist("status"))
         if status_filter is not None:
             combined_q |= status_filter
             has_filter = True
@@ -153,24 +149,23 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         """
         project = self.get_object()
 
-        agents_filters = Q(
-            project_permissions__project=project, is_active=True
-        )
+        agents_filters = Q(project_permissions__project=project, is_active=True)
 
         queues = request.query_params.getlist("queue")
         sectors = request.query_params.getlist("sector")
         agent = request.query_params.get("agent")
 
         if queues:
-            agents_filters &= (
-                Q(project_permissions__queue_authorizations__queue__in=queues)
-                | Q(rooms__queue__in=queues)
-            )
+            agents_filters &= Q(
+                project_permissions__queue_authorizations__queue__in=queues
+            ) | Q(rooms__queue__in=queues)
         elif sectors:
             agents_filters &= (
                 Q(project_permissions__sector_authorizations__sector__in=sectors)
                 | Q(rooms__queue__sector__in=sectors)
-                | Q(project_permissions__queue_authorizations__queue__sector__in=sectors)
+                | Q(
+                    project_permissions__queue_authorizations__queue__sector__in=sectors
+                )
             )
 
         is_weni_admin = should_exclude_admin_domains(
@@ -221,10 +216,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         aggregate_kwargs = {}
         if "online" in requested:
             aggregate_kwargs["online"] = Count(
-                "email", distinct=True, filter=Q(perm_status="ONLINE"),
+                "email",
+                distinct=True,
+                filter=Q(perm_status="ONLINE"),
             )
         if "custom_breaks" in requested:
-            custom_breaks_filter = Q(perm_status="OFFLINE", has_active_custom_status=True)
+            custom_breaks_filter = Q(
+                perm_status="OFFLINE", has_active_custom_status=True
+            )
             if custom_status_names:
                 custom_emails = list(
                     CustomStatus.objects.filter(
@@ -233,13 +232,18 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
                         project=project,
                     ).values_list("user", flat=True)
                 )
-                custom_breaks_filter = Q(email__in=custom_emails) if custom_emails else Q(pk__in=[])
+                custom_breaks_filter = (
+                    Q(email__in=custom_emails) if custom_emails else Q(pk__in=[])
+                )
             aggregate_kwargs["custom_breaks"] = Count(
-                "email", distinct=True, filter=custom_breaks_filter,
+                "email",
+                distinct=True,
+                filter=custom_breaks_filter,
             )
         if "offline" in requested:
             aggregate_kwargs["offline"] = Count(
-                "email", distinct=True,
+                "email",
+                distinct=True,
                 filter=Q(perm_status="OFFLINE", has_active_custom_status=False),
             )
 
@@ -297,6 +301,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             tags=params.get("tags"),
             agent=params.get("agent"),
+            channels=params.get("channels"),
         )
 
         csat_service = CSATService()
@@ -368,15 +373,17 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             tags=request.query_params.getlist("tags", []),
             queue=params.get("queue"),
             queues=request.query_params.getlist("queues", []),
+            channels=request.query_params.getlist("channels") or params.get("channels"),
             user_request=params.get("user_request", ""),
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
             ordering=params.get("ordering"),
         )
 
         agents_service = AgentsService()
-        general_csat_metrics, agents_csat_metrics = (
-            agents_service.get_agents_csat_score(filters, project)
-        )
+        (
+            general_csat_metrics,
+            agents_csat_metrics,
+        ) = agents_service.get_agents_csat_score(filters, project)
 
         agents_csat_metrics = agents_csat_metrics.order_by("-avg_rating")
         paginator = CustomCursorPagination()

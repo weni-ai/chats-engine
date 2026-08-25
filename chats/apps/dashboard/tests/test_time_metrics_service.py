@@ -442,6 +442,104 @@ class TimeMetricsServiceTest(TestCase):
         self.assertEqual(result["avg_first_response_time"], 300)
         self.assertEqual(result["max_first_response_time"], 400)
 
+    def test_time_metrics_filter_by_whatsapp_channel(self):
+        now = timezone.now()
+        room_wa = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            user=self.user,
+            is_active=True,
+            urn="whatsapp:5511999999999",
+        )
+        Room.objects.filter(uuid=room_wa.uuid).update(
+            first_user_assigned_at=now - timedelta(minutes=10)
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(name="FB", email="fb@test.com"),
+            user=self.user,
+            is_active=True,
+            urn="facebook:page",
+        )
+
+        filters = Filters(
+            project=self.project,
+            channels=["whatsapp"],
+            is_weni_admin=False,
+        )
+        result = self.service.get_time_metrics(filters, self.project)
+        self.assertGreater(result["avg_conversation_duration"], 550)
+        self.assertLess(result["avg_conversation_duration"], 700)
+
+    def test_time_metrics_for_analysis_filter_by_channel(self):
+        now = timezone.now()
+        start = (now - timedelta(days=1)).isoformat()
+        end = (now + timedelta(days=1)).isoformat()
+
+        wa_room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            user=self.user,
+            is_active=False,
+            ended_at=now,
+            urn="whatsapp:5511999999999",
+        )
+        RoomMetrics.objects.create(room=wa_room, waiting_time=100)
+        fb_room = Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(name="FB", email="fb@test.com"),
+            user=self.user,
+            is_active=False,
+            ended_at=now,
+            urn="facebook:page",
+        )
+        RoomMetrics.objects.create(room=fb_room, waiting_time=500)
+
+        filters = Filters(
+            start_date=start,
+            end_date=end,
+            channels=["whatsapp"],
+            project=self.project,
+        )
+        result = self.service.get_time_metrics_for_analysis(filters, self.project)
+        self.assertEqual(result["avg_waiting_time"], 100)
+        self.assertEqual(result["max_waiting_time"], 100)
+
+    def test_time_metrics_for_analysis_others_channel(self):
+        now = timezone.now()
+        start = (now - timedelta(days=1)).isoformat()
+        end = (now + timedelta(days=1)).isoformat()
+
+        other = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            user=self.user,
+            is_active=False,
+            ended_at=now,
+            urn="telegram:1",
+        )
+        RoomMetrics.objects.create(room=other, waiting_time=40)
+        RoomMetrics.objects.create(
+            room=Room.objects.create(
+                queue=self.queue,
+                contact=Contact.objects.create(name="WA"),
+                user=self.user,
+                is_active=False,
+                ended_at=now,
+                urn="whatsapp:5511",
+            ),
+            waiting_time=90,
+        )
+
+        filters = Filters(
+            start_date=start,
+            end_date=end,
+            channels=["others"],
+            project=self.project,
+        )
+        result = self.service.get_time_metrics_for_analysis(filters, self.project)
+        self.assertEqual(result["avg_waiting_time"], 40)
+
 
 class TimeMetricsServiceGoalsIntegrationTest(TestCase):
     """
@@ -545,9 +643,7 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
         for i in range(3):
             room = Room.objects.create(
                 queue=self.queue,
-                contact=Contact.objects.create(
-                    name=f"c-{i}", email=f"c{i}@test.com"
-                ),
+                contact=Contact.objects.create(name=f"c-{i}", email=f"c{i}@test.com"),
                 user=None,
                 is_active=True,
             )
@@ -576,9 +672,7 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
         for i in range(5):
             room = Room.objects.create(
                 queue=self.queue,
-                contact=Contact.objects.create(
-                    name=f"c-{i}", email=f"c{i}@test.com"
-                ),
+                contact=Contact.objects.create(name=f"c-{i}", email=f"c{i}@test.com"),
                 user=None,
                 is_active=True,
             )

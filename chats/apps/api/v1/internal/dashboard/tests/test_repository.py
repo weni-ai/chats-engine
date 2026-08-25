@@ -1,28 +1,27 @@
-import pytz
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+import pytz
 from django.test import TestCase
 from django.utils import timezone
 
-
-from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
-from datetime import datetime
-
-from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.rooms.models import Room
-from chats.apps.csat.models import CSATSurvey
-from chats.apps.queues.models import Queue
-from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
-from chats.apps.sectors.models import SectorAuthorization, Sector, SectorTag
-from chats.apps.queues.models import QueueAuthorization
+from chats.apps.api.v1.internal.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.repository import (
+    AgentRepository,
+    CSATRepository,
+)
+from chats.apps.contacts.models import Contact
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
     Project,
     ProjectPermission,
 )
-from chats.apps.api.v1.internal.dashboard.repository import CSATRepository
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class CSATRepositoryTest(TestCase):
@@ -556,6 +555,50 @@ class CSATRepositoryTest(TestCase):
         self.assertEqual(rating_dict.get(2, 0), 0)  # Old date excluded
         self.assertEqual(rating_dict.get(4, 0), 0)  # No tag excluded
 
+    def test_get_csat_ratings_filter_by_whatsapp_channel(self):
+        wa_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="whatsapp:5511999999999",
+        )
+        ig_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="instagram:user",
+        )
+        CSATSurvey.objects.create(room=wa_room, rating=5, answered_on=timezone.now())
+        CSATSurvey.objects.create(room=ig_room, rating=1, answered_on=timezone.now())
+
+        ratings = self.repository.get_csat_ratings(
+            Filters(project=self.project, channels=["whatsapp"]),
+            self.project,
+        )
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
+        self.assertEqual(rating_dict.get(5, 0), 1)
+        self.assertEqual(rating_dict.get(1, 0), 0)
+
+    def test_get_csat_ratings_filter_by_others_channel(self):
+        other_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="telegram:1",
+        )
+        wa_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="whatsapp:5511",
+        )
+        CSATSurvey.objects.create(room=other_room, rating=3, answered_on=timezone.now())
+        CSATSurvey.objects.create(room=wa_room, rating=5, answered_on=timezone.now())
+
+        ratings = self.repository.get_csat_ratings(
+            Filters(project=self.project, channels=["others"]),
+            self.project,
+        )
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
+        self.assertEqual(rating_dict.get(3, 0), 1)
+        self.assertEqual(rating_dict.get(5, 0), 0)
+
     def test_get_csat_ratings_no_surveys_matching_filters(self):
         tag = SectorTag.objects.create(name="Tag 1", sector=self.sector)
         agent = User.objects.create(
@@ -896,6 +939,7 @@ class AgentRepositoryTestCase(TestCase):
 
         # Create room with specific end date within the filter range
         from datetime import datetime
+
         import pytz
 
         utc_tz = pytz.timezone("UTC")
@@ -1015,6 +1059,33 @@ class AgentRepositoryTestCase(TestCase):
         self.assertGreaterEqual(general_csat_metrics.avg_rating, 3.0)
         self.assertLessEqual(general_csat_metrics.avg_rating, 5.0)
 
+    def test_get_csat_general_filter_by_channel(self):
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            urn="whatsapp:5511",
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            urn="telegram:1",
+        )
+        metrics = self.repository._get_csat_general(
+            Filters(channels=["whatsapp"]), self.project
+        )
+        self.assertEqual(metrics.rooms, 1)
+
+        others = self.repository._get_csat_general(
+            Filters(channels=["others"]), self.project
+        )
+        self.assertEqual(others.rooms, 1)
+
     def test_get_csat_agents_basic(self):
         from chats.apps.accounts.models import User
         from chats.apps.projects.models import ProjectPermission
@@ -1118,9 +1189,9 @@ class AgentRepositoryTestCase(TestCase):
 
     def test_get_csat_agents_combined_filters(self):
         from chats.apps.accounts.models import User
-        from chats.apps.sectors.models import SectorAuthorization
-        from chats.apps.queues.models import QueueAuthorization
         from chats.apps.projects.models import ProjectPermission
+        from chats.apps.queues.models import QueueAuthorization
+        from chats.apps.sectors.models import SectorAuthorization
 
         user1 = User.objects.create(
             email="agent1@test.com", first_name="Agent", last_name="One"
@@ -1241,9 +1312,7 @@ class AgentRepositoryTestCase(TestCase):
         permission_sector = ProjectPermission.objects.create(
             user=user_sector, project=self.project, role=2
         )
-        ProjectPermission.objects.create(
-            user=user_other, project=self.project, role=2
-        )
+        ProjectPermission.objects.create(user=user_other, project=self.project, role=2)
 
         QueueAuthorization.objects.create(permission=permission_queue, queue=self.queue)
         SectorAuthorization.objects.create(
@@ -1482,6 +1551,7 @@ class AgentRepositoryTestCase(TestCase):
 
         # Create rooms with different end dates
         from datetime import datetime
+
         import pytz
 
         utc_tz = pytz.timezone("UTC")
@@ -1703,9 +1773,7 @@ class AgentRepositoryTestCase(TestCase):
         QueueAuthorization.objects.create(
             permission=permission_authorized, queue=self.queue
         )
-        QueueAuthorization.objects.create(
-            permission=permission_unrelated, queue=queue2
-        )
+        QueueAuthorization.objects.create(permission=permission_unrelated, queue=queue2)
 
         Room.objects.create(
             queue=self.queue,

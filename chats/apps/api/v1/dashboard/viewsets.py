@@ -15,6 +15,8 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
@@ -25,10 +27,6 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
     DashboardRoomSerializer,
     DashboardSectorSerializer,
-)
-from chats.apps.api.authentication.classes import JWTAuthentication
-from chats.apps.api.authentication.permissions import (
-    IsAuthenticatedOrHasInternalJWT,
 )
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
@@ -461,6 +459,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             tag=params.get("tag"),
             queue=params.get("queue"),
+            channels=params.get("channels"),
             user_request=None if is_anonymous else request.user,
             project=project,
             is_weni_admin=should_exclude_admin_domains(user_email),
@@ -488,6 +487,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             queue=params.get("queue"),
             tag=params.get("tag"),
+            channels=params.get("channels"),
             user_request=request.user,
             project=project,
             is_weni_admin=should_exclude_admin_domains(
@@ -951,9 +951,7 @@ class ReportFieldsValidatorViewSet(APIView):
             fields_config, "agent_status_logs"
         )
         if agent_status_logs is not None:
-            self._merge_root_dates(
-                agent_status_logs, root_start_date, root_end_date
-            )
+            self._merge_root_dates(agent_status_logs, root_start_date, root_end_date)
             if root_entities["agents"] is not None:
                 agent_status_logs["agents"] = root_entities["agents"]
 
