@@ -1,3 +1,7 @@
+# 3.73.6
+# Add
+  - Message field to BulkSendHistorySerializer and update related test case
+
 # 3.73.5
 # Add
   - Queue bonding with Flows, including selected flows, listing verification, and related filters
