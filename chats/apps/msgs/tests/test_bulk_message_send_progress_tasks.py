@@ -16,6 +16,9 @@ from chats.apps.projects.models import Project
 
 User = get_user_model()
 
+# Long enough that the lock stays held for the duration of each test.
+_LOCK_TIMEOUT_SECONDS = 30
+
 
 class UpdateBulkMessageSendProgressTaskTests(TestCase):
     def setUp(self):
@@ -53,7 +56,7 @@ class UpdateBulkMessageSendProgressTaskTests(TestCase):
     def test_rejected_call_schedules_deferred_retry(
         self, mock_apply_async, mock_usecase
     ):
-        cache.set(self._lock_key(), True, timeout=30)
+        cache.set(self._lock_key(), True, timeout=_LOCK_TIMEOUT_SECONDS)
 
         result = update_bulk_message_send_progress(self.bulk_send.uuid)
 
@@ -69,7 +72,7 @@ class UpdateBulkMessageSendProgressTaskTests(TestCase):
     def test_second_rejected_call_does_not_schedule_duplicate_retry(
         self, mock_apply_async, mock_usecase
     ):
-        cache.set(self._lock_key(), True, timeout=30)
+        cache.set(self._lock_key(), True, timeout=_LOCK_TIMEOUT_SECONDS)
 
         result_1 = update_bulk_message_send_progress(self.bulk_send.uuid)
         result_2 = update_bulk_message_send_progress(self.bulk_send.uuid)
@@ -84,7 +87,7 @@ class UpdateBulkMessageSendProgressTaskTests(TestCase):
     def test_multiple_rejected_calls_schedule_only_one_retry(
         self, mock_apply_async, mock_usecase
     ):
-        cache.set(self._lock_key(), True, timeout=30)
+        cache.set(self._lock_key(), True, timeout=_LOCK_TIMEOUT_SECONDS)
 
         for _ in range(5):
             update_bulk_message_send_progress(self.bulk_send.uuid)
@@ -95,7 +98,7 @@ class UpdateBulkMessageSendProgressTaskTests(TestCase):
     @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress_usecase")
     @patch("chats.apps.msgs.tasks.update_bulk_message_send_progress.apply_async")
     def test_retry_uses_configured_delay(self, mock_apply_async, mock_usecase):
-        cache.set(self._lock_key(), True, timeout=30)
+        cache.set(self._lock_key(), True, timeout=_LOCK_TIMEOUT_SECONDS)
 
         update_bulk_message_send_progress(self.bulk_send.uuid)
 
@@ -117,7 +120,7 @@ class UpdateBulkMessageSendProgressTaskTests(TestCase):
             status=BulkMessageSendStatus.PROCESSING,
             rooms_qty=1,
         )
-        cache.set(self._lock_key(), True, timeout=30)
+        cache.set(self._lock_key(), True, timeout=_LOCK_TIMEOUT_SECONDS)
 
         locked_result = update_bulk_message_send_progress(self.bulk_send.uuid)
         unlocked_result = update_bulk_message_send_progress(other.uuid)
