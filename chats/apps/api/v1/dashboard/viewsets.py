@@ -15,25 +15,23 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
     RoomsCacheRepository,
 )
-from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
-from chats.apps.api.authentication.classes import JWTAuthentication
-from chats.apps.api.authentication.permissions import (
-    IsAuthenticatedOrHasInternalJWT,
-)
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.dashboard.usecases import GetReportStatusUseCase
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.core.storages import ExcelStorage
@@ -462,6 +460,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             tag=params.get("tag"),
             queue=params.get("queue"),
+            channels=params.get("channels"),
             user_request=None if is_anonymous else request.user,
             project=project,
             is_weni_admin=should_exclude_admin_domains(user_email),
@@ -494,6 +493,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             queue=params.get("queue"),
             tag=params.get("tag"),
+            channels=params.get("channels"),
             user_request=request.user,
             project=project,
             is_weni_admin=should_exclude_admin_domains(

@@ -54,7 +54,9 @@ class BaseFinishedRoomsStatusTest(APITestCase):
     def _get(self, params=None, project=None):
         return self.client.get(self._url(project), params or {})
 
-    def _make_room(self, *, is_active=False, ended_at=None, queue=None, user=None):
+    def _make_room(
+        self, *, is_active=False, ended_at=None, queue=None, user=None, urn=""
+    ):
         """Creates a closed room in the current period by default."""
         return Room.objects.create(
             queue=queue or self.queue,
@@ -62,6 +64,7 @@ class BaseFinishedRoomsStatusTest(APITestCase):
             is_active=is_active,
             ended_at=ended_at if ended_at is not None else self.now,
             first_user_assigned_at=self.now - timedelta(minutes=5),
+            urn=urn,
         )
 
     def _make_metrics(
@@ -475,4 +478,56 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_waiting_time"], 100.0)
+        self.assertEqual(response.data["finished"], 2)
+
+
+class TestFilterByChannel(BaseFinishedRoomsStatusTest):
+    def test_filter_by_whatsapp_channel(self):
+        self._make_room(urn="whatsapp:5511999999999")
+        self._make_room(urn="instagram:user")
+
+        self._auth()
+        today = self.now.strftime("%Y-%m-%d")
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "channels": "whatsapp",
+            }
+        )
+
+        self.assertEqual(response.data["finished"], 1)
+
+    def test_filter_by_others_excludes_known_prefixes(self):
+        self._make_room(urn="telegram:1")
+        self._make_room(urn="whatsapp:5511")
+        self._make_room(urn="msteams:thread")
+
+        self._auth()
+        today = self.now.strftime("%Y-%m-%d")
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "channels": "others",
+            }
+        )
+
+        self.assertEqual(response.data["finished"], 1)
+
+    def test_multiple_channels_are_union(self):
+        self._make_room(urn="whatsapp:5511")
+        self._make_room(urn="instagram:user")
+        self._make_room(urn="telegram:1")
+
+        self._auth()
+        today = self.now.strftime("%Y-%m-%d")
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "channels": "whatsapp,instagram",
+            }
+        )
+
         self.assertEqual(response.data["finished"], 2)

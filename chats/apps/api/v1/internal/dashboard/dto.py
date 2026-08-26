@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from chats.apps.projects.models import Project, ProjectPermission
 from typing import List, Optional
+
+from chats.apps.projects.models import Project, ProjectPermission
 
 
 @dataclass
@@ -14,6 +15,7 @@ class Filters:
     queues: List = None
     tag: str = None
     tags: List = None
+    channels: List = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None

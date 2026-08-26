@@ -13,6 +13,11 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardTransferCountSerializer,
 )
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+from chats.apps.rooms.channel_filters import (
+    apply_channels_filter,
+    merge_channels_q,
+    normalize_channels,
+)
 from chats.apps.rooms.models import Room
 
 from .dto import Agent, Filters, Sector
@@ -122,7 +127,7 @@ class TimeMetricsService:
             queryset = queryset.filter(queue__uuid__in=filters.queue)
         if filters.agent:
             queryset = queryset.filter(user=filters.agent)
-        return queryset
+        return apply_channels_filter(queryset, filters.channels)
 
     def _apply_q_filters(self, base_filter: Q, filters: Filters) -> Q:
         """Apply common Q filters."""
@@ -134,7 +139,7 @@ class TimeMetricsService:
             base_filter &= Q(queue__uuid__in=filters.queue)
         if filters.agent:
             base_filter &= Q(user=filters.agent)
-        return base_filter
+        return merge_channels_q(base_filter, filters.channels)
 
     def _calculate_avg_max(self, values: list) -> tuple:
         """Calculate average and maximum from a list of values."""
@@ -156,6 +161,7 @@ class TimeMetricsService:
                 waiting_filter &= Q(tags__uuid__in=filters.tag)
         if filters.queue:
             waiting_filter &= Q(queue__uuid__in=filters.queue)
+        waiting_filter = merge_channels_q(waiting_filter, filters.channels)
 
         active_rooms_in_queue = Room.objects.filter(waiting_filter)
         waiting_times = [
@@ -235,6 +241,7 @@ class TimeMetricsService:
         filters.sector = self._normalize_to_list(filters.sector)
         filters.queue = self._normalize_to_list(filters.queue)
         filters.tag = self._normalize_to_list(filters.tag)
+        filters.channels = normalize_channels(filters.channels)
 
     def get_time_metrics(self, filters: Filters, project):
         self._normalize_filters(filters)
@@ -311,6 +318,8 @@ class TimeMetricsService:
             if not isinstance(filters.tag, list):
                 filters.tag = [filters.tag]
             rooms_filter &= Q(tags__uuid__in=filters.tag)
+
+        rooms_filter = merge_channels_q(rooms_filter, filters.channels)
 
         print("[get_time_metrics_for_analysis] rooms_filter: ", rooms_filter)
 

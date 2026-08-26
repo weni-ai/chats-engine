@@ -3,7 +3,6 @@ from typing import Optional
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
-    QuerySet,
     Avg,
     BooleanField,
     Case,
@@ -13,6 +12,7 @@ from django.db.models import (
     IntegerField,
     OuterRef,
     Q,
+    QuerySet,
     Subquery,
     Sum,
     Value,
@@ -25,15 +25,16 @@ from pendulum.parser import parse as pendulum_parse
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.api.v1.internal.dashboard.dto import (
-    Filters,
-    CSATScoreGeneral,
     CSATRatingCount,
     CSATRatings,
+    CSATScoreGeneral,
+    Filters,
 )
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
-from chats.apps.csat.models import CSATSurvey
+from chats.apps.rooms.channel_filters import apply_channels_filter, channels_q
 from chats.apps.rooms.models import Room
 
 
@@ -303,17 +304,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -601,18 +602,24 @@ class AgentRepository:
             if value:
                 rooms_query[query_expression] = value
 
+        rooms_qs = apply_channels_filter(
+            Room.objects.filter(**rooms_query), filters.channels
+        )
+        reviewed_qs = apply_channels_filter(
+            Room.objects.filter(
+                csat_survey__isnull=False,
+                csat_survey__rating__isnull=False,
+                **rooms_query,
+            ),
+            filters.channels,
+        )
+
         return CSATScoreGeneral(
-            rooms=Room.objects.filter(**rooms_query).count(),
-            reviews=Room.objects.filter(
-                csat_survey__isnull=False,
-                csat_survey__rating__isnull=False,
-                **rooms_query,
-            ).count(),
-            avg_rating=Room.objects.filter(
-                csat_survey__isnull=False,
-                csat_survey__rating__isnull=False,
-                **rooms_query,
-            ).aggregate(avg_rating=Avg("csat_survey__rating"))["avg_rating"],
+            rooms=rooms_qs.count(),
+            reviews=reviewed_qs.count(),
+            avg_rating=reviewed_qs.aggregate(avg_rating=Avg("csat_survey__rating"))[
+                "avg_rating"
+            ],
         )
 
     def _get_csat_agents_scope_filter(
@@ -629,9 +636,9 @@ class AgentRepository:
 
         queues = filters.queues or ([filters.queue] if filters.queue else None)
         if queues:
-            return Q(
-                project_permissions__queue_authorizations__queue__in=queues
-            ) | (Q(rooms__queue__in=queues) & rooms_in_period)
+            return Q(project_permissions__queue_authorizations__queue__in=queues) | (
+                Q(rooms__queue__in=queues) & rooms_in_period
+            )
 
         sectors = filters.sector or filters.sectors
         if sectors:
@@ -699,30 +706,41 @@ class AgentRepository:
     def get_agents_csat_score(self, filters: Filters, project: Project) -> tuple:
         agents = self._get_csat_agents(filters, project)
         rooms_query = self._get_csat_rooms_query(filters, project)
+        rooms_filter = Q(**rooms_query)
+        channel_filter = channels_q(filters.channels, urn_field="rooms__urn")
+        if channel_filter is not None:
+            rooms_filter &= channel_filter
 
         csat_reviews_query = rooms_query.copy()
         csat_reviews_query["rooms__csat_survey__isnull"] = False
         csat_reviews_query["rooms__csat_survey__rating__isnull"] = False
+        reviews_filter = Q(**csat_reviews_query)
+        if channel_filter is not None:
+            reviews_filter &= channel_filter
 
-        agents = agents.annotate(
-            rooms_count=Count(
-                "rooms__uuid",
-                distinct=True,
-                filter=Q(**rooms_query),
-            ),
-            reviews=Count(
-                "rooms__csat_survey__uuid",
-                distinct=True,
-                filter=Q(**csat_reviews_query),
-            ),
-            avg_rating=Coalesce(
-                Avg(
-                    "rooms__csat_survey__rating",
-                    filter=Q(**csat_reviews_query),
+        agents = (
+            agents.annotate(
+                rooms_count=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=rooms_filter,
                 ),
-                Value(0.0),
-            ),
-        ).exclude(is_deleted=True, rooms_count=0).distinct()
+                reviews=Count(
+                    "rooms__csat_survey__uuid",
+                    distinct=True,
+                    filter=reviews_filter,
+                ),
+                avg_rating=Coalesce(
+                    Avg(
+                        "rooms__csat_survey__rating",
+                        filter=reviews_filter,
+                    ),
+                    Value(0.0),
+                ),
+            )
+            .exclude(is_deleted=True, rooms_count=0)
+            .distinct()
+        )
 
         return self._get_csat_general(filters, project), agents
 
@@ -748,7 +766,11 @@ class CSATRepository:
                 csat_query[field_name] = filter_value
 
         csat_ratings = (
-            CSATSurvey.objects.filter(**csat_query)
+            apply_channels_filter(
+                CSATSurvey.objects.filter(**csat_query),
+                filters.channels,
+                urn_field="room__urn",
+            )
             .values("rating")
             .annotate(count=Count("uuid"))
             .order_by("rating")
