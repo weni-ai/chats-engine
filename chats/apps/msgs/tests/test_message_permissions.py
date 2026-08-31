@@ -194,6 +194,30 @@ class TestMessageMediaPermission(TestCase):
         result = self.permission.has_object_permission(request, None, obj)
         self.assertTrue(result)
 
+    def test_has_object_permission_falls_back_to_message_room(self):
+        """
+        Legacy media may have room unset; use message.room instead.
+        """
+        request = self.factory.get("/api/v1/msgs/media/1/")
+        force_authenticate(request, user=self.user)
+        request = Request(request)
+        obj = mock.Mock(room=None, message=mock.Mock(room=self.room))
+
+        result = self.permission.has_object_permission(request, None, obj)
+        self.assertTrue(result)
+
+    def test_has_object_permission_without_room_or_message(self):
+        """
+        Deny access when media has neither room nor message.
+        """
+        request = self.factory.get("/api/v1/msgs/media/1/")
+        force_authenticate(request, user=self.user)
+        request = Request(request)
+        obj = mock.Mock(room=None, message=None)
+
+        result = self.permission.has_object_permission(request, None, obj)
+        self.assertFalse(result)
+
 
 class TestRestrictOfflineAgents(APITestCase):
     def setUp(self):

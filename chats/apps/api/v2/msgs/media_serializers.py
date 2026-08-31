@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from chats.apps.api.v1.msgs.serializers import process_uploaded_media_file
@@ -32,6 +33,7 @@ class MessageMediaCreateSerializerV2(serializers.ModelSerializer):
         return media.public_url
 
     def create(self, validated_data):
-        validated_data = process_uploaded_media_file(validated_data)
-        validated_data["message"] = None
-        return super().create(validated_data)
+        with transaction.atomic():
+            validated_data = process_uploaded_media_file(validated_data)
+            validated_data["message"] = None
+            return super().create(validated_data)
