@@ -171,6 +171,11 @@ class Room(BaseModel, BaseConfigurableModel):
         default=list,
         blank=True,
     )
+    last_message_metadata = models.JSONField(
+        _("Last message metadata"),
+        null=True,
+        blank=True,
+    )
 
     automatic_message_sent_at = models.DateTimeField(
         _("Automatic message sent at"), null=True, blank=True
@@ -836,7 +841,9 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message, user=None, update_last_interaction=True):
+    def update_last_message(
+        self, message, user=None, update_last_interaction=True, metadata=None
+    ):
         """
         Updates last message fields. Used for agent/system messages.
 
@@ -854,6 +861,7 @@ class Room(BaseModel, BaseConfigurableModel):
             "last_message_user": user,
             "last_message_contact": None,
             "last_message_media": media_data,
+            "last_message_metadata": metadata,
         }
         if update_last_interaction:
             fields["last_interaction"] = message.created_on
@@ -877,6 +885,7 @@ class Room(BaseModel, BaseConfigurableModel):
             "last_message_user": None,
             "last_message_contact": contact,
             "last_message_media": media_data,
+            "last_message_metadata": None,
         }
 
         if increment_unread > 0:
