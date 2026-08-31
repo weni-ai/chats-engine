@@ -248,6 +248,16 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         related_name="medias",
         verbose_name=_("Message"),
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="medias",
+        verbose_name=_("Room"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
@@ -270,10 +280,20 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         ]
 
     def __str__(self):
-        return f"{self.message.pk} - {self.url}"
+        message_pk = self.message_id or "unattached"
+        return f"{message_pk} - {self.url}"
 
     def save(self, *args, **kwargs) -> None:
-        if self.message.room.is_active is False:
+        if self.message_id and not self.room_id:
+            self.room = self.message.room
+        elif self.message_id and self.room_id:
+            if self.message.room_id != self.room_id:
+                raise ValidationError(
+                    {"detail": _("Media room must match the message room")}
+                )
+
+        room = self.room
+        if room is not None and room.is_active is False:
             raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         return super().save(*args, **kwargs)
 
@@ -293,7 +313,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         Check if the use flows media url feature flag is active.
         """
         try:
-            project_uuid = self.message.room.queue.sector.project.uuid
+            project_uuid = self.room.queue.sector.project.uuid
             use_flows_media_url = is_feature_active_for_attributes(
                 settings.USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY,
                 {
@@ -351,10 +371,13 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     def callback(self):
         """Send webhook callback for MessageMedia"""
+        if not self.message_id:
+            return
+
         msg_data = self.message.serialized_ws_data
         msg_data["text"] = ""
 
-        if self.message.room.callback_url:
+        if self.room.callback_url:
             request_session = get_request_session_with_retries(
                 retries=getattr(settings, "CALLBACK_RETRY_COUNT", 5),
                 backoff_factor=getattr(settings, "CALLBACK_RETRY_BACKOFF_FACTOR", 0.1),
@@ -370,7 +393,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                 timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
 
                 response = request_session.post(
-                    self.message.room.callback_url,
+                    self.room.callback_url,
                     data=json.dumps(
                         {"type": "msg.create", "content": msg_data},
                         sort_keys=True,
@@ -395,8 +418,8 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                         extras={
                             "media_uuid": self.pk,
                             "message_uuid": self.message.pk,
-                            "room_uuid": self.message.room.uuid,
-                            "callback_url": self.message.room.callback_url,
+                            "room_uuid": self.room.uuid,
+                            "callback_url": self.room.callback_url,
                             "status_code": response.status_code,
                             "response_text": response.text[:500],
                         },
@@ -415,18 +438,20 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                     extras={
                         "media_uuid": self.pk,
                         "message_uuid": self.message.pk,
-                        "room_uuid": self.message.room.uuid,
-                        "callback_url": self.message.room.callback_url,
+                        "room_uuid": self.room.uuid,
+                        "callback_url": self.room.callback_url,
                     },
                 )
 
     def notify_room(self, action: str = "create", callback: bool = False):
         """Delegate room notification to the associated Message"""
+        if not self.message_id:
+            return
         self.message.notify_room(action, callback)
 
     @property
     def project(self):
-        return self.message.project
+        return self.room.project
 
 
 class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
