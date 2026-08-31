@@ -7,20 +7,20 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
+from chats.apps.ai_features.improve_user_message.choices import (
+    ImprovedUserMessageStatusChoices,
+    ImprovedUserMessageTypeChoices,
+)
+from chats.apps.ai_features.improve_user_message.tasks import (
+    register_message_improvement_task,
+)
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
-from chats.apps.ai_features.improve_user_message.choices import (
-    ImprovedUserMessageStatusChoices,
-    ImprovedUserMessageTypeChoices,
-)
 from chats.apps.rooms.models import RoomNote
-from chats.apps.ai_features.improve_user_message.tasks import (
-    register_message_improvement_task,
-)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,9 +37,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     collision between rooms/projects from surfacing a foreign message.
     """
 
-    exact_match = ChatMessageReplyIndex.objects.filter(
-        external_id=replied_id
-    ).first()
+    exact_match = ChatMessageReplyIndex.objects.filter(external_id=replied_id).first()
     if exact_match is not None:
         return exact_match
 
@@ -48,9 +46,7 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
         return None
 
     try:
-        project_uuid = str(message.room.project_uuid or "") or str(
-            message.project.uuid
-        )
+        project_uuid = str(message.room.project_uuid or "") or str(message.project.uuid)
     except Exception:
         project_uuid = ""
 
@@ -75,36 +71,7 @@ TODO: Refactor these serializers into less classes
 class ReplyToSerializer(serializers.Serializer):
     """Write payload for agent replies to a contact message."""
 
-    uuid = serializers.UUIDField()
-
-
-def _resolve_external_id_for_reply(room, message_uuid: str) -> str:
-    """Resolve the WhatsApp/external id of the message being replied to.
-
-    Prefer ``Message.external_id``; fall back to ``ChatMessageReplyIndex``.
-    Scoped to ``room`` so a foreign message uuid cannot be cited.
-    """
-    try:
-        original = ChatMessage.objects.get(uuid=message_uuid, room=room)
-    except ChatMessage.DoesNotExist as exc:
-        raise serializers.ValidationError(
-            {"reply_to": {"uuid": "Message not found in this room"}}
-        ) from exc
-
-    if original.external_id:
-        return original.external_id
-
-    index = (
-        ChatMessageReplyIndex.objects.filter(message=original)
-        .order_by("-created_on")
-        .first()
-    )
-    if index and index.external_id:
-        return index.external_id
-
-    raise serializers.ValidationError(
-        {"reply_to": {"uuid": "Message has no external_id"}}
-    )
+    external_id = serializers.CharField(allow_blank=False)
 
 
 def _apply_reply_to_metadata(attrs: dict) -> dict:
@@ -113,16 +80,9 @@ def _apply_reply_to_metadata(attrs: dict) -> dict:
     if not reply_to:
         return attrs
 
-    room = attrs.get("room")
-    if room is None:
-        raise serializers.ValidationError(
-            {"reply_to": "Room is required when replying to a message"}
-        )
-
-    external_id = _resolve_external_id_for_reply(room, reply_to["uuid"])
     metadata = dict(attrs.get("metadata") or {})
     context = dict(metadata.get("context") or {})
-    context["id"] = external_id
+    context["id"] = reply_to["external_id"]
     metadata["context"] = context
     attrs["metadata"] = metadata
     return attrs
@@ -502,7 +462,7 @@ class MessageSerializer(BaseMessageSerializer):
 
 
 class MessageWSSerializer(MessageSerializer):
-    """WS/callback serializer. Adds outbound ``reply_to`` for VCS/Flows."""
+    """WS/callback serializer. Adds outbound ``reply_to`` when the message is a reply."""
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
