@@ -30,6 +30,7 @@ from chats.apps.api.v1.msgs.serializers import (
     BulkSendHistoryQueryParamsSerializer,
     BulkSendHistorySerializer,
     BulkSendMessagesSerializer,
+    BulkSendQuickMessageSerializer,
     BulkSendRecentHistorySerializer,
     BulkSendRoomsCountQueryParamsSerializer,
     MessageAndMediaSerializer,
@@ -38,6 +39,7 @@ from chats.apps.api.v1.msgs.serializers import (
 )
 from chats.apps.msgs.usecases.create_agent_message import PostCreateAgentMessageUseCase
 from chats.apps.api.v1.permissions import (
+    ProjectAccessPermission,
     ProjectBodyFieldIsAdmin,
     ProjectQueryFieldIsAdmin,
 )
@@ -46,6 +48,9 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.msgs.usecases.start_bulk_send_messages import (
     StartBulkSendMessagesUseCase,
+)
+from chats.apps.msgs.usecases.start_bulk_send_quick_message import (
+    StartBulkSendQuickMessageUseCase,
 )
 from chats.apps.msgs.usecases.get_bulk_send_history import GetBulkSendHistoryUseCase
 from chats.apps.api.v1.permissions import ProjectQueryIsAdmin
@@ -170,6 +175,29 @@ class MessageViewset(
             statuses=data["status"],
             queues=data.get("queues") or None,
             agents=data.get("agents") or None,
+        )
+
+        return Response(
+            {"status": "PROCESSING", "uuid": str(bulk_send.uuid)},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_path="bulk-send-quick-message",
+        permission_classes=[IsAuthenticated, ProjectAccessPermission],
+    )
+    def bulk_send_quick_message(self, request, *args, **kwargs):
+        serializer = BulkSendQuickMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        bulk_send = StartBulkSendQuickMessageUseCase().execute(
+            user_email=request.user.email,
+            text=data["text"],
+            project_uuid=data["project"],
+            contacts=data.get("contacts"),
         )
 
         return Response(

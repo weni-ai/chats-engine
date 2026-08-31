@@ -133,6 +133,18 @@ class BulkSendMessagesSerializer(serializers.Serializer):
     )
 
 
+class BulkSendQuickMessageSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    project = serializers.UUIDField(required=True)
+    contacts = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=None,
+    )
+
+
 class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
     sent_at = serializers.DateTimeField(source="created_on", read_only=True)
 
@@ -167,10 +179,11 @@ class BulkSendHistorySerializer(serializers.ModelSerializer):
     queue = serializers.SerializerMethodField()
     sent_by = serializers.SerializerMethodField()
     date = serializers.DateTimeField(source="created_on", read_only=True)
+    message = serializers.CharField(source="bulk_message_send.text", read_only=True)
 
     class Meta:
         model = BulkMessageSendMessage
-        fields = ["contact", "queue", "sent_by", "date", "status"]
+        fields = ["contact", "queue", "sent_by", "date", "status", "message"]
 
     def get_contact(self, obj: BulkMessageSendMessage) -> dict:
         contact = obj.room.contact
