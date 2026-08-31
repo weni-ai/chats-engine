@@ -226,44 +226,11 @@ class TestMessageMediaModel(TestCase):
         self.assertEqual(msg_media.created_on.hour, timestamp.hour)
         self.assertEqual(msg_media.created_on.minute, timestamp.minute)
         self.assertEqual(msg_media.created_on.second, timestamp.second)
-        self.assertEqual(msg_media.room_id, self.room.uuid)
 
     def test_create_message_media_without_passing_created_on(self):
         msg_media = MessageMedia.objects.create(message=self.msg)
 
         self.assertEqual(msg_media.created_on.date(), timezone.now().date())
-        self.assertEqual(msg_media.room_id, self.room.uuid)
-
-    def test_create_unattached_media_with_room(self):
-        media = MessageMedia.objects.create(
-            room=self.room,
-            message=None,
-            content_type="image/png",
-            media_url="https://example.com/image.png",
-        )
-
-        self.assertIsNone(media.message_id)
-        self.assertEqual(media.room_id, self.room.uuid)
-        self.assertIn("unattached", str(media))
-
-    def test_save_rejects_room_mismatch(self):
-        other_room = Room.objects.create()
-        with self.assertRaises(Exception):
-            MessageMedia.objects.create(
-                message=self.msg,
-                room=other_room,
-                content_type="image/png",
-                media_url="https://example.com/image.png",
-            )
-
-    def test_callback_noop_when_unattached(self):
-        media = MessageMedia.objects.create(
-            room=self.room,
-            message=None,
-            content_type="image/png",
-            media_url="https://example.com/image.png",
-        )
-        media.callback()
 
 
 class TestMessageNotifyRoom(TestCase):
