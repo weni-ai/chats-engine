@@ -90,6 +90,17 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         room.refresh_from_db()
         self.assertEqual(room.last_message, message)
         self.assertEqual(room.last_message_user, self.agent)
+        self.assertEqual(
+            room.last_message_metadata,
+            {
+                "bulk_message": {
+                    "sent_by": {
+                        "email": "requester@test.com",
+                        "name": "Requester User",
+                    }
+                }
+            },
+        )
 
         mock_notify_room.assert_called_once_with("create", True)
         mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
@@ -124,6 +135,14 @@ class SendBulkMessageToRoomUseCaseTests(TestCase):
         room.refresh_from_db()
         self.assertEqual(room.last_message, message)
         self.assertIsNone(room.last_message_user)
+        self.assertEqual(
+            room.last_message_metadata["bulk_message"]["sent_by"]["email"],
+            "requester@test.com",
+        )
+        self.assertEqual(
+            room.last_message_metadata["bulk_message"]["sent_by"]["name"],
+            "Requester User",
+        )
 
         mock_notify_room.assert_called_once_with("create", True)
         mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
