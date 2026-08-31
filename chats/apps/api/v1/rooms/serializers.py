@@ -25,48 +25,17 @@ from chats.apps.history.filters.rooms_filter import (
 )
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
-from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
 from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
 
 
-def _get_room_project_uuid(room: Room):
-    try:
-        return str(room.queue.sector.project.uuid)
-    except AttributeError:
-        return None
-
-
-def _is_room_inactivity_feature_active(room: Room) -> bool:
-    return is_inactivity_feature_active(_get_room_project_uuid(room))
-
-
-def _is_inactivity_feature_active_from_context(context: dict, room: Room) -> bool:
-    """
-    Prefers the `inactivity_feature_active` flag pre-computed by the viewset
-    (avoids calling the feature-flag service once per room in list endpoints).
-    Falls back to a per-room evaluation when the context does not provide it
-    (e.g. when the serializer is used outside `RoomViewset.list`).
-    """
-    cached = context.get("inactivity_feature_active") if context else None
-    if cached is not None:
-        return cached
-    return _is_room_inactivity_feature_active(room)
-
-
-def _get_room_inactivity_timeout_time(room: Room, context: dict = None) -> int:
+def _get_room_inactivity_timeout_time(room: Room) -> int:
     """
     Returns the inactivity warning timeout (in seconds) configured for the
     room's sector, falling back to the default when not configured.
-
-    Returns 0 when the inactivity feature flag is disabled for the project,
-    so the front-end skips the inactivity timer for that room.
     """
-    if not _is_inactivity_feature_active_from_context(context or {}, room):
-        return 0
-
     try:
         sector_config = room.queue.sector.inactivity_timeout
     except AttributeError:
@@ -268,14 +237,9 @@ class RoomSerializer(serializers.ModelSerializer):
         ).exists()
 
     def get_inactivity_timeout_time(self, room: Room) -> int:
-        return _get_room_inactivity_timeout_time(room, self.context)
+        return _get_room_inactivity_timeout_time(room)
 
     def get_is_inactive(self, room: Room) -> bool:
-        # Hide stale `is_inactive` values when the feature flag is off, so
-        # the front-end never renders an inactivity alert for projects that
-        # opted out of the feature.
-        if not _is_inactivity_feature_active_from_context(self.context, room):
-            return False
         return bool(room.is_inactive)
 
 
@@ -437,11 +401,9 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return None
 
     def get_inactivity_timeout_time(self, room: Room) -> int:
-        return _get_room_inactivity_timeout_time(room, self.context)
+        return _get_room_inactivity_timeout_time(room)
 
     def get_is_inactive(self, room: Room) -> bool:
-        if not _is_inactivity_feature_active_from_context(self.context, room):
-            return False
         return bool(room.is_inactive)
 
     def to_representation(self, instance):

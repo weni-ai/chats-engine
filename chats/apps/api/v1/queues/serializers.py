@@ -14,24 +14,6 @@ User = get_user_model()
 MAX_INT_32 = 2**31 - 1
 
 
-def validate_queue_purpose_feature_flag(request, project, queue_purpose):
-    if queue_purpose in (None, ""):
-        return
-
-    if not request or not getattr(request, "user", None):
-        return
-
-    if not is_feature_active(
-        settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
-        request.user.email,
-        str(project.uuid),
-    ):
-        raise serializers.ValidationError(
-            {"detail": _("Queue purpose feature is not active.")},
-            code="queue_purpose_feature_flag_is_off",
-        )
-
-
 class QueueLimitSerializer(serializers.Serializer):
     limit = serializers.IntegerField(
         required=False, allow_null=True, min_value=0, max_value=MAX_INT_32
@@ -46,6 +28,39 @@ class QueueLimitSerializer(serializers.Serializer):
         return data
 
 
+def apply_selected_flows(serializer, data):
+    """
+    Sync selected_flows with bond_flows_queue.
+
+    The frontend always sends the full desired list (replace, not append).
+    When the feature is disabled, selected_flows must be an empty list.
+    """
+    initial = serializer.initial_data or {}
+    instance = serializer.instance
+
+    bond = data.get(
+        "bond_flows_queue",
+        getattr(instance, "bond_flows_queue", False) if instance else False,
+    )
+
+    if not bond:
+        if (
+            "bond_flows_queue" in initial
+            or "selected_flows" in initial
+            or instance is None
+        ):
+            data["selected_flows"] = []
+        return data
+
+    if "selected_flows" in initial:
+        flows = data.get("selected_flows") or []
+        data["selected_flows"] = [str(flow_uuid) for flow_uuid in flows]
+    elif instance is None:
+        data.setdefault("selected_flows", [])
+
+    return data
+
+
 class QueueSerializer(AuditableModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
@@ -53,6 +68,10 @@ class QueueSerializer(AuditableModelSerializer):
         source="sector.required_tags", read_only=True
     )
     queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
 
     class Meta:
         model = Queue
@@ -67,6 +86,8 @@ class QueueSerializer(AuditableModelSerializer):
             "config",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "sector",
         ]
 
@@ -79,29 +100,14 @@ class QueueSerializer(AuditableModelSerializer):
         sector = source.get("sector")
         return sector.project if sector else None
 
-    def _validate_queue_purpose(self, data):
-        if "queue_purpose" not in (self.initial_data or {}):
-            return
-
-        queue_purpose = data.get("queue_purpose", self.initial_data.get("queue_purpose"))
-        project = self._get_audit_project(data=data)
-        request = self.context.get("request")
-
-        if project:
-            validate_queue_purpose_feature_flag(request, project, queue_purpose)
-
     def validate(self, data):
         """
         Check if queue already exist in sector.
         """
-        self._validate_queue_purpose(data)
-
         name = data.get("name")
         if name:
             if name == "":
-                raise serializers.ValidationError(
-                    {"detail": _("Enter a name")}
-                )
+                raise serializers.ValidationError({"detail": _("Enter a name")})
             if self.instance:
                 if Queue.objects.filter(
                     sector=self.instance.sector, name=name
@@ -124,7 +130,7 @@ class QueueSerializer(AuditableModelSerializer):
             if "limit" in queue_limit:
                 data["queue_limit"] = queue_limit.get("limit")
 
-        return data
+        return apply_selected_flows(self, data)
 
 
 class QueueSimpleSerializer(serializers.ModelSerializer):
@@ -134,6 +140,11 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
 
 
 class QueueUpdateSerializer(AuditableModelSerializer):
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
+
     class Meta:
         model = Queue
         fields = "__all__"
@@ -141,17 +152,7 @@ class QueueUpdateSerializer(AuditableModelSerializer):
         extra_kwargs = {field: {"required": False} for field in fields}
 
     def validate(self, data):
-        if "queue_purpose" in (self.initial_data or {}) and self.instance:
-            queue_purpose = data.get(
-                "queue_purpose", self.initial_data.get("queue_purpose")
-            )
-            validate_queue_purpose_feature_flag(
-                self.context.get("request"),
-                self.instance.sector.project,
-                queue_purpose,
-            )
-
-        return data
+        return apply_selected_flows(self, data)
 
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
@@ -166,6 +167,8 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
             "uuid",
             "name",
             "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "agents",
             "created_on",
             "sector_name",
@@ -294,7 +297,9 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
-    queue_purpose = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    queue_purpose = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(
@@ -360,35 +365,5 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                     "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing_names)}."
                 }
             )
-
-        if request:
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                request.user.email,
-                str(sector.project.uuid),
-            )
-            is_queue_purpose_feature_active = is_feature_active(
-                settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY,
-                request.user.email,
-                str(sector.project.uuid),
-            )
-            for queue_data in queues:
-                queue_limit = queue_data.get("queue_limit")
-                if (
-                    queue_limit
-                    and not is_queue_limit_feature_active
-                    and queue_limit.get("is_active") is True
-                ):
-                    raise serializers.ValidationError(
-                        {"detail": _("Queue limit feature is not active.")},
-                        code="queue_limit_feature_flag_is_off",
-                    )
-
-                queue_purpose = queue_data.get("queue_purpose")
-                if queue_purpose and not is_queue_purpose_feature_active:
-                    raise serializers.ValidationError(
-                        {"detail": _("Queue purpose feature is not active.")},
-                        code="queue_purpose_feature_flag_is_off",
-                    )
 
         return data

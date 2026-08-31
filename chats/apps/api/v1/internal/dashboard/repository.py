@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
@@ -613,6 +615,36 @@ class AgentRepository:
             ).aggregate(avg_rating=Avg("csat_survey__rating"))["avg_rating"],
         )
 
+    def _get_csat_agents_scope_filter(
+        self, filters: Filters, project: Project
+    ) -> Optional[Q]:
+        """Agents with authorization on the filtered sector/queue, or a closed
+        room there in the selected period. None when no sector/queue filter."""
+        rooms_in_period = Q(rooms__is_active=False)
+        start_date, end_date = self._get_converted_dates(filters, project)
+        if start_date:
+            rooms_in_period &= Q(rooms__ended_at__gte=start_date)
+        if end_date:
+            rooms_in_period &= Q(rooms__ended_at__lte=end_date)
+
+        queues = filters.queues or ([filters.queue] if filters.queue else None)
+        if queues:
+            return Q(
+                project_permissions__queue_authorizations__queue__in=queues
+            ) | (Q(rooms__queue__in=queues) & rooms_in_period)
+
+        sectors = filters.sector or filters.sectors
+        if sectors:
+            return (
+                Q(project_permissions__sector_authorizations__sector__in=sectors)
+                | Q(
+                    project_permissions__queue_authorizations__queue__sector__in=sectors
+                )
+                | (Q(rooms__queue__sector__in=sectors) & rooms_in_period)
+            )
+
+        return None
+
     def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
         agents = User.objects.filter(
             email__in=ProjectPermission.all_objects.filter(project=project).values_list(
@@ -633,7 +665,12 @@ class AgentRepository:
 
         if filters.agent:
             agents = agents.filter(email=filters.agent)
-        return agents
+
+        scope_filter = self._get_csat_agents_scope_filter(filters, project)
+        if scope_filter:
+            agents = agents.filter(scope_filter)
+
+        return agents.distinct()
 
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
@@ -675,7 +712,7 @@ class AgentRepository:
             ),
             reviews=Count(
                 "rooms__csat_survey__uuid",
-                distinct=False,
+                distinct=True,
                 filter=Q(**csat_reviews_query),
             ),
             avg_rating=Coalesce(
@@ -685,7 +722,7 @@ class AgentRepository:
                 ),
                 Value(0.0),
             ),
-        ).exclude(is_deleted=True, rooms_count=0)
+        ).exclude(is_deleted=True, rooms_count=0).distinct()
 
         return self._get_csat_general(filters, project), agents
 

@@ -211,6 +211,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     def managers(self):
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
@@ -219,6 +220,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
             project_permissions__status="ONLINE",
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
@@ -374,7 +376,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         )
 
 
-class SectorAuthorization(AuditableMixin, BaseModel):
+class SectorAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_MANAGER = 1
 
@@ -408,7 +410,9 @@ class SectorAuthorization(AuditableMixin, BaseModel):
         verbose_name_plural = _("Department authorizations")
         constraints = [
             models.UniqueConstraint(
-                fields=["sector", "permission"], name="unique_sector_auth"
+                fields=["sector", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_sector_auth",
             )
         ]
 

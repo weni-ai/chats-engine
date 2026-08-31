@@ -13,7 +13,6 @@ from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackT
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
 )
-from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 
@@ -240,18 +239,6 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
                 "text": "hello wrold",
                 "type": "GRAMMAR_AND_SPELLING",
                 "project_uuid": str(other_project.uuid),
-            }
-        )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_returns_403_when_feature_flag_is_inactive(self, mock_use_case_cls):
-        mock_use_case_cls.return_value.execute.side_effect = FeatureFlagInactiveError()
-
-        response = self._post(
-            {
-                "text": "hello wrold",
-                "type": "GRAMMAR_AND_SPELLING",
-                "project_uuid": str(self.project.uuid),
             }
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

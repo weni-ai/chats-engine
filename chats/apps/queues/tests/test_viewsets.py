@@ -1,12 +1,12 @@
 import uuid
-from django.conf import settings
+from unittest.mock import MagicMock, patch
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
-from django.test import override_settings
 from rest_framework.response import Response
-from unittest.mock import patch, MagicMock
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -17,11 +17,10 @@ from chats.apps.projects.models.models import (
     CustomStatusType,
     ProjectPermission,
 )
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-
-from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class QueueTests(APITestCase):
@@ -320,9 +319,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(self.queue.queue_limit, None)
         self.assertEqual(self.queue.is_queue_limit_active, False)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue_with_queue_purpose(self, mock_is_feature_active):
+    def test_create_queue_with_queue_purpose(self):
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -334,30 +332,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data.get("queue_purpose"), "Atendimento comercial")
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
     @with_project_permission()
-    def test_create_queue_with_queue_purpose_when_feature_flag_off_returns_400(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
-            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
-        )
-        response = self.create_queue(
-            {
-                "name": "Testing",
-                "sector": str(self.sector.pk),
-                "queue_purpose": "Atendimento comercial",
-            }
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
-        )
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
-    @with_project_permission()
-    def test_update_queue_with_queue_purpose(self, mock_is_feature_active):
+    def test_update_queue_with_queue_purpose(self):
         response = self.update_queue(
             self.queue.pk,
             {"queue_purpose": "Suporte técnico"},
@@ -367,23 +343,165 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.queue.refresh_from_db()
         self.assertEqual(self.queue.queue_purpose, "Suporte técnico")
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
     @with_project_permission()
-    def test_update_queue_with_queue_purpose_when_feature_flag_off_returns_400(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
-            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
-        )
-        response = self.update_queue(
-            self.queue.pk,
-            {"queue_purpose": "Suporte técnico"},
+    def test_create_queue_with_bond_flows_queue(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+            }
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertTrue(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_create_queue_without_bond_flows_queue_defaults_to_false(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
         )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertFalse(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_update_queue_with_bond_flows_queue(self):
+        self.assertFalse(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": True},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        self.queue.refresh_from_db()
+        self.assertTrue(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_create_queue_with_selected_flows(self):
+        flow_uuids = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+                "selected_flows": flow_uuids,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), flow_uuids)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, flow_uuids)
+
+    @with_project_permission()
+    def test_create_queue_with_bond_flows_queue_false_clears_selected_flows(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": False,
+                "selected_flows": ["11111111-1111-1111-1111-111111111111"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_create_queue_without_selected_flows_defaults_to_empty_list(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_update_queue_replaces_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+            "33333333-3333-3333-3333-333333333333",
+        ]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        updated_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "bond_flows_queue": True,
+                "selected_flows": updated_flows,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), updated_flows)
+
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.selected_flows, updated_flows)
+
+    @with_project_permission()
+    def test_update_queue_disabling_bond_flows_queue_clears_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = ["11111111-1111-1111-1111-111111111111"]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+        self.assertEqual(self.queue.selected_flows, [])
 
 
 class QueueTransferAgentsTests(APITestCase):
@@ -933,9 +1051,7 @@ class QueueTransferAgentsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         target_emails = {online_agent.email, paused_agent.email, offline_agent.email}
-        filtered = [
-            item for item in response.data if item["email"] in target_emails
-        ]
+        filtered = [item for item in response.data if item["email"] in target_emails]
         ordered_emails = [item["email"] for item in filtered]
 
         self.assertEqual(
@@ -984,7 +1100,6 @@ class QueueTransferAgentsTests(APITestCase):
 
 
 class QueueEndAllChatsTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -1099,7 +1214,6 @@ class QueueEndAllChatsTests(APITestCase):
 
 
 class QueueTransferOnDeleteTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(

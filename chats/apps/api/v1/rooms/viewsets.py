@@ -180,11 +180,6 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
-        # Evaluated once per request (see `list`); fallback to None so the
-        # serializer falls back to per-room evaluation in other actions.
-        context["inactivity_feature_active"] = getattr(
-            self, "inactivity_feature_active", None
-        )
         pinned_ids = getattr(self, "_pinned_ids_context", None)
         if pinned_ids is not None:
             context["pinned_ids"] = pinned_ids
@@ -201,7 +196,6 @@ class RoomViewset(
         room_status = request.query_params.get("room_status", None)
 
         self.disable_has_history = False
-        self.inactivity_feature_active = None
 
         if (
             not project
@@ -228,16 +222,6 @@ class RoomViewset(
                     str(project_instance.uuid),
                 ):
                     self.disable_has_history = True
-
-                # Evaluate the inactivity feature flag once per request so the
-                # serializer does not re-evaluate it for every room in the list.
-                from chats.apps.rooms.usecases.inactivity import (
-                    is_inactivity_feature_active,
-                )
-
-                self.inactivity_feature_active = is_inactivity_feature_active(
-                    str(project_instance.uuid)
-                )
 
         if use_pins_optimization:
             return self._list_with_optimized_pin_order(qs, request, project)
