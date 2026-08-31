@@ -110,6 +110,17 @@ class TestMessageModel(TestCase):
         serialized_data = msg.serialized_ws_data
         self.assertIn("metadata", serialized_data)
         self.assertEqual(serialized_data["metadata"], metadata)
+        self.assertEqual(
+            serialized_data["reply_to"],
+            {"external_id": "123e4567-e89b-12d3-a456-426614174000"},
+        )
+
+    def test_message_serialized_data_omits_reply_to_without_context_id(self):
+        msg = Message.objects.create(room=self.room, text="no reply")
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertNotIn("reply_to", serialized_data)
 
     def test_message_with_empty_context_values(self):
         """
@@ -422,7 +433,9 @@ class TestMessageMediaCallback(TestCase):
             media_url="https://example.com/image.jpg",
         )
 
-    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False
+    )
     @patch("chats.apps.msgs.models.logger")
     @patch("chats.apps.msgs.models.get_request_session_with_retries")
     def test_callback_success(self, mock_get_session, mock_logger, _mock_ff):
@@ -448,7 +461,9 @@ class TestMessageMediaCallback(TestCase):
 
         mock_logger.error.assert_not_called()
 
-    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False
+    )
     @patch("chats.apps.msgs.models.logger")
     @patch("chats.apps.msgs.models.get_request_session_with_retries")
     def test_callback_error_logging(self, mock_get_session, mock_logger, _mock_ff):
@@ -556,9 +571,7 @@ class TestMessageMediaURLProperties(TestCase):
 
     # --- is_flows_media_url_feature_active ---
 
-    @patch(
-        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
-    )
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True)
     def test_is_flows_media_url_feature_active_returns_true(self, mock_ff):
         self.assertTrue(self.media.is_flows_media_url_feature_active)
         mock_ff.assert_called_once()
@@ -578,9 +591,7 @@ class TestMessageMediaURLProperties(TestCase):
     ):
         self.assertFalse(self.media.is_flows_media_url_feature_active)
 
-    @patch(
-        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
-    )
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True)
     def test_is_flows_media_url_feature_active_passes_project_uuid(self, mock_ff):
         self.media.is_flows_media_url_feature_active
 
@@ -596,12 +607,12 @@ class TestMessageMediaURLProperties(TestCase):
         self.assertEqual(self.media.public_url, self.media.url)
 
     @override_settings(FLOWS_BASE_URL="https://flows.example.com")
-    @patch(
-        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
-    )
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True)
     def test_public_url_returns_flows_media_url_when_feature_active(self, _mock_ff):
         result = self.media.public_url
-        self.assertIn("https://flows.example.com/api/v2/internals/media/download/", result)
+        self.assertIn(
+            "https://flows.example.com/api/v2/internals/media/download/", result
+        )
 
     def test_public_url_returns_media_file_url_when_file_exists(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -621,9 +632,7 @@ class TestMessageMediaURLProperties(TestCase):
         self.assertEqual(self.media.final_media_url, self.media.url)
 
     @patch("chats.apps.msgs.models.requests.head")
-    @patch(
-        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
-    )
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True)
     def test_final_media_url_follows_redirects_when_feature_active(
         self, _mock_ff, mock_head
     ):
@@ -638,9 +647,7 @@ class TestMessageMediaURLProperties(TestCase):
         mock_head.assert_called_once_with(self.media.url, allow_redirects=True)
 
     @patch("chats.apps.msgs.models.requests.head", side_effect=Exception("timeout"))
-    @patch(
-        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
-    )
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True)
     def test_final_media_url_returns_original_url_on_exception(
         self, _mock_ff, _mock_head
     ):
