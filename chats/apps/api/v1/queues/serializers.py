@@ -6,6 +6,11 @@ from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.usecases.resolve_selected_flow_names import (
+    collect_selected_flow_uuids,
+    get_flow_name_map,
+    represent_selected_flows,
+)
 from chats.apps.sectors.models import Sector
 from chats.core.serializers import AuditableModelSerializer
 
@@ -61,7 +66,34 @@ def apply_selected_flows(serializer, data):
     return data
 
 
-class QueueSerializer(AuditableModelSerializer):
+class QueueSelectedFlowsListSerializer(serializers.ListSerializer):
+    def to_representation(self, data):
+        queues = list(data)
+        uuids = collect_selected_flow_uuids(queues)
+        project = None
+        for queue in queues:
+            if queue.selected_flows:
+                project = queue.sector.project
+                break
+        self.context["flow_name_map"] = get_flow_name_map(project, uuids)
+        return super().to_representation(queues)
+
+
+class SelectedFlowsOutputMixin:
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        name_map = self.context.get("flow_name_map")
+        if name_map is None:
+            name_map = get_flow_name_map(
+                instance.sector.project,
+                [str(flow_uuid) for flow_uuid in (instance.selected_flows or [])],
+            )
+            self.context["flow_name_map"] = name_map
+        data["selected_flows"] = represent_selected_flows(instance, name_map)
+        return data
+
+
+class QueueSerializer(SelectedFlowsOutputMixin, AuditableModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
     required_tags = serializers.BooleanField(
@@ -90,6 +122,7 @@ class QueueSerializer(AuditableModelSerializer):
             "selected_flows",
             "sector",
         ]
+        list_serializer_class = QueueSelectedFlowsListSerializer
 
     def _get_audit_project(self, data=None):
         if self.instance is not None:
@@ -139,7 +172,7 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
         fields = ["uuid", "name"]
 
 
-class QueueUpdateSerializer(AuditableModelSerializer):
+class QueueUpdateSerializer(SelectedFlowsOutputMixin, AuditableModelSerializer):
     selected_flows = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
@@ -150,12 +183,15 @@ class QueueUpdateSerializer(AuditableModelSerializer):
         fields = "__all__"
 
         extra_kwargs = {field: {"required": False} for field in fields}
+        list_serializer_class = QueueSelectedFlowsListSerializer
 
     def validate(self, data):
         return apply_selected_flows(self, data)
 
 
-class QueueReadOnlyListSerializer(serializers.ModelSerializer):
+class QueueReadOnlyListSerializer(
+    SelectedFlowsOutputMixin, serializers.ModelSerializer
+):
     agents = serializers.SerializerMethodField()
     sector_name = serializers.CharField(source="sector.name", read_only=True)
     sector_uuid = serializers.CharField(source="sector.uuid", read_only=True)
@@ -176,6 +212,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
             "required_tags",
             "queue_limit",
         ]
+        list_serializer_class = QueueSelectedFlowsListSerializer
 
     def get_agents(self, queue: Queue):
         return queue.agent_count
