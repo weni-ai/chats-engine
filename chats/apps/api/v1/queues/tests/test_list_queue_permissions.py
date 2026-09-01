@@ -36,6 +36,9 @@ class ListQueuePermissionsTests(TestCase):
         resp = view(req)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["user_permissions"]), 1)
+        permission = resp.data["user_permissions"][0]
+        self.assertEqual(permission["queue_name"], "Q")
+        self.assertEqual(permission["sector_name"], "S")
 
     @patch(
         "chats.apps.api.v1.queues.viewsets.get_user_id_by_email_cached",

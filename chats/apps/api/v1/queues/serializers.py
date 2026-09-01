@@ -183,6 +183,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
 
 class QueueAuthorizationSerializer(AuditableModelSerializer):
     queue_name = serializers.CharField(source="queue.name", read_only=True)
+    sector_name = serializers.CharField(source="queue.sector.name", read_only=True)
 
     class Meta:
         model = QueueAuthorization
