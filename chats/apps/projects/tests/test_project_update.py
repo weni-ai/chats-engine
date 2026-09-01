@@ -1,4 +1,6 @@
 import uuid
+from datetime import date, time
+from unittest.mock import patch
 
 from django.test import TestCase
 
@@ -7,6 +9,7 @@ from chats.apps.projects.usecases.project_update import (
     ProjectUpdateDTO,
     ProjectUpdateUseCase,
 )
+from chats.apps.sectors.models import Sector, SectorHoliday
 
 
 class TestProjectUpdateUseCase(TestCase):
@@ -142,3 +145,96 @@ class TestProjectUpdateUseCase(TestCase):
 
         project.refresh_from_db()
         self.assertEqual(project.config, {"brand_new": "config"})
+
+    def _create_holiday(self, project, holiday_date=None):
+        sector = Sector.objects.create(
+            name="Support",
+            project=project,
+            rooms_limit=5,
+            work_start=time(8, 0),
+            work_end=time(18, 0),
+        )
+        return SectorHoliday.objects.create(
+            sector=sector,
+            date=holiday_date or date(2026, 8, 17),
+            day_type=SectorHoliday.CLOSED,
+            description="Official holiday",
+        )
+
+    def test_update_timezone_deletes_sector_holidays(self):
+        holiday = self._create_holiday(self.project)
+
+        dto = ProjectUpdateDTO(
+            project_uuid=str(self.project.uuid),
+            user_email="user@test.com",
+            timezone="America/Sao_Paulo",
+        )
+
+        self.use_case.update_project(dto)
+
+        holiday.refresh_from_db()
+        self.assertTrue(holiday.is_deleted)
+
+    def test_same_timezone_does_not_delete_sector_holidays(self):
+        holiday = self._create_holiday(self.project)
+
+        dto = ProjectUpdateDTO(
+            project_uuid=str(self.project.uuid),
+            user_email="user@test.com",
+            timezone="UTC",
+        )
+
+        self.use_case.update_project(dto)
+
+        holiday.refresh_from_db()
+        self.assertFalse(holiday.is_deleted)
+
+    def test_update_name_does_not_delete_sector_holidays(self):
+        holiday = self._create_holiday(self.project)
+
+        dto = ProjectUpdateDTO(
+            project_uuid=str(self.project.uuid),
+            user_email="user@test.com",
+            name="Updated Name",
+        )
+
+        self.use_case.update_project(dto)
+
+        holiday.refresh_from_db()
+        self.assertFalse(holiday.is_deleted)
+
+    def test_timezone_change_does_not_delete_holidays_from_other_projects(self):
+        other_project = Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Other Project",
+            timezone="UTC",
+        )
+        other_holiday = self._create_holiday(other_project)
+        self._create_holiday(self.project)
+
+        dto = ProjectUpdateDTO(
+            project_uuid=str(self.project.uuid),
+            user_email="user@test.com",
+            timezone="America/Sao_Paulo",
+        )
+
+        self.use_case.update_project(dto)
+
+        other_holiday.refresh_from_db()
+        self.assertFalse(other_holiday.is_deleted)
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_timezone_change_invalidates_holiday_cache(self, mock_cache_client_cls):
+        mock_cache_client = mock_cache_client_cls.return_value
+        holiday = self._create_holiday(self.project, holiday_date=date(2026, 8, 17))
+
+        dto = ProjectUpdateDTO(
+            project_uuid=str(self.project.uuid),
+            user_email="user@test.com",
+            timezone="America/Sao_Paulo",
+        )
+        self.use_case.update_project(dto)
+
+        mock_cache_client.delete.assert_any_call(
+            f"holiday:{holiday.sector.uuid}:2026-08-17"
+        )

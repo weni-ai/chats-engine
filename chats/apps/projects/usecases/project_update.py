@@ -19,12 +19,14 @@ class ProjectUpdateUseCase:
         project = Project.objects.get(uuid=project_dto.project_uuid)
 
         update_fields = []
+        timezone_changed = False
 
         if project_dto.name is not None:
             project.name = project_dto.name
             update_fields.append("name")
 
         if project_dto.timezone is not None:
+            timezone_changed = str(project.timezone) != str(project_dto.timezone)
             project.timezone = project_dto.timezone
             update_fields.append("timezone")
 
@@ -40,5 +42,8 @@ class ProjectUpdateUseCase:
 
         if update_fields:
             project.save(update_fields=update_fields + ["modified_on"])
+
+        if timezone_changed:
+            project.delete_sector_holidays()
 
         return project
