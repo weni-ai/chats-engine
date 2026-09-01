@@ -15,7 +15,10 @@ from chats.apps.projects.models.models import Project
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.cache import CacheClient
 
+from .choices import RoomFeedbackMethods
 from .models import Room
+from .utils import create_transfer_json
+from .views import create_room_feedback_message
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +33,23 @@ def requeue_agent_rooms(rooms_queryset):
         old_user = room.user
         if old_user is None:
             continue
+
+        feedback = create_transfer_json(
+            action="requeue",
+            from_=old_user,
+            to=room.queue,
+        )
+
         room.user = None
         room.save()
+        room.add_transfer_to_history(feedback)
+
+        create_room_feedback_message(
+            room,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+        )
+
         room.notify_user("update", user=old_user)
         room.notify_queue("update")
         if room.queue:
