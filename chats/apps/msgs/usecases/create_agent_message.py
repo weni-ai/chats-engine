@@ -168,7 +168,7 @@ class CreateAgentMessageUseCase:
 
         serializer_data = {
             key: data[key]
-            for key in ("room", "text", "metadata", "ai_text_improvement")
+            for key in ("room", "text", "metadata", "ai_text_improvement", "media")
             if key in data
         }
         serializer_data["room"] = str(room.uuid)
