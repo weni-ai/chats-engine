@@ -95,6 +95,17 @@ class SectorInactivityTimeoutSerializer(serializers.Serializer):
                 }
             )
 
+        if is_message_timeout_enabled and not (
+            attrs.get("message_timeout_text") or ""
+        ).strip():
+            raise serializers.ValidationError(
+                {
+                    "message_timeout_text": _(
+                        "Provide a message when the inactivity warning is enabled."
+                    )
+                }
+            )
+
         if is_message_timeout_enabled and not attrs.get("message_timeout_time"):
             raise serializers.ValidationError(
                 {
