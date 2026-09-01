@@ -4,7 +4,7 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("msgs", "0028_bulkquickmessagesend_bulkquickmessagesendmessage"),
+        ("msgs", "0027_bulkmessagesend_rooms_qty"),
     ]
 
     operations = [
