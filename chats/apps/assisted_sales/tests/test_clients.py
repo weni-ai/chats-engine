@@ -115,3 +115,52 @@ class CopilotConnectClientTests(TestCase):
 
         mock_get.assert_called_once()
         self.assertEqual(data[0]["name"], "copilot")
+
+    @override_settings(CONNECT_API_URL="https://connect.example.com")
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_get_project_authorization(self, mock_get, _mock_token):
+        payload = {
+            "user": "member@example.com",
+            "project_authorization": 3,
+            "available_roles": {"3": "moderator"},
+        }
+        mock_get.return_value = MagicMock(ok=True, json=lambda: payload)
+
+        data = self.client_rest.get_project_authorization(
+            "project-uuid", "member@example.com"
+        )
+
+        mock_get.assert_called_once_with(
+            url="https://connect.example.com/projects/project-uuid/authorization",
+            headers=self.client_rest.headers,
+            params={"user": "member@example.com"},
+            timeout=15,
+        )
+        self.assertEqual(data["project_authorization"], 3)
+
+    @override_settings(CONNECT_API_URL="https://connect.example.com")
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_get_project_authorization_raises_on_error(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(
+            ok=False,
+            status_code=404,
+            text="not found",
+            json=lambda: {"error": "missing"},
+        )
+
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.get_project_authorization(
+                "project-uuid", "member@example.com"
+            )
+
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.error, "missing")
+
+    @override_settings(CONNECT_API_URL="")
+    def test_get_project_authorization_raises_when_url_missing(self, _mock_token):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.get_project_authorization(
+                "project-uuid", "member@example.com"
+            )
+
+        self.assertEqual(ctx.exception.status_code, 502)
