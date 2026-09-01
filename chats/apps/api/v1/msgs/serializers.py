@@ -55,10 +55,11 @@ def process_uploaded_media_file(validated_data: dict) -> dict:
         AudioSegment.from_file(io.BytesIO(file_bytes)).export(
             converted_bytes, **export_conf
         )
-
+        converted_bytes.seek(0)
+        file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+        converted_bytes.seek(0)
         media.file = converted_bytes
         media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
-        file_type = magic.from_buffer(converted_bytes.read(), mime=True)
 
     validated_data["content_type"] = file_type
     return validated_data
