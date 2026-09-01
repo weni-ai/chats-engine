@@ -63,6 +63,11 @@ class RoomFilter(filters.FilterSet):
         method="filter_tags",
         help_text="Room Tags",
     )
+    tag_name = filters.CharFilter(
+        required=False,
+        method="filter_tag_name",
+        help_text="Tag name. Use with sector when the same name exists in more than one sector.",
+    )
     protocol = filters.CharFilter(
         required=False,
         field_name="protocol",
@@ -93,6 +98,13 @@ class RoomFilter(filters.FilterSet):
     def filter_tags(self, queryset, name, value):
         values = value.split(",")
         return queryset.filter(tags__in=values)
+
+    def filter_tag_name(self, queryset, name, value):
+        lookup = {"tags__name": value}
+        sector = self.data.get("sector")
+        if sector:
+            lookup["tags__sector"] = sector
+        return queryset.filter(**lookup).distinct()
 
     def filter_attending(self, queryset, name, value):
         return queryset.filter(user__isnull=not value)

@@ -12,7 +12,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class BaseTestInternalListRoomsViewSetV2(APITestCase):
@@ -109,3 +109,26 @@ class TestInternalListRoomsViewSetV2AsAuthenticatedUser(
             set(response.data["agent"].keys()),
             {"name", "email", "is_deleted"},
         )
+
+    @with_internal_auth
+    def test_list_filter_by_tag_name(self):
+        tag = SectorTag.objects.create(name="Cancelamento - NC", sector=self.sector)
+        self.room.tags.add(tag)
+        other = Room.objects.create(
+            contact=Contact.objects.create(name="Other"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
+
+        response = self.list_rooms(
+            {
+                "project": str(self.project.uuid),
+                "tag_name": "Cancelamento - NC",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = {row["uuid"] for row in response.data["results"]}
+        self.assertIn(str(self.room.uuid), uuids)
+        self.assertNotIn(str(other.uuid), uuids)

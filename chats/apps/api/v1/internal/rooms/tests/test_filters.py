@@ -1,8 +1,10 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
-from rest_framework.test import APITestCase
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.accounts.tests.decorators import with_internal_auth
@@ -11,7 +13,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class RoomFilterTestCase(TestCase):
@@ -184,7 +186,9 @@ class RoomFilterTestCase(TestCase):
             project_uuid=str(self.project.uuid),
             urn="whatsapp:558492126050",
         )
-        self.assertNotIn(room, self._filter_contact("992126050", ninth_digit_enabled=False))
+        self.assertNotIn(
+            room, self._filter_contact("992126050", ninth_digit_enabled=False)
+        )
 
     def test_filter_contact_no_matches(self):
         """
@@ -197,6 +201,117 @@ class RoomFilterTestCase(TestCase):
         filtered_queryset = room_filter.qs
 
         self.assertEqual(filtered_queryset.count(), 0)
+
+    def test_filter_tag_name_without_sector_matches_all_sectors(self):
+        tag = SectorTag.objects.create(name="Cancelamento - NC", sector=self.sector)
+        self.room_angela.tags.add(tag)
+
+        other_sector = Sector.objects.create(
+            name="Other Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        other_queue = Queue.objects.create(name="Other Queue", sector=other_sector)
+        same_name_tag = SectorTag.objects.create(
+            name="Cancelamento - NC",
+            sector=other_sector,
+        )
+        other_room = Room.objects.create(
+            contact=Contact.objects.create(name="Other Sector Contact"),
+            queue=other_queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
+        other_room.tags.add(same_name_tag)
+
+        room_filter = RoomFilter(
+            data={"tag_name": "Cancelamento - NC", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        filtered = list(room_filter.qs)
+
+        self.assertIn(self.room_angela, filtered)
+        self.assertIn(other_room, filtered)
+        self.assertEqual(len(filtered), 2)
+
+    def test_filter_tag_name_with_sector_restricts_to_sector(self):
+        tag = SectorTag.objects.create(name="Cancelamento - NC", sector=self.sector)
+        self.room_angela.tags.add(tag)
+
+        other_sector = Sector.objects.create(
+            name="Other Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        other_queue = Queue.objects.create(name="Other Queue", sector=other_sector)
+        same_name_tag = SectorTag.objects.create(
+            name="Cancelamento - NC",
+            sector=other_sector,
+        )
+        other_room = Room.objects.create(
+            contact=Contact.objects.create(name="Other Sector Contact"),
+            queue=other_queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
+        other_room.tags.add(same_name_tag)
+
+        room_filter = RoomFilter(
+            data={
+                "tag_name": "Cancelamento - NC",
+                "sector": str(self.sector.uuid),
+                "project": str(self.project.uuid),
+            },
+            queryset=Room.objects.all(),
+        )
+        filtered = list(room_filter.qs)
+
+        self.assertEqual(filtered, [self.room_angela])
+        self.assertNotIn(other_room, filtered)
+
+    def test_filter_tag_name_unknown_returns_empty(self):
+        room_filter = RoomFilter(
+            data={"tag_name": "Tag Inexistente", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        self.assertEqual(room_filter.qs.count(), 0)
+
+    def test_filter_without_tag_name_keeps_all_project_rooms(self):
+        room_filter = RoomFilter(
+            data={"project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        self.assertEqual(room_filter.qs.count(), 4)
+
+    def test_filter_tag_name_combines_with_ended_at(self):
+        now = timezone.now()
+        tag = SectorTag.objects.create(name="Cancelamento - NC", sector=self.sector)
+        self.room_angela.is_active = False
+        self.room_angela.ended_at = now
+        self.room_angela.save(update_fields=["is_active", "ended_at"])
+        self.room_angela.tags.add(tag)
+
+        self.room_jose.is_active = False
+        self.room_jose.ended_at = now
+        self.room_jose.save(update_fields=["is_active", "ended_at"])
+
+        room_filter = RoomFilter(
+            data={
+                "project": str(self.project.uuid),
+                "is_active": False,
+                "tag_name": "Cancelamento - NC",
+                "ended_at__gte": (now - timedelta(days=1)).isoformat(),
+                "ended_at__lte": (now + timedelta(days=1)).isoformat(),
+            },
+            queryset=Room.objects.all(),
+        )
+        filtered = list(room_filter.qs)
+
+        self.assertEqual(filtered, [self.room_angela])
 
 
 class InternalRoomsViewSetFilterTestCase(APITestCase):
@@ -262,3 +377,27 @@ class InternalRoomsViewSetFilterTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
+
+    @with_internal_auth
+    def test_list_rooms_filter_by_tag_name(self):
+        tag = SectorTag.objects.create(name="Cancelamento - NC", sector=self.sector)
+        self.room.tags.add(tag)
+        other = Room.objects.create(
+            contact=Contact.objects.create(name="Other"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
+
+        response = self.client.get(
+            "/v1/internal/rooms/",
+            {
+                "project": str(self.project.uuid),
+                "tag_name": "Cancelamento - NC",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = {row["uuid"] for row in response.data["results"]}
+        self.assertIn(str(self.room.uuid), uuids)
+        self.assertNotIn(str(other.uuid), uuids)
