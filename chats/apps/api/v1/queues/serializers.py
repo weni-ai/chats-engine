@@ -301,6 +301,15 @@ class BulkQueueItemSerializer(serializers.Serializer):
     queue_purpose = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    default_message = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    bond_flows_queue = serializers.BooleanField(required=False, default=False)
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(
@@ -308,6 +317,9 @@ class BulkQueueItemSerializer(serializers.Serializer):
         required=False,
         default=list,
     )
+
+    def validate(self, data):
+        return apply_selected_flows(self, data)
 
 
 class BulkQueueCreateSerializer(serializers.Serializer):

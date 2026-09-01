@@ -221,6 +221,31 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
+    def test_creates_queue_with_bond_flows_queue(self, mock_feature_flag):
+        flow_uuid = "0a2bbe58-1fac-4fa5-ac2e-add3018a815f"
+        payload = self._payload(
+            queues=[
+                {
+                    "name": "esfihas",
+                    "default_message": "",
+                    "bond_flows_queue": True,
+                    "selected_flows": [flow_uuid],
+                    "queue_limit": {"is_active": False, "limit": None},
+                    "queue_purpose": "",
+                    "agents": [],
+                }
+            ]
+        )
+        response = self.client.post(self._url(), data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        queue = Queue.objects.get(sector=self.sector, name="esfihas")
+        self.assertTrue(queue.bond_flows_queue)
+        self.assertEqual(queue.selected_flows, [flow_uuid])
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
     def test_creates_queue_with_all_optional_fields(self, mock_feature_flag):
         payload = {
             "sector": str(self.sector.pk),

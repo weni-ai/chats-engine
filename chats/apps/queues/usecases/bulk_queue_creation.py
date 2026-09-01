@@ -7,10 +7,10 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, status
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.eda_clients.change_history_client import (
     publish_change_history,
 )
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -48,10 +48,12 @@ class BulkQueueCreationUseCase:
         sector: Sector,
         queues_data: List[dict],
         user: User,
+        request=None,
     ):
         self.sector = sector
         self.queues_data = queues_data
         self.user = user
+        self.request = request
         self.project = sector.project
         self.has_group_sectors = SectorGroupSector.objects.filter(
             sector=sector
@@ -64,10 +66,14 @@ class BulkQueueCreationUseCase:
 
     def _build_queue(self, queue_data: dict) -> Queue:
         queue_limit_data = queue_data.get("queue_limit") or {}
+        selected_flows = queue_data.get("selected_flows") or []
         return Queue.objects.create(
             sector=self.sector,
             name=queue_data["name"],
-            queue_purpose=queue_data.get("queue_purpose"),
+            queue_purpose=queue_data.get("queue_purpose") or None,
+            default_message=queue_data.get("default_message") or None,
+            bond_flows_queue=bool(queue_data.get("bond_flows_queue")),
+            selected_flows=[str(flow_uuid) for flow_uuid in selected_flows],
             config=queue_data.get("config"),
             queue_limit=queue_limit_data.get("limit"),
             # Coerce explicit ``null`` from the serializer (which allows it)
@@ -100,7 +106,7 @@ class BulkQueueCreationUseCase:
         ]
         created = QueueAuthorization.objects.bulk_create(authorizations)
         for auth in created:
-            publish_change_history(after=auth, user=self.user)
+            publish_change_history(after=auth, user=self.user, request=self.request)
 
     def _persist_queues(self) -> List[Queue]:
         created_queues: List[Queue] = []
@@ -108,7 +114,7 @@ class BulkQueueCreationUseCase:
         for queue_data in self.queues_data:
             agent_emails = queue_data.get("agents", []) or []
             queue = self._build_queue(queue_data)
-            publish_change_history(after=queue, user=self.user)
+            publish_change_history(after=queue, user=self.user, request=self.request)
             self._create_queue_authorizations(queue, agent_emails)
 
             if self.has_group_sectors:

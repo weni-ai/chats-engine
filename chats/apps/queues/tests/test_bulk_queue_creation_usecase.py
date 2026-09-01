@@ -34,11 +34,12 @@ class BulkQueueCreationUseCaseTests(TestCase):
     def _queues_data(self, queues=None):
         return queues or [{"name": "Fila 1"}, {"name": "Fila 2"}]
 
-    def _make_use_case(self, queues_data=None, sector=None):
+    def _make_use_case(self, queues_data=None, sector=None, request=None):
         return BulkQueueCreationUseCase(
             sector=sector or self.sector,
             queues_data=queues_data if queues_data is not None else self._queues_data(),
             user=self.user,
+            request=request,
         )
 
     @override_settings(USE_WENI_FLOWS=False)
@@ -297,3 +298,30 @@ class BulkQueueCreationUseCaseTests(TestCase):
         auth = queue.authorizations.get(permission__user=agent)
         self.assertEqual(auth.created_by, self.user)
         self.assertEqual(auth.modified_by, self.user)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    def test_accepts_request_keyword_without_raising(self):
+        request = MagicMock()
+        created = self._make_use_case(request=request).execute()
+
+        self.assertEqual(len(created), 2)
+        self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 2)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    def test_persists_bond_flows_and_selected_flows(self):
+        flow_uuid = "0a2bbe58-1fac-4fa5-ac2e-add3018a815f"
+        self._make_use_case(
+            queues_data=[
+                {
+                    "name": "esfihas",
+                    "bond_flows_queue": True,
+                    "selected_flows": [flow_uuid],
+                    "default_message": "",
+                }
+            ],
+        ).execute()
+
+        queue = Queue.objects.get(sector=self.sector, name="esfihas")
+        self.assertTrue(queue.bond_flows_queue)
+        self.assertEqual(queue.selected_flows, [flow_uuid])
+        self.assertIsNone(queue.default_message)
