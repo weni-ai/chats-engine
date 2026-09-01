@@ -79,7 +79,6 @@ class TestMessageMediaViewSetV2(APITestCase):
         self.assertIn("uuid", response.data)
         media = MessageMedia.objects.get(uuid=response.data["uuid"])
         self.assertIsNone(media.message_id)
-        self.assertEqual(media.room_id, self.room.uuid)
         self.assertEqual(media.content_type, "image/png")
 
     def test_create_media_forbidden_for_other_agent(self):

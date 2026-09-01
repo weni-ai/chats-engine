@@ -189,10 +189,22 @@ class TestMessageMediaPermission(TestCase):
         request = self.factory.get("/api/v1/msgs/media/1/")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        obj = mock.Mock(room=self.room)
+        obj = mock.Mock(message=mock.Mock(room=self.room))
 
         result = self.permission.has_object_permission(request, None, obj)
         self.assertTrue(result)
+
+    def test_has_object_permission_without_message(self):
+        """
+        Deny access when media has no message.
+        """
+        request = self.factory.get("/api/v1/msgs/media/1/")
+        force_authenticate(request, user=self.user)
+        request = Request(request)
+        obj = mock.Mock(message=None)
+
+        result = self.permission.has_object_permission(request, None, obj)
+        self.assertFalse(result)
 
 
 class TestRestrictOfflineAgents(APITestCase):

@@ -117,7 +117,10 @@ class MessageMediaPermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
 
-        room = obj.room
+        if not obj.message:
+            return False
+
+        room = obj.message.room
         if room.user == request.user:
             return True
 
