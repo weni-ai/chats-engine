@@ -15,6 +15,17 @@ KNOWN_URN_PREFIXES = tuple(
 VALID_CHANNELS = frozenset(CHANNEL_URN_PREFIXES) | {"others"}
 
 
+def channel_name_from_urn(urn) -> str:
+    if not urn:
+        return "others"
+    urn = str(urn)
+    for channel, prefixes in CHANNEL_URN_PREFIXES.items():
+        for prefix in prefixes:
+            if urn.startswith(prefix):
+                return channel
+    return "others"
+
+
 def normalize_channels(value):
     if value is None or value == "":
         return None
