@@ -35,7 +35,8 @@ def apply_selected_flows(serializer, data):
     The frontend always sends the full desired list (replace, not append).
     When the feature is disabled, selected_flows must be an empty list.
     """
-    initial = serializer.initial_data or {}
+    # Nested ListSerializer children (bulk create) never get ``initial_data``.
+    initial = getattr(serializer, "initial_data", None) or {}
     instance = serializer.instance
 
     bond = data.get(
@@ -52,11 +53,9 @@ def apply_selected_flows(serializer, data):
             data["selected_flows"] = []
         return data
 
-    if "selected_flows" in initial:
+    if "selected_flows" in initial or instance is None:
         flows = data.get("selected_flows") or []
         data["selected_flows"] = [str(flow_uuid) for flow_uuid in flows]
-    elif instance is None:
-        data.setdefault("selected_flows", [])
 
     return data
 
