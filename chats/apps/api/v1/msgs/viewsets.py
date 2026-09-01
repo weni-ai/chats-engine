@@ -358,8 +358,7 @@ class MessageMediaViewset(
     def download(self, request, *args, **kwargs):
         media = get_object_or_404(
             MessageMedia.objects.select_related(
-                "message__room__queue__sector__project",
-                "room__queue__sector__project",
+                "message__room__queue__sector__project"
             ),
             uuid=kwargs["uuid"],
         )

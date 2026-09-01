@@ -65,7 +65,7 @@ class MessageFilter(filters.FilterSet):
 class MessageMediaFilter(filters.FilterSet):
     class Meta:
         model = MessageMedia
-        fields = ["message", "room"]
+        fields = ["message"]
 
     contact = filters.UUIDFilter(
         field_name="contact",
@@ -98,20 +98,20 @@ class MessageMediaFilter(filters.FilterSet):
         """
         Return medias given a contact, using the contact rooms for the search
         """
-        queryset = queryset.filter(room__contact__uuid=value)
+        queryset = queryset.filter(message__room__contact__uuid=value)
 
         return queryset
 
     def filter_room(self, queryset, name, value):
         """
-        Return medias given a room
+        Return medias given a contact, using the contact rooms for the search
         """
-        queryset = queryset.filter(room__uuid=value)
+        queryset = queryset.filter(message__room__uuid=value)
 
         return queryset
 
     def filter_project(self, queryset, name, value):
-        return queryset.filter(room__queue__sector__project__uuid=value)
+        return queryset.filter(message__room__queue__sector__project__uuid=value)
 
     def filter_content_type(self, queryset, name, value):
         if value == MessageMediaContentTypesFilterParams.AUDIO:

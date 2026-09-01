@@ -31,6 +31,7 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
 from chats.apps.api.v1.internal.csat.views import CSATWebhookView
 from chats.apps.api.v1.internal.contacts.views import RoomsContactsInternalViewSet
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
+from chats.apps.api.v1.internal.msgs.viewsets import InternalRoomHistoryMessagesViewSet
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import (
     InternalListRoomsViewSet,
@@ -220,6 +221,11 @@ router.register(
     "internal/tag",
     SectorTagsInternalViewset,
     basename="tag_internal",
+)
+router.register(
+    "internal/room_messages",
+    InternalRoomHistoryMessagesViewSet,
+    basename="internal_room_messages",
 )
 
 

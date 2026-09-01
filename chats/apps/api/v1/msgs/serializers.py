@@ -5,7 +5,6 @@ from typing import Optional
 import magic
 from django.conf import settings
 from django.db import transaction
-from django.utils.translation import gettext_lazy as _
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
@@ -34,34 +33,6 @@ from chats.apps.rooms.models import RoomNote
 LOGGER = logging.getLogger(__name__)
 
 BULK_SEND_ROOM_STATUS_CHOICES = ("waiting", "ongoing")
-
-
-def process_uploaded_media_file(validated_data: dict) -> dict:
-    """Detect MIME type and convert unsupported audio formats in place."""
-    media = validated_data["media_file"]
-    file_bytes = media.file.read()
-    file_type = magic.from_buffer(file_bytes, mime=True)
-    if file_type in settings.FILE_CHECK_CONTENT_TYPE:
-        file_type = media.name[-3:]
-    if (
-        file_type.startswith("audio")
-        or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
-    ):
-        export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
-        if settings.AUDIO_CODEC_TO_CONVERT != "":
-            export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
-
-        converted_bytes = io.BytesIO()
-        AudioSegment.from_file(io.BytesIO(file_bytes)).export(
-            converted_bytes, **export_conf
-        )
-
-        media.file = converted_bytes
-        media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
-        file_type = magic.from_buffer(converted_bytes.read(), mime=True)
-
-    validated_data["content_type"] = file_type
-    return validated_data
 
 
 class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
@@ -337,7 +308,6 @@ class MessageMediaSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
-            "message": {"required": True},
         }
 
     def get_url(self, media: MessageMedia):
@@ -378,11 +348,31 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return result
 
     def create(self, validated_data):
-        message = validated_data.get("message")
-        if message is not None:
-            validated_data["room"] = message.room
-        validated_data = process_uploaded_media_file(validated_data)
-        return super().create(validated_data)
+        media = validated_data["media_file"]
+        file_bytes = media.file.read()
+        file_type = magic.from_buffer(file_bytes, mime=True)
+        if file_type in settings.FILE_CHECK_CONTENT_TYPE:
+            file_type = media.name[-3:]
+        if (
+            file_type.startswith("audio")
+            or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
+        ):
+            export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
+            if settings.AUDIO_CODEC_TO_CONVERT != "":
+                export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
+
+            converted_bytes = io.BytesIO()
+            AudioSegment.from_file(io.BytesIO(file_bytes)).export(
+                converted_bytes, **export_conf
+            )
+
+            media.file = converted_bytes
+            media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
+            file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+
+        validated_data["content_type"] = file_type
+        msg = super().create(validated_data)
+        return msg
 
 
 class BaseMessageSerializer(serializers.ModelSerializer):
@@ -475,9 +465,7 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         message = validated_data.pop("message")
         message = ChatMessage.objects.create(**message)
-        media = MessageMedia.objects.create(
-            **validated_data, message=message, room=message.room
-        )
+        media = MessageMedia.objects.create(**validated_data, message=message)
         return media
 
 
@@ -489,12 +477,7 @@ class AITextImprovementSerializer(serializers.Serializer):
 class MessageSerializer(BaseMessageSerializer):
     """Serializer for the messages endpoint"""
 
-    media = serializers.ListField(
-        child=serializers.UUIDField(),
-        required=False,
-        write_only=True,
-        allow_empty=False,
-    )
+    media = MessageMediaSimpleSerializer(many=True, required=False)
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
     bulk_message = serializers.SerializerMethodField(read_only=True)
@@ -535,96 +518,24 @@ class MessageSerializer(BaseMessageSerializer):
             "external_id",
         ]
 
-    def validate_media(self, media_uuids):
-        max_attachments = settings.MESSAGE_MEDIA_MAX_ATTACHMENTS
-        if len(media_uuids) > max_attachments:
-            raise serializers.ValidationError(
-                _("At most {max_attachments} media files are allowed").format(
-                    max_attachments=max_attachments
-                )
-            )
-        return media_uuids
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        media_uuids = attrs.pop("media", None)
-        if media_uuids is None:
-            return attrs
-
-        room = attrs.get("room")
-        medias = list(
-            MessageMedia.objects.filter(uuid__in=media_uuids).select_related("room")
-        )
-        medias_by_uuid = {media.uuid: media for media in medias}
-
-        missing = [
-            str(media_uuid)
-            for media_uuid in media_uuids
-            if media_uuid not in medias_by_uuid
-        ]
-        if missing:
-            raise serializers.ValidationError(
-                {"media": _("One or more media items were not found")}
-            )
-
-        ordered_medias = []
-        for media_uuid in media_uuids:
-            media = medias_by_uuid[media_uuid]
-            if media.room_id != room.pk:
-                raise serializers.ValidationError(
-                    {"media": _("Media must belong to the same room as the message")}
-                )
-            if media.message_id is not None:
-                raise serializers.ValidationError(
-                    {"media": _("Media is already attached to a message")}
-                )
-            ordered_medias.append(media)
-
-        attrs["_media_to_attach"] = ordered_medias
-        return attrs
-
     def create(self, validated_data):
         ai_text_improvement = validated_data.pop("ai_text_improvement", None)
-        medias_to_attach = validated_data.pop("_media_to_attach", [])
+        msg = super().create(validated_data)
 
-        with transaction.atomic():
-            msg = super().create(validated_data)
-
-            if medias_to_attach:
-                media_ids = [media.pk for media in medias_to_attach]
-                updated = MessageMedia.objects.filter(
-                    pk__in=media_ids, message__isnull=True, room_id=msg.room_id
-                ).update(message=msg)
-                if updated != len(media_ids):
-                    raise serializers.ValidationError(
-                        {"media": _("Media is already attached to a message")}
-                    )
-
-            if ai_text_improvement:
-                transaction.on_commit(
-                    lambda message_uuid=str(
-                        msg.uuid
-                    ), improvement_type=ai_text_improvement[
-                        "type"
-                    ], status=ai_text_improvement[
-                        "status"
-                    ]: (
-                        register_message_improvement_task.delay(
-                            message_uuid=message_uuid,
-                            improvement_type=improvement_type,
-                            status=status,
-                        )
+        if ai_text_improvement:
+            transaction.on_commit(
+                lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
+                    "type"
+                ], status=ai_text_improvement["status"]: (
+                    register_message_improvement_task.delay(
+                        message_uuid=message_uuid,
+                        improvement_type=improvement_type,
+                        status=status,
                     )
                 )
+            )
 
         return msg
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["media"] = MessageMediaSimpleSerializer(
-            instance.medias.all(), many=True, context=self.context
-        ).data
-        return data
 
     def get_replied_message(self, obj):
         if obj.metadata is None or obj.metadata == {}:

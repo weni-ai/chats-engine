@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from django.db.models import QuerySet
@@ -10,8 +11,11 @@ from chats.apps.rooms.models import Room
 
 class GetRoomMessagesHistoryUseCase:
     """
-    Returns the message history queryset for a closed room that belongs to the
-    given project.
+    Returns the message history queryset for a closed room.
+
+    When ``project`` is provided, the room must belong to that project.
+    When omitted, the room is looked up by UUID only (trusted internal
+    callers).
 
     Raises ``RoomNotFoundError`` when the room does not exist or does not
     belong to the project.  Raises ``RoomStillActiveError`` when the room
@@ -22,15 +26,14 @@ class GetRoomMessagesHistoryUseCase:
     ``RoomNote.message``.
     """
 
-    def execute(self, room_uuid: UUID, project: Project) -> "QuerySet[Message]":
-        room = (
-            Room.objects.filter(
-                uuid=room_uuid,
-                queue__sector__project=project,
-            )
-            .only("uuid", "is_active")
-            .first()
-        )
+    def execute(
+        self, room_uuid: UUID, project: Optional[Project] = None
+    ) -> "QuerySet[Message]":
+        filters = {"uuid": room_uuid}
+        if project is not None:
+            filters["queue__sector__project"] = project
+
+        room = Room.objects.filter(**filters).only("uuid", "is_active").first()
         if room is None:
             raise RoomNotFoundError()
 

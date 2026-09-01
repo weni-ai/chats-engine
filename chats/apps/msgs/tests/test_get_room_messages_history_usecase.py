@@ -71,6 +71,17 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
                 room_uuid=self.room.uuid, project=other_project
             )
 
+    def test_returns_messages_when_project_is_omitted(self):
+        msg = Message.objects.create(
+            room=self.room, contact=self.contact, text="Hello"
+        )
+        self.close_room()
+
+        result = list(self.usecase.execute(room_uuid=self.room.uuid))
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].uuid, msg.uuid)
+
     def test_raises_room_still_active_when_room_is_open(self):
         with self.assertRaises(RoomStillActiveError):
             self.usecase.execute(
