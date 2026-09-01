@@ -13,12 +13,29 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_messages_received_total,
 )
 from chats.apps.rooms.models import Room
+from chats.core.sentry import is_closed_websocket_error
 
 logger = logging.getLogger(__name__)
 
 
 class ContactRoomConsumer(AsyncJsonWebsocketConsumer):
     CONSUMER_TYPE = "contact"
+
+    async def safe_send_json(self, content):
+        """Send JSON, ignoring races where the client already disconnected."""
+        try:
+            await self.send_json(content)
+        except Exception as exc:
+            if is_closed_websocket_error(exc):
+                logger.warning(
+                    "Skipping WS send on closed connection",
+                    extra={
+                        "room_id": getattr(self, "room_id", None),
+                        "error": str(exc),
+                    },
+                )
+                return
+            raise
 
     async def connect(self):
         self._start_time = time.time()
@@ -75,7 +92,7 @@ class ContactRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def notify(self, event):
         # event["content"] is expected to be a dict/JSON-compatible object
-        await self.send_json(event["content"])
+        await self.safe_send_json(event["content"])
 
     @database_sync_to_async
     def get_room(self):
@@ -89,7 +106,7 @@ class ContactRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def send_msgs(self):
         messages = await self.get_msgs()
-        await self.send_json(
+        await self.safe_send_json(
             {
                 "type": "notify",
                 "action": "message.load",

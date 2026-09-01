@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 
 import requests
 from growthbook import GrowthBook
-from sentry_sdk import capture_exception
 
 from chats.core.cache import CacheClient
 
@@ -161,11 +160,11 @@ class GrowthbookClient(BaseGrowthbookClient):
             try:
                 cached_feature_flags = json.loads(cached_feature_flags)
             except json.JSONDecodeError as e:
-                logger.error(
+                logger.warning(
                     "Failed to parse feature flags from short cache: %s",
                     cached_feature_flags,
+                    exc_info=e,
                 )
-                capture_exception(e)
                 return None
 
         return cached_feature_flags
@@ -183,11 +182,11 @@ class GrowthbookClient(BaseGrowthbookClient):
             try:
                 cached_feature_flags = json.loads(cached_feature_flags)
             except json.JSONDecodeError as e:
-                logger.error(
+                logger.warning(
                     "Failed to parse feature flags from long cache: %s",
                     cached_feature_flags,
+                    exc_info=e,
                 )
-                capture_exception(e)
                 return None
 
         return cached_feature_flags
@@ -253,13 +252,11 @@ class GrowthbookClient(BaseGrowthbookClient):
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            logger.error(
-                "Failed to update feature flags definitions: %s",
+            logger.warning(
+                "Failed to update feature flags definitions from GrowthBook: %s",
                 e,
             )
-            capture_exception(e)
-
-            raise e
+            raise
 
         response = response.json()
         features = response.get("features", {})
