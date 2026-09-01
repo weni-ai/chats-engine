@@ -259,6 +259,8 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         related_name="medias",
         verbose_name=_("Message"),
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
@@ -281,10 +283,11 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         ]
 
     def __str__(self):
-        return f"{self.message.pk} - {self.url}"
+        message_pk = self.message_id or "unattached"
+        return f"{message_pk} - {self.url}"
 
     def save(self, *args, **kwargs) -> None:
-        if self.message.room.is_active is False:
+        if self.message_id and self.message.room.is_active is False:
             raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         return super().save(*args, **kwargs)
 
@@ -358,10 +361,13 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return f"{settings.FLOWS_BASE_URL}/api/v2/internals/media/download/{object_key}"
 
     def get_authorization(self, user):
-        return self.room.get_authorization(user)
+        return self.message.room.get_authorization(user)
 
     def callback(self):
         """Send webhook callback for MessageMedia"""
+        if not self.message_id:
+            return
+
         msg_data = self.message.serialized_ws_data
         msg_data["text"] = ""
 
@@ -433,6 +439,8 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     def notify_room(self, action: str = "create", callback: bool = False):
         """Delegate room notification to the associated Message"""
+        if not self.message_id:
+            return
         self.message.notify_room(action, callback)
 
     @property

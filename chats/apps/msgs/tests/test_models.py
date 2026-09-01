@@ -207,6 +207,24 @@ class TestMessageMediaModel(TestCase):
 
         self.assertEqual(msg_media.created_on.date(), timezone.now().date())
 
+    def test_create_unattached_media(self):
+        media = MessageMedia.objects.create(
+            message=None,
+            content_type="image/png",
+            media_url="https://example.com/image.png",
+        )
+
+        self.assertIsNone(media.message_id)
+        self.assertIn("unattached", str(media))
+
+    def test_callback_noop_when_unattached(self):
+        media = MessageMedia.objects.create(
+            message=None,
+            content_type="image/png",
+            media_url="https://example.com/image.png",
+        )
+        media.callback()
+
 
 class TestMessageNotifyRoom(TestCase):
     """Test Message.notify_room callback functionality with retries and logging"""

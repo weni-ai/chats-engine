@@ -328,3 +328,108 @@ class TestMessageViewsetCreate(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ai_text_improvement", response.data)
+
+
+class TestMessageViewsetCreateWithMedia(APITestCase):
+    """Tests for creating messages with pre-uploaded media UUIDs."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.contact = Contact.objects.create(
+            name="Test Contact", email="contact@test.com"
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            email="agent@test.com", password="testpass123"
+        )
+        self.room.user = self.user
+        self.room.save(update_fields=["user"])
+        self.client.force_authenticate(user=self.user)
+
+    def _create_unattached_media(self, **kwargs):
+        from chats.apps.msgs.models import MessageMedia
+
+        defaults = {
+            "message": None,
+            "content_type": "image/png",
+            "media_url": "https://example.com/image.png",
+        }
+        defaults.update(kwargs)
+        return MessageMedia.objects.create(**defaults)
+
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_create_message_attaches_media_uuids(self, mock_notify_room):
+        media_one = self._create_unattached_media()
+        media_two = self._create_unattached_media(
+            media_url="https://example.com/image-2.png"
+        )
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "alo",
+            "seen": True,
+            "media": [str(media_one.uuid), str(media_two.uuid)],
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["media"]), 2)
+        media_one.refresh_from_db()
+        media_two.refresh_from_db()
+        self.assertEqual(str(media_one.message_id), response.data["uuid"])
+        self.assertEqual(str(media_two.message_id), response.data["uuid"])
+        mock_notify_room.assert_called()
+
+    def test_create_message_rejects_too_many_media(self):
+        from django.conf import settings
+
+        media_uuids = [
+            str(self._create_unattached_media().uuid)
+            for _ in range(settings.MESSAGE_MEDIA_MAX_ATTACHMENTS + 1)
+        ]
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "alo",
+            "media": media_uuids,
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("media", response.data)
+
+    def test_create_message_rejects_already_attached_media(self):
+        from chats.apps.msgs.models import Message
+
+        existing_message = Message.objects.create(
+            room=self.room, user=self.user, text="existing"
+        )
+        media = self._create_unattached_media(message=existing_message)
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "alo",
+            "media": [str(media.uuid)],
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("media", response.data)

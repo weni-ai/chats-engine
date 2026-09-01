@@ -539,6 +539,7 @@ UNPERMITTED_AUDIO_TYPES = env.list(
         "webm",
     ],
 )
+MESSAGE_MEDIA_MAX_ATTACHMENTS = env.int("MESSAGE_MEDIA_MAX_ATTACHMENTS", default=5)
 
 # Maximum audio duration in seconds for transcription (default: 5 minutes)
 AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
