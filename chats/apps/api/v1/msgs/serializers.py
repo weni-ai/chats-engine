@@ -358,9 +358,6 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return result
 
     def create(self, validated_data):
-        message = validated_data.get("message")
-        if message is not None:
-            validated_data["room"] = message.room
         validated_data = process_uploaded_media_file(validated_data)
         return super().create(validated_data)
 
@@ -450,9 +447,7 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         message = validated_data.pop("message")
         message = ChatMessage.objects.create(**message)
-        media = MessageMedia.objects.create(
-            **validated_data, message=message, room=message.room
-        )
+        media = MessageMedia.objects.create(**validated_data, message=message)
         return media
 
 
@@ -523,10 +518,7 @@ class MessageSerializer(BaseMessageSerializer):
         if media_uuids is None:
             return attrs
 
-        room = attrs.get("room")
-        medias = list(
-            MessageMedia.objects.filter(uuid__in=media_uuids).select_related("room")
-        )
+        medias = list(MessageMedia.objects.filter(uuid__in=media_uuids))
         medias_by_uuid = {media.uuid: media for media in medias}
 
         missing = [
@@ -542,10 +534,6 @@ class MessageSerializer(BaseMessageSerializer):
         ordered_medias = []
         for media_uuid in media_uuids:
             media = medias_by_uuid[media_uuid]
-            if media.room_id != room.pk:
-                raise serializers.ValidationError(
-                    {"media": _("Media must belong to the same room as the message")}
-                )
             if media.message_id is not None:
                 raise serializers.ValidationError(
                     {"media": _("Media is already attached to a message")}
@@ -565,7 +553,7 @@ class MessageSerializer(BaseMessageSerializer):
             if medias_to_attach:
                 media_ids = [media.pk for media in medias_to_attach]
                 updated = MessageMedia.objects.filter(
-                    pk__in=media_ids, message__isnull=True, room_id=msg.room_id
+                    pk__in=media_ids, message__isnull=True
                 ).update(message=msg)
                 if updated != len(media_ids):
                     raise serializers.ValidationError(

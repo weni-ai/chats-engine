@@ -349,14 +349,6 @@ class TestMessageViewsetCreateWithMedia(APITestCase):
             contact=self.contact,
             is_active=True,
         )
-        self.other_contact = Contact.objects.create(
-            name="Other Contact", email="other-contact@test.com"
-        )
-        self.other_room = Room.objects.create(
-            queue=self.queue,
-            contact=self.other_contact,
-            is_active=True,
-        )
         self.user = User.objects.create_user(
             email="agent@test.com", password="testpass123"
         )
@@ -364,11 +356,10 @@ class TestMessageViewsetCreateWithMedia(APITestCase):
         self.room.save(update_fields=["user"])
         self.client.force_authenticate(user=self.user)
 
-    def _create_unattached_media(self, room=None, **kwargs):
+    def _create_unattached_media(self, **kwargs):
         from chats.apps.msgs.models import MessageMedia
 
         defaults = {
-            "room": room or self.room,
             "message": None,
             "content_type": "image/png",
             "media_url": "https://example.com/image.png",
@@ -399,7 +390,6 @@ class TestMessageViewsetCreateWithMedia(APITestCase):
         media_two.refresh_from_db()
         self.assertEqual(str(media_one.message_id), response.data["uuid"])
         self.assertEqual(str(media_two.message_id), response.data["uuid"])
-        self.assertEqual(media_one.room_id, self.room.uuid)
         mock_notify_room.assert_called()
 
     def test_create_message_rejects_too_many_media(self):
@@ -415,21 +405,6 @@ class TestMessageViewsetCreateWithMedia(APITestCase):
             "user_email": self.user.email,
             "text": "alo",
             "media": media_uuids,
-        }
-
-        response = self.client.post(url, data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("media", response.data)
-
-    def test_create_message_rejects_media_from_other_room(self):
-        media = self._create_unattached_media(room=self.other_room)
-        url = reverse("message-list")
-        data = {
-            "room": str(self.room.uuid),
-            "user_email": self.user.email,
-            "text": "alo",
-            "media": [str(media.uuid)],
         }
 
         response = self.client.post(url, data, format="json")
@@ -457,70 +432,3 @@ class TestMessageViewsetCreateWithMedia(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("media", response.data)
 
-
-class TestMessageMediaViewsetCreateSetsRoom(APITestCase):
-    """Tests that POST /v1/media/ sets room from the message."""
-
-    def setUp(self):
-        self.project = Project.objects.create(name="Test Project")
-        self.sector = Sector.objects.create(
-            name="Test Sector",
-            project=self.project,
-            rooms_limit=10,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.contact = Contact.objects.create(
-            name="Test Contact", email="contact@test.com"
-        )
-        self.room = Room.objects.create(
-            queue=self.queue,
-            contact=self.contact,
-            is_active=True,
-        )
-        self.user = User.objects.create_user(
-            email="agent@test.com", password="testpass123"
-        )
-        self.room.user = self.user
-        self.room.save(update_fields=["user"])
-        self.client.force_authenticate(user=self.user)
-
-        from chats.apps.msgs.models import Message
-
-        self.message = Message.objects.create(room=self.room, user=self.user, text="")
-
-    def _create_test_image(self):
-        file_content = BytesIO()
-        file_content.write(
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-            b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00"
-            b"\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00"
-            b"\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
-        )
-        file_content.seek(0)
-        return SimpleUploadedFile(
-            "test_image.png", file_content.read(), content_type="image/png"
-        )
-
-    @patch(
-        "chats.apps.api.v1.msgs.serializers.magic.from_buffer", return_value="image/png"
-    )
-    @patch("chats.apps.msgs.models.MessageMedia.callback")
-    @patch("chats.apps.msgs.models.Message.notify_room")
-    def test_create_media_sets_room_from_message(
-        self, mock_notify_room, mock_callback, mock_magic
-    ):
-        from chats.apps.msgs.models import MessageMedia
-
-        url = reverse("media-list")
-        data = {
-            "message": str(self.message.uuid),
-            "media_file": self._create_test_image(),
-        }
-
-        response = self.client.post(url, data, format="multipart")
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        media = MessageMedia.objects.get(message=self.message)
-        self.assertEqual(media.room_id, self.room.uuid)

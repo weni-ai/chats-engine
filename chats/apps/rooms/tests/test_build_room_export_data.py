@@ -210,7 +210,6 @@ class BuildRoomExportDataTests(TestCase):
             [
                 MessageMedia(
                     message=msg,
-                    room=msg.room,
                     content_type="image/jpeg",
                     media_url="https://example.com/img.jpg",
                 ),

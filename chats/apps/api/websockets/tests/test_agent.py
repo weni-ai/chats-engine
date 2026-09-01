@@ -103,7 +103,6 @@ class AgentMessageCreateWebSocketTestCase(AgentConsumerTestCase):
         from chats.apps.msgs.models import MessageMedia
 
         media = MessageMedia.objects.create(
-            room=self.room,
             message=None,
             content_type="image/png",
             media_url="https://example.com/image.png",

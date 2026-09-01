@@ -118,7 +118,6 @@ class TestCreateAgentMessageUseCase(TestCase):
         self, mock_notify_room, mock_first_response_task
     ):
         media = MessageMedia.objects.create(
-            room=self.room,
             message=None,
             content_type="image/png",
             media_url="https://example.com/image.png",
@@ -133,31 +132,6 @@ class TestCreateAgentMessageUseCase(TestCase):
         self.assertEqual(media.message_id, message.pk)
         self.assertEqual(message.medias.count(), 1)
         mock_notify_room.assert_called_once_with("create", True)
-
-    def test_execute_rejects_media_from_other_room(self):
-        other_contact = Contact.objects.create(
-            name="Other Contact", email="other-contact@example.com"
-        )
-        other_room = Room.objects.create(
-            queue=self.queue,
-            contact=other_contact,
-            user=self.user,
-            is_active=True,
-        )
-        media = MessageMedia.objects.create(
-            room=other_room,
-            message=None,
-            content_type="image/png",
-            media_url="https://example.com/image.png",
-        )
-
-        with self.assertRaises(MessageCreateError) as ctx:
-            self.use_case.execute(
-                self.user,
-                self._payload(text="With media", media=[str(media.uuid)]),
-            )
-
-        self.assertEqual(ctx.exception.error_code, "validation_error")
 
     def test_execute_room_not_found(self):
         with self.assertRaises(MessageCreateError) as ctx:
