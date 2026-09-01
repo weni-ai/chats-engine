@@ -1300,24 +1300,23 @@ class RoomViewset(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create a blank message to attach the internal note
-        msg = Message.objects.create(
-            room=room,
-            user=request.user,
-            contact=None,
-            text="",
-        )
+        with transaction.atomic():
+            # Create a blank message to attach the internal note
+            msg = Message.objects.create(
+                room=room,
+                user=request.user,
+                contact=None,
+                text="",
+            )
 
-        # Create the note attached to the message
-        note = RoomNote.objects.create(
-            room=room,
-            user=request.user,
-            text=serializer.validated_data["text"],
-            message=msg,
-        )
-
-        # Notify message creation for clients listening to messages
-        msg.notify_room("create", True)
+            # Create the note attached to the message
+            note = RoomNote.objects.create(
+                room=room,
+                user=request.user,
+                text=serializer.validated_data["text"],
+                message=msg,
+            )
+            transaction.on_commit(lambda: msg.notify_room("create", True))
 
         # Return serialized note
         return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
@@ -1581,13 +1580,14 @@ class RoomNoteMediaViewset(
             serializer.save()
             instance = serializer.instance
             note = instance.note
+            message = note.message
 
             # Re-notify the related message so clients receive the note with
             # its updated medias.
-            if note.message:
-                note.message.notify_room("update", True)
+            if message:
+                transaction.on_commit(lambda: message.notify_room("update", True))
             else:
-                note.notify_websocket("create")
+                transaction.on_commit(lambda: note.notify_websocket("create"))
 
 
 class RoomsCountView(APIView):
