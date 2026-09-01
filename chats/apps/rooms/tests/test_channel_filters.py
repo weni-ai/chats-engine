@@ -9,6 +9,7 @@ from chats.apps.rooms.channel_filters import (
     CHANNEL_URN_PREFIXES,
     KNOWN_URN_PREFIXES,
     apply_channels_filter,
+    channel_name_from_urn,
     channels_q,
     normalize_channels,
 )
@@ -73,6 +74,28 @@ class ChannelsQMappingTests(TestCase):
         q = channels_q(["whatsapp", "instagram"])
         expected = Q(urn__startswith="whatsapp:") | Q(urn__startswith="instagram:")
         self.assertEqual(str(q), str(expected))
+
+
+class ChannelNameFromUrnTests(TestCase):
+    def test_known_prefixes_map_to_channel_slugs(self):
+        expected = {
+            "instagram": "instagram",
+            "facebook": "facebook",
+            "whatsapp": "whatsapp",
+            "teams": "teams",
+            "msteams": "teams",
+            "email": "email",
+            "mailto": "email",
+            "ext": "shopping_assistant",
+            "shopping_assistant": "shopping_assistant",
+            "telegram": "others",
+            "empty": "others",
+        }
+        for key, urn in CHANNEL_URN_SAMPLES.items():
+            self.assertEqual(channel_name_from_urn(urn), expected[key], key)
+
+    def test_none_urn_is_others(self):
+        self.assertEqual(channel_name_from_urn(None), "others")
 
 
 class ApplyChannelsFilterTests(TestCase):
