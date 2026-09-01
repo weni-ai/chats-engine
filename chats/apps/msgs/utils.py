@@ -37,22 +37,20 @@ logger = logging.getLogger(__name__)
 
 _WAMID_PREFIX = "wamid."
 
-# Protobuf-like field markers that immediately precede the trailing message
-# id bytes inside the decoded WAMID payload. They were derived from real
-# WAMIDs observed in production for both ``wamid.HBgM`` (contact-origin) and
-# ``wamid.HBgT`` (agent-origin) envelopes.
+# After the envelope (phone / LID), the internal message id is encoded as:
 #
-# ``0x12, 0x18, 0x20`` additionally covers the envelope seen when a contact
-# replies to their own earlier message: the ``context.id`` Meta sends in that
-# case uses a LID-based ``wamid.HBgT<LID>...`` wrapper instead of the
-# phone-based ``wamid.HBgM<phone>...`` wrapper the original message was
-# stored with, so the exact ``external_id`` match misses and this fallback
-# marker is what lets the core comparison still line up.
-_WAMID_TRAILER_MARKERS = (
-    bytes([0x12, 0x18, 0x16]),
-    bytes([0x11, 0x18, 0x12]),
-    bytes([0x12, 0x18, 0x20]),
-)
+#     [tag 0x11|0x12]  0x18  [length N]  [N hex-ASCII chars]  [optional 0x00]
+#
+# The third byte is the **length of the id**, not a fixed magic. Meta has
+# already emitted N in {18, 20, 22, 32}; hard-coding those values kept
+# breaking every time a new id size appeared (e.g. contact self-reply with
+# ``HBgU`` / length 20). Parsing the length byte covers current and future
+# sizes without another deploy per envelope.
+_WAMID_ID_TAGS = (0x11, 0x12)
+_WAMID_LENGTH_FIELD = 0x18
+_WAMID_MIN_ID_LEN = 8
+_WAMID_MAX_ID_LEN = 64
+_WAMID_HEX_ALPHABET = b"0123456789ABCDEFabcdef"
 
 
 def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
@@ -60,7 +58,7 @@ def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
 
     Returns ``None`` for ``None``, empty strings, non-string values, ids that
     do not start with the ``wamid.`` prefix, or payloads whose decoded bytes
-    do not contain the expected trailer markers. Failures are logged at WARNING
+    do not contain a recognizable id trailer. Failures are logged at WARNING
     level and never raise, because this helper is used inside hot paths
     (serializers, consumers) where a malformed WAMID must not break the flow.
     """
@@ -83,12 +81,33 @@ def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
         )
         return None
 
-    for marker in _WAMID_TRAILER_MARKERS:
-        idx = raw.rfind(marker)
-        if idx != -1:
-            core_bytes = raw[idx + len(marker):]
-            if core_bytes:
-                return core_bytes.hex().upper()
+    # Scan from the end: the message id trailer sits after the envelope.
+    for i in range(len(raw) - 3, -1, -1):
+        if raw[i] not in _WAMID_ID_TAGS:
+            continue
+        if raw[i + 1] != _WAMID_LENGTH_FIELD:
+            continue
+
+        length = raw[i + 2]
+        if not (_WAMID_MIN_ID_LEN <= length <= _WAMID_MAX_ID_LEN):
+            continue
+
+        start = i + 3
+        end = start + length
+        if end > len(raw):
+            continue
+
+        id_bytes = raw[start:end]
+        if not id_bytes or any(b not in _WAMID_HEX_ALPHABET for b in id_bytes):
+            continue
+
+        # Preserve the historical core format (id bytes + trailing NUL when
+        # present) so values already stored in ``external_id_core`` keep
+        # matching without a rewrite of every row.
+        if end < len(raw) and raw[end] == 0x00:
+            end += 1
+
+        return raw[start:end].hex().upper()
 
     return None
 
