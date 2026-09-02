@@ -420,7 +420,8 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
 
-    def test_room_order_with_pin(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_pin(self, mock_is_feature_active):
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -491,7 +492,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results_uuids[1], str(room_1.uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    def test_room_order_with_email(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_email(self, mock_is_feature_active):
         another_user = User.objects.create(email="another_user@example.com")
         QueueAuthorization.objects.create(
             permission=ProjectPermission.objects.create(
@@ -535,7 +537,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results[1]["uuid"], str(rooms[0].uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    def test_pins_returned_separately(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pins_returned_separately(self, mock_is_feature_active):
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -565,7 +568,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results_uuids[1], str(room_2.uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    def test_pin_page_budget_fills_remaining_with_unpinned(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pin_page_budget_fills_remaining_with_unpinned(self, mock_is_feature_active):
         pinned = []
         for _i in range(5):
             room = Room.objects.create(
@@ -607,7 +611,10 @@ class TestRoomsViewSet(APITestCase):
             [str(room.uuid) for room in unpinned[:15]],
         )
 
-    def test_pin_page_budget_paginates_when_pins_exceed_limit(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pin_page_budget_paginates_when_pins_exceed_limit(
+        self, mock_is_feature_active
+    ):
         pinned = []
         for _i in range(30):
             room = Room.objects.create(

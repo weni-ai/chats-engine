@@ -253,13 +253,13 @@ class RoomViewset(
             )
 
         limit, offset = configured
-        page_pin_ids = pinned_ids[offset : offset + limit]
+        page_end = offset + limit
+        page_pin_ids = pinned_ids[offset:page_end]
         remaining = limit - len(page_pin_ids)
         unpinned_offset = max(0, offset - pin_count)
+        unpinned_end = unpinned_offset + remaining
         unpinned_page = (
-            list(unpinned_qs[unpinned_offset : unpinned_offset + remaining])
-            if remaining > 0
-            else []
+            list(unpinned_qs[unpinned_offset:unpinned_end]) if remaining > 0 else []
         )
 
         pinned_data = []
