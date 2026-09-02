@@ -206,6 +206,14 @@ class RoomViewset(
 
         return self._list_with_pin_order(qs, request, project)
 
+    @staticmethod
+    def _compute_page_slices(pinned_ids, offset, limit):
+        pin_count = len(pinned_ids)
+        page_pin_ids = pinned_ids[offset : offset + limit]
+        remaining = limit - len(page_pin_ids)
+        unpinned_offset = max(0, offset - pin_count)
+        return page_pin_ids, remaining, unpinned_offset
+
     def _list_with_pin_order(self, qs, request, project):
         user = request.user
 
@@ -253,10 +261,9 @@ class RoomViewset(
             )
 
         limit, offset = configured
-        page_end = offset + limit
-        page_pin_ids = pinned_ids[offset:page_end]
-        remaining = limit - len(page_pin_ids)
-        unpinned_offset = max(0, offset - pin_count)
+        page_pin_ids, remaining, unpinned_offset = self._compute_page_slices(
+            pinned_ids, offset, limit
+        )
         unpinned_end = unpinned_offset + remaining
         unpinned_page = (
             list(unpinned_qs[unpinned_offset:unpinned_end]) if remaining > 0 else []
