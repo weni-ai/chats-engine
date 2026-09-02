@@ -219,6 +219,15 @@ def process_bulk_quick_message_send(bulk_send_uuid: UUID):
         f"{bulk_send_uuid} marked as PROCESSING"
     )
 
+    if not room_uuids:
+        update_bulk_quick_message_send_progress.delay(bulk_send_uuid)
+
+        logger.info(
+            f"[process_bulk_quick_message_send] No rooms matched bulk send with "
+            f"UUID {bulk_send_uuid}. Dispatched progress update"
+        )
+        return
+
     for room_uuid in room_uuids:
         send_bulk_quick_message_to_room.delay(bulk_send_uuid, room_uuid)
 

@@ -1,4 +1,3 @@
-from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -43,8 +42,7 @@ class MessageMediaCreateSerializerV2(serializers.ModelSerializer):
         return room_uuid
 
     def create(self, validated_data):
-        with transaction.atomic():
-            validated_data.pop("room", None)
-            validated_data = process_uploaded_media_file(validated_data)
-            validated_data["message"] = None
-            return super().create(validated_data)
+        validated_data.pop("room", None)
+        validated_data = process_uploaded_media_file(validated_data)
+        validated_data["message"] = None
+        return super().create(validated_data)
