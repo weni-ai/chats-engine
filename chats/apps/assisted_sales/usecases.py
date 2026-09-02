@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from chats.apps.assisted_sales.exceptions import (
 )
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
@@ -231,3 +233,48 @@ class ListExistingCopilotsUseCase:
             "uuid": copilot_uuid,
             "project_uuid": copilot_uuid,
         }
+
+
+def parse_channel_uuid(raw) -> Optional[UUID]:
+    if not raw:
+        return None
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def get_copilot_channel_uuid(room: Room) -> Optional[UUID]:
+    if not room.queue_id:
+        return None
+
+    sector = room.queue.sector
+    integration = CopilotIntegration.objects.filter(sector=sector).first()
+    if not integration:
+        integration = CopilotIntegration.objects.filter(
+            project=sector.project, sector__isnull=True
+        ).first()
+    if not integration:
+        return None
+
+    connection = integration.connection or {}
+    return parse_channel_uuid(
+        connection.get("channelUuid") or connection.get("channel_uuid")
+    )
+
+
+class SetRoomCopilotChannelUseCase:
+    def execute(self, room_pk: str) -> None:
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(pk=room_pk)
+            .first()
+        )
+        if not room:
+            return
+
+        channel_uuid = get_copilot_channel_uuid(room)
+        if not channel_uuid:
+            return
+
+        Room.objects.filter(pk=room.pk).update(channel_uuid=channel_uuid)
