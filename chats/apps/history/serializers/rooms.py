@@ -1,4 +1,5 @@
 from typing import Optional
+
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
@@ -64,6 +65,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         model = Room
         fields = [
             "uuid",
+            "channel_uuid",
             "created_on",
             "ended_at",
             "user",
@@ -121,6 +123,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
         model = Room
         fields = [
             "uuid",
+            "channel_uuid",
             "custom_fields",
             "urn",
             "created_on",

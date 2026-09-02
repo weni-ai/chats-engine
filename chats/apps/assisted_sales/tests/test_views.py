@@ -13,7 +13,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 
 @override_settings(
     CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
     WENI_WEBCHAT_HOST="https://flows.weni.ai",
     WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
 )
@@ -119,7 +119,7 @@ class CopilotProjectCreateViewTests(APITestCase):
 
 @override_settings(
     CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
-    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+    NEXUS_API_URL="https://nexus.example.com",
 )
 class CopilotProjectUpdateViewTests(APITestCase):
     def setUp(self):
@@ -350,3 +350,85 @@ class CopilotExistingProjectsViewTests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(CONNECT_API_URL="https://connect.example.com")
+class CopilotCreatePermissionViewTests(APITestCase):
+    def setUp(self):
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.url = f"/v1/project/copilot/can_create/{self.project.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _authorization(self, role):
+        return {
+            "user": self.user.email,
+            "project_authorization": role,
+            "available_roles": {
+                "0": "not set",
+                "1": "viewer",
+                "2": "contributor",
+                "3": "moderator",
+                "4": "support",
+                "5": "Chat user",
+                "6": "marketing",
+            },
+        }
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_true_when_user_is_moderator(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_project_authorization.return_value = self._authorization(3)
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": True})
+        mock_client.get_project_authorization.assert_called_once_with(
+            str(self.project.uuid), self.user.email
+        )
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_false_when_user_is_not_moderator(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_project_authorization.return_value = self._authorization(2)
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": False})
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_forbidden_without_permission(self, mock_client_cls):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_client_cls.return_value.get_project_authorization.assert_not_called()
+
+    def test_returns_not_found_for_unknown_project(self):
+        response = self.client.get(f"/v1/project/copilot/can_create/{uuid4()}")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_connect_error(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_project_authorization.side_effect = CopilotConnectError(
+            status_code=502, error="Connect unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Connect unavailable")

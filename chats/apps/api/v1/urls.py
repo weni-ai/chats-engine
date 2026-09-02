@@ -22,13 +22,6 @@ from chats.apps.api.v1.dashboard.viewsets import (
     ReportFieldsValidatorViewSet,
 )
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
-from chats.apps.assisted_sales.views import (
-    CopilotExistingProjectsView,
-    CopilotLinkedProjectView,
-    CopilotProjectCreateView,
-    CopilotProjectRemoveView,
-    CopilotProjectUpdateView,
-)
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.rooms.viewsets import (
@@ -38,6 +31,14 @@ from chats.apps.api.v1.rooms.viewsets import (
     RoomsReportViewSet,
 )
 from chats.apps.api.v1.routers import router
+from chats.apps.assisted_sales.views import (
+    CopilotCreatePermissionView,
+    CopilotExistingProjectsView,
+    CopilotLinkedProjectView,
+    CopilotProjectCreateView,
+    CopilotProjectRemoveView,
+    CopilotProjectUpdateView,
+)
 
 urlpatterns = [
     path(
@@ -108,6 +109,11 @@ urlpatterns = [
         "project/copilot/create",
         CopilotProjectCreateView.as_view(),
         name="copilot_project_create",
+    ),
+    path(
+        "project/copilot/can_create/<uuid:project_uuid>",
+        CopilotCreatePermissionView.as_view(),
+        name="copilot_create_permission",
     ),
     path(
         "project/copilot/update/<uuid:uuid>",

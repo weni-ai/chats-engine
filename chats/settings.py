@@ -436,9 +436,6 @@ CONNECT_COPILOT_CREATE_URL = env.str("CONNECT_COPILOT_CREATE_URL", default="")
 CONNECT_COPILOT_UPDATE_URL = env.str("CONNECT_COPILOT_UPDATE_URL", default="")
 CONNECT_COPILOT_REMOVE_URL = env.str("CONNECT_COPILOT_REMOVE_URL", default="")
 CONNECT_COPILOT_LIST_URL = env.str("CONNECT_COPILOT_LIST_URL", default="")
-CONNECT_COPILOT_AGENTS_COUNT_URL = env.str(
-    "CONNECT_COPILOT_AGENTS_COUNT_URL", default=""
-)
 WENI_WEBCHAT_HOST = env.str("WENI_WEBCHAT_HOST", default="https://flows.weni.ai")
 WENI_WEBCHAT_SOCKET_URL = env.str(
     "WENI_WEBCHAT_SOCKET_URL", default="wss://websocket.weni.ai"
@@ -663,9 +660,7 @@ METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
     "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
 )
 # Base URL of the Weni dashboard used as the CTA link in risk alert emails.
-WENI_DASHBOARD_URL = env.str(
-    "WENI_DASHBOARD_URL", default="https://dash.weni.ai"
-)
+WENI_DASHBOARD_URL = env.str("WENI_DASHBOARD_URL", default="https://dash.weni.ai")
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)

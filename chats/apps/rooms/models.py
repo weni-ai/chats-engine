@@ -195,6 +195,15 @@ class Room(BaseModel, BaseConfigurableModel):
             "(e.g. inactivity timeout) rather than by a human agent."
         ),
     )
+    channel_uuid = models.UUIDField(
+        _("WWC channel UUID"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Weni Web Chat channel UUID used in the room, snapshotted from "
+            "the copilot integration on close."
+        ),
+    )
 
     tracker = FieldTracker(fields=["user_id", "queue_id", "is_active"])
 
@@ -541,6 +550,9 @@ class Room(BaseModel, BaseConfigurableModel):
             self.clear_pins()
 
             self.save()
+            from chats.apps.assisted_sales.tasks import enqueue_set_room_copilot_channel
+
+            enqueue_set_room_copilot_channel(str(self.pk))
 
         # Notify the in-service tracker now that the room is inactive in the
         # database, so the agent leaves "In-Service" if this was their last

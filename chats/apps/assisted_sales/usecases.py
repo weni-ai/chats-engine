@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from chats.apps.assisted_sales.exceptions import (
 )
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
@@ -100,10 +102,13 @@ class UpdateCopilotIntegrationUseCase:
                 error="New copilot uuid is the same as the current one",
             )
 
-        connect_data = self.client.switch_copilot_project(
-            old_copilot_uuid=str(integration.copilot_project_uuid),
-            new_copilot_uuid=str(new_uuid),
-        ) or {}
+        connect_data = (
+            self.client.switch_copilot_project(
+                old_copilot_uuid=str(integration.copilot_project_uuid),
+                new_copilot_uuid=str(new_uuid),
+            )
+            or {}
+        )
 
         copilot_uuid = new_uuid
         if connect_data.get("uuid") or connect_data.get("project_uuid"):
@@ -159,6 +164,37 @@ class GetLinkedCopilotUseCase:
         return integration
 
 
+CONNECT_MODERATOR_ROLE_LABEL = "moderator"
+
+
+def user_can_create_copilot(authorization_data: dict) -> bool:
+    available_roles = authorization_data.get("available_roles") or {}
+    moderator_role = None
+    for key, label in available_roles.items():
+        if str(label).strip().lower() == CONNECT_MODERATOR_ROLE_LABEL:
+            try:
+                moderator_role = int(key)
+            except (TypeError, ValueError):
+                return False
+            break
+    if moderator_role is None:
+        return False
+    try:
+        current_role = int(authorization_data.get("project_authorization"))
+    except (TypeError, ValueError):
+        return False
+    return current_role == moderator_role
+
+
+class CheckCopilotCreatePermissionUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, project_uuid: str, user_email: str) -> bool:
+        data = self.client.get_project_authorization(project_uuid, user_email)
+        return user_can_create_copilot(data)
+
+
 class ListExistingCopilotsUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
@@ -197,3 +233,48 @@ class ListExistingCopilotsUseCase:
             "uuid": copilot_uuid,
             "project_uuid": copilot_uuid,
         }
+
+
+def parse_channel_uuid(raw) -> Optional[UUID]:
+    if not raw:
+        return None
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def get_copilot_channel_uuid(room: Room) -> Optional[UUID]:
+    if not room.queue_id:
+        return None
+
+    sector = room.queue.sector
+    integration = CopilotIntegration.objects.filter(sector=sector).first()
+    if not integration:
+        integration = CopilotIntegration.objects.filter(
+            project=sector.project, sector__isnull=True
+        ).first()
+    if not integration:
+        return None
+
+    connection = integration.connection or {}
+    return parse_channel_uuid(
+        connection.get("channelUuid") or connection.get("channel_uuid")
+    )
+
+
+class SetRoomCopilotChannelUseCase:
+    def execute(self, room_pk: str) -> None:
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(pk=room_pk)
+            .first()
+        )
+        if not room:
+            return
+
+        channel_uuid = get_copilot_channel_uuid(room)
+        if not channel_uuid:
+            return
+
+        Room.objects.filter(pk=room.pk).update(channel_uuid=channel_uuid)

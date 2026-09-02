@@ -17,6 +17,7 @@ from chats.apps.assisted_sales.serializers import (
     UpdateCopilotIntegrationSerializer,
 )
 from chats.apps.assisted_sales.usecases import (
+    CheckCopilotCreatePermissionUseCase,
     CreateCopilotIntegrationUseCase,
     GetLinkedCopilotUseCase,
     ListExistingCopilotsUseCase,
@@ -223,6 +224,42 @@ class CopilotLinkedProjectView(APIView):
             CopilotLinkedProjectSerializer(integration).data,
             status=status.HTTP_200_OK,
         )
+
+
+class CopilotCreatePermissionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_uuid):
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            can_create = CheckCopilotCreatePermissionUseCase().execute(
+                project_uuid=str(project.uuid),
+                user_email=request.user.email,
+            )
+        except CopilotConnectError as exc:
+            return Response(
+                {"status_code": exc.status_code, "error": exc.error},
+                status=exc.status_code
+                if 400 <= exc.status_code < 600
+                else status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({"can_create": can_create}, status=status.HTTP_200_OK)
 
 
 class CopilotExistingProjectsView(APIView):
