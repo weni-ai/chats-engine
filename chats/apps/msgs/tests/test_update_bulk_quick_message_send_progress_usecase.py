@@ -178,3 +178,33 @@ class UpdateBulkQuickMessageSendProgressUseCaseTests(TestCase):
         self.bulk_send.refresh_from_db()
         self.assertEqual(self.bulk_send.status, BulkQuickMessageSendStatus.PROCESSING)
         mock_send.assert_called_once()
+
+    @patch(
+        "chats.apps.msgs.usecases.update_bulk_quick_message_send_progress.send_channels_group"
+    )
+    def test_send_without_matching_rooms_finishes_at_100_percent(self, mock_send):
+        self.bulk_send.rooms_qty = 0
+        self.bulk_send.save(update_fields=["rooms_qty"])
+
+        content = self.usecase.execute(self.bulk_send.uuid)
+
+        self.assertEqual(content["percentage"], 100.0)
+        self.assertEqual(content["success_total"], 0)
+        self.assertEqual(content["failed_total"], 0)
+        self.assertEqual(content["total_to_send"], 0)
+
+        self.bulk_send.refresh_from_db()
+        self.assertEqual(self.bulk_send.status, BulkQuickMessageSendStatus.FINISHED)
+
+        mock_send.assert_called_once_with(
+            group_name=f"permission_{self.permission.pk}",
+            call_type="notify",
+            action="bulk_quick_message_send_progress",
+            content={
+                "uuid": str(self.bulk_send.uuid),
+                "percentage": 100.0,
+                "success_total": 0,
+                "failed_total": 0,
+                "total_to_send": 0,
+            },
+        )
