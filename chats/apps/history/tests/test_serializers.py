@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -122,6 +124,39 @@ class TestRoomHistorySerializerClosedBy(TestCase):
 
         data = RoomHistorySerializer(room).data
         self.assertIsNone(data["closed_by"])
+
+    def test_history_serializer_includes_channel_uuid(self):
+        channel_uuid = uuid4()
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, channel_uuid=channel_uuid
+        )
+        room.is_active = False
+        room.ended_at = timezone.now()
+        room.save()
+
+        data = RoomHistorySerializer(room).data
+        self.assertEqual(str(data["channel_uuid"]), str(channel_uuid))
+
+    def test_history_serializer_returns_null_channel_uuid(self):
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.is_active = False
+        room.ended_at = timezone.now()
+        room.save()
+
+        data = RoomHistorySerializer(room).data
+        self.assertIsNone(data["channel_uuid"])
+
+    def test_detail_serializer_includes_channel_uuid(self):
+        channel_uuid = uuid4()
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, channel_uuid=channel_uuid
+        )
+        room.is_active = False
+        room.ended_at = timezone.now()
+        room.save()
+
+        data = RoomDetailSerializer(room).data
+        self.assertEqual(str(data["channel_uuid"]), str(channel_uuid))
 
 
 class TestRoomDetailSerializerCsat(TestCase):
