@@ -100,10 +100,13 @@ class UpdateCopilotIntegrationUseCase:
                 error="New copilot uuid is the same as the current one",
             )
 
-        connect_data = self.client.switch_copilot_project(
-            old_copilot_uuid=str(integration.copilot_project_uuid),
-            new_copilot_uuid=str(new_uuid),
-        ) or {}
+        connect_data = (
+            self.client.switch_copilot_project(
+                old_copilot_uuid=str(integration.copilot_project_uuid),
+                new_copilot_uuid=str(new_uuid),
+            )
+            or {}
+        )
 
         copilot_uuid = new_uuid
         if connect_data.get("uuid") or connect_data.get("project_uuid"):
@@ -157,6 +160,37 @@ class GetLinkedCopilotUseCase:
             integration.assigned_agents = assigned_agents
             integration.save(update_fields=["assigned_agents", "modified_on"])
         return integration
+
+
+CONNECT_MODERATOR_ROLE_LABEL = "moderator"
+
+
+def user_can_create_copilot(authorization_data: dict) -> bool:
+    available_roles = authorization_data.get("available_roles") or {}
+    moderator_role = None
+    for key, label in available_roles.items():
+        if str(label).strip().lower() == CONNECT_MODERATOR_ROLE_LABEL:
+            try:
+                moderator_role = int(key)
+            except (TypeError, ValueError):
+                return False
+            break
+    if moderator_role is None:
+        return False
+    try:
+        current_role = int(authorization_data.get("project_authorization"))
+    except (TypeError, ValueError):
+        return False
+    return current_role == moderator_role
+
+
+class CheckCopilotCreatePermissionUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, project_uuid: str, user_email: str) -> bool:
+        data = self.client.get_project_authorization(project_uuid, user_email)
+        return user_can_create_copilot(data)
 
 
 class ListExistingCopilotsUseCase:
