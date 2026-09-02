@@ -131,7 +131,7 @@ class CopilotConnectClientTests(TestCase):
         )
 
         mock_get.assert_called_once_with(
-            url="https://connect.example.com/projects/project-uuid/authorization",
+            url="https://connect.example.com/v2/projects/project-uuid/authorization",
             headers=self.client_rest.headers,
             params={"user": "member@example.com"},
             timeout=15,
