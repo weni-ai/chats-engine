@@ -136,7 +136,7 @@ class CopilotConnectClient(InternalAuthentication):
                 error="Connect API URL is not configured",
             )
 
-        url = f"{base_url}/projects/{project_uuid}/authorization"
+        url = f"{base_url}/v2/projects/{project_uuid}/authorization"
         try:
             response = requests.get(
                 url=url,
