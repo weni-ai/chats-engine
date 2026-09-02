@@ -3,16 +3,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import (
-    BooleanField,
-    Case,
-    Count,
-    DateTimeField,
-    OuterRef,
-    Q,
-    Subquery,
-    When,
-)
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.timezone import make_aware
@@ -205,83 +196,17 @@ class RoomViewset(
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
-        project_instance = None
-        use_pins_optimization = False
+        project_instance = Project.objects.filter(uuid=project).first()
+        if project_instance and is_feature_active(
+            settings.WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY,
+            request.user.email,
+            str(project_instance.uuid),
+        ):
+            self.disable_has_history = True
 
-        if project:
-            project_instance = Project.objects.filter(uuid=project).first()
-            if project_instance:
-                use_pins_optimization = is_feature_active(
-                    settings.WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY,
-                    request.user.email,
-                    str(project_instance.uuid),
-                )
-                if is_feature_active(
-                    settings.WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY,
-                    request.user.email,
-                    str(project_instance.uuid),
-                ):
-                    self.disable_has_history = True
+        return self._list_with_pin_order(qs, request, project)
 
-        if use_pins_optimization:
-            return self._list_with_optimized_pin_order(qs, request, project)
-
-        return self._list_with_legacy_pin_order(qs, request, project)
-
-    def _list_with_legacy_pin_order(self, qs, request, project):
-        pins_query = {
-            "project": project,
-        }
-
-        if user_email := request.query_params.get("email"):
-            pins_query["user__email"] = user_email
-        else:
-            pins_query["user"] = request.user
-
-        pins = RoomPin.objects.filter(**pins_query)
-
-        pinned_rooms = Room.objects.filter(
-            pk__in=pins.values_list("room__pk", flat=True)
-        )
-
-        filtered_qs = self.filter_queryset(qs)
-        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
-            pinned_rooms.values_list("pk", flat=True)
-        )
-
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pin_created_on_subquery = (
-            RoomPin.objects.filter(
-                user=request.user,
-                room=OuterRef("pk"),
-                project=project,
-            )
-            .order_by("-created_on")
-            .values("created_on")[:1]
-        )
-
-        annotated_qs = qs.filter(pk__in=room_ids).annotate(
-            is_pinned=Case(
-                When(pk__in=pinned_rooms, then=True),
-                default=False,
-                output_field=BooleanField(),
-            ),
-            pin_created_on=Subquery(
-                pin_created_on_subquery, output_field=DateTimeField()
-            ),
-        )
-
-        if secondary_sort:
-            annotated_qs = annotated_qs.order_by(
-                "-is_pinned", "-pin_created_on", *secondary_sort
-            )
-        else:
-            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
-
-        return self._get_paginated_response(annotated_qs)
-
-    def _list_with_optimized_pin_order(self, qs, request, project):
+    def _list_with_pin_order(self, qs, request, project):
         user = request.user
 
         if user_email := request.query_params.get("email"):
@@ -301,28 +226,55 @@ class RoomViewset(
         )
 
         filtered_qs = self.filter_queryset(qs)
+        unpinned_qs = (
+            filtered_qs.exclude(pk__in=pinned_ids) if pinned_ids else filtered_qs
+        )
 
-        if not pinned_ids:
-            return self._get_paginated_response(filtered_qs)
-
-        main_qs = filtered_qs.exclude(pk__in=pinned_ids)
         self._pinned_ids_context = set(pinned_ids)
 
-        response = self._get_paginated_response(main_qs)
+        pin_count = len(pinned_ids)
+        combined_count = pin_count + unpinned_qs.count()
 
-        include_pinned = request.query_params.get("include_pinned", "true")
-        if include_pinned.lower() == "true":
+        paginator = self.paginator
+        configured = paginator.configure(request, combined_count)
+        if configured is None:
             pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
             pinned_rooms = sorted(
                 qs.filter(pk__in=pinned_ids),
-                key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
+                key=lambda r: pin_order.get(r.pk, pin_count),
             )
-            serializer = self.get_serializer(pinned_rooms, many=True)
-            response.data["pinned_rooms"] = serializer.data
-        else:
-            response.data["pinned_rooms"] = []
+            serializer = self.get_serializer(unpinned_qs, many=True)
+            pinned_serializer = self.get_serializer(pinned_rooms, many=True)
+            return Response(
+                {
+                    "pinned_rooms": pinned_serializer.data,
+                    "results": serializer.data,
+                }
+            )
 
-        return response
+        limit, offset = configured
+        page_pin_ids = pinned_ids[offset : offset + limit]
+        remaining = limit - len(page_pin_ids)
+        unpinned_offset = max(0, offset - pin_count)
+        unpinned_page = (
+            list(unpinned_qs[unpinned_offset : unpinned_offset + remaining])
+            if remaining > 0
+            else []
+        )
+
+        pinned_data = []
+        if page_pin_ids:
+            pin_order = {rid: idx for idx, rid in enumerate(page_pin_ids)}
+            pinned_rooms = sorted(
+                qs.filter(pk__in=page_pin_ids),
+                key=lambda r: pin_order.get(r.pk, len(page_pin_ids)),
+            )
+            pinned_data = self.get_serializer(pinned_rooms, many=True).data
+
+        results_data = self.get_serializer(unpinned_page, many=True).data
+        return paginator.get_paginated_response(
+            results_data, pinned_rooms=pinned_data
+        )
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)

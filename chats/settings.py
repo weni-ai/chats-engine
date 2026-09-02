@@ -836,10 +836,6 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
 )
 
 # Keys
-WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
-    "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
-    default="weniChatsPinRoomsOptimization",
-)
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
