@@ -151,3 +151,49 @@ class RoomInternalListSerializerV2Tests(TestCase):
         )
         data = self._serialize(room)
         self.assertTrue(data["agent"]["is_deleted"])
+
+
+CHANNEL_NAME_CASES = (
+    ("instagram:user123", "instagram"),
+    ("facebook:page456", "facebook"),
+    ("whatsapp:5511999999999", "whatsapp"),
+    ("teams:thread-id", "teams"),
+    ("msteams:thread-id", "teams"),
+    ("email:ada@example.com", "email"),
+    ("mailto:ada@example.com", "email"),
+    ("ext:shopping-id", "shopping_assistant"),
+    ("shopping_assistant:cart-id", "shopping_assistant"),
+    ("telegram:999", "others"),
+    ("", "others"),
+)
+
+
+class RoomInternalListSerializerV2ChannelNameTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.project = Project.objects.create(
+            name="Channel Name V2 Project",
+            timezone=str(django_timezone.get_current_timezone()),
+        )
+        cls.sector = Sector.objects.create(
+            name="Alpha Sector",
+            project=cls.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        cls.queue = Queue.objects.create(name="Alpha Queue", sector=cls.sector)
+        cls.contact = Contact.objects.create(name="Client", email="client@test.com")
+
+    def test_channel_name_from_urn_schemes(self):
+        for urn, expected in CHANNEL_NAME_CASES:
+            with self.subTest(urn=urn):
+                contact = Contact.objects.create(name=f"Client {urn or 'empty'}")
+                room = Room.objects.create(
+                    contact=contact,
+                    queue=self.queue,
+                    user=None,
+                    urn=urn,
+                )
+                data = RoomInternalListSerializerV2(room).data
+                self.assertEqual(data["channel_name"], expected)

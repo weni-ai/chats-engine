@@ -1,11 +1,13 @@
 from typing import Optional
+
 from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.csat.models import CSATSurvey
-from chats.apps.rooms.models import Room
 from chats.apps.dashboard.models import MetricGoal, RoomMetrics
+from chats.apps.rooms.channel_filters import channel_name_from_urn
+from chats.apps.rooms.models import Room
 
 # Maps each MetricGoal metric to the serializer method used to compute the
 # equivalent per-room value, so `goals_metrics` can reuse the exact same
@@ -23,7 +25,9 @@ _GOAL_METRIC_TO_OUTPUT_KEY = {
 class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     agent = serializers.SerializerMethodField()
-    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
+    user_email = serializers.EmailField(
+        source="user.email", default=None, read_only=True
+    )
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.CharField(source="queue.sector.name")
     queue = serializers.CharField(source="queue.name")
@@ -35,6 +39,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     csat_rating = serializers.SerializerMethodField()
     pending_response = serializers.BooleanField(read_only=True, default=False)
     goals_metrics = serializers.SerializerMethodField()
+    channel_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -44,6 +49,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "user_email",
             "contact",
             "urn",
+            "channel_name",
             "is_active",
             "ended_at",
             "sector",
@@ -65,6 +71,9 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         if not self.context.get("include_pending_response", False):
             self.fields.pop("pending_response", None)
+
+    def get_channel_name(self, obj) -> str:
+        return channel_name_from_urn(getattr(obj, "urn", None))
 
     def get_contact(self, obj) -> str:
         try:
