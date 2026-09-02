@@ -209,7 +209,7 @@ class RoomViewset(
     @staticmethod
     def _compute_page_slices(pinned_ids, offset, limit):
         pin_count = len(pinned_ids)
-        page_pin_ids = pinned_ids[offset : offset + limit]
+        page_pin_ids = pinned_ids[offset:offset + limit]
         remaining = limit - len(page_pin_ids)
         unpinned_offset = max(0, offset - pin_count)
         return page_pin_ids, remaining, unpinned_offset
