@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
-from rest_framework.test import APITestCase
 from rest_framework import status
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.accounts.tests.decorators import with_internal_auth
@@ -184,7 +184,9 @@ class RoomFilterTestCase(TestCase):
             project_uuid=str(self.project.uuid),
             urn="whatsapp:558492126050",
         )
-        self.assertNotIn(room, self._filter_contact("992126050", ninth_digit_enabled=False))
+        self.assertNotIn(
+            room, self._filter_contact("992126050", ninth_digit_enabled=False)
+        )
 
     def test_filter_contact_no_matches(self):
         """
@@ -197,6 +199,45 @@ class RoomFilterTestCase(TestCase):
         filtered_queryset = room_filter.qs
 
         self.assertEqual(filtered_queryset.count(), 0)
+
+    def test_filter_channels_whatsapp(self):
+        instagram_room = Room.objects.create(
+            contact=Contact.objects.create(name="IG"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="instagram:user",
+        )
+        room_filter = RoomFilter(
+            data={"channels": "whatsapp", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        qs = room_filter.qs
+        self.assertIn(self.room_angela, qs)
+        self.assertNotIn(instagram_room, qs)
+
+    def test_filter_channels_others(self):
+        telegram_room = Room.objects.create(
+            contact=Contact.objects.create(name="TG"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="telegram:1",
+        )
+        room_filter = RoomFilter(
+            data={"channels": "others", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        qs = list(room_filter.qs)
+        self.assertIn(telegram_room, qs)
+        self.assertNotIn(self.room_angela, qs)
+
+    def test_urn_contact_search_is_unchanged_when_channels_absent(self):
+        room_filter = RoomFilter(
+            data={"urn": "5511999999991", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        self.assertIn(self.room_angela, room_filter.qs)
 
 
 class InternalRoomsViewSetFilterTestCase(APITestCase):

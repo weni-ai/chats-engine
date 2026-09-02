@@ -52,6 +52,7 @@ class ExternalFinishedRoomsStatusViewSet(viewsets.GenericViewSet):
           queue       UUID        Filter by queue (comma-separated).
           tag         UUID        Filter by tag (comma-separated).
           agent       email       Filter by agent email.
+          channels    enum        Filter by room URN scheme (comma-separated).
         """
         project = self.get_object()
 

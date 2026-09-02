@@ -20,6 +20,7 @@ from chats.apps.api.v1.dashboard.metric_goals.constants import (
     threshold_seconds_to_unit_value,
 )
 from chats.apps.dashboard.models import MetricGoal
+from chats.apps.rooms.channel_filters import merge_channels_q
 from chats.apps.rooms.models import Room
 
 
@@ -40,7 +41,7 @@ def _apply_filters_to_q(base_filter: Q, filters: Optional[Filters]) -> Q:
         base_filter &= Q(queue__uuid__in=filters.queue)
     if filters.agent:
         base_filter &= Q(user=filters.agent)
-    return base_filter
+    return merge_channels_q(base_filter, filters.channels)
 
 
 class MetricGoalBreachService:
@@ -65,9 +66,7 @@ class MetricGoalBreachService:
     `chats.apps.dashboard.services.metric_goal_alerts.Violation.meets_rooms_threshold`).
     """
 
-    def get_goals_payload(
-        self, project, filters: Optional[Filters] = None
-    ) -> dict:
+    def get_goals_payload(self, project, filters: Optional[Filters] = None) -> dict:
         """Returns `{metric}_goal` entries keyed by metric name."""
         goals = MetricGoal.objects.filter(
             project=project,
@@ -79,9 +78,7 @@ class MetricGoalBreachService:
             for goal in goals
         }
 
-    def _build_goal_entry(
-        self, goal: MetricGoal, filters: Optional[Filters]
-    ) -> dict:
+    def _build_goal_entry(self, goal: MetricGoal, filters: Optional[Filters]) -> dict:
         breached_count = self._count_breached_rooms(goal, filters)
         return {
             "threshold_seconds": goal.threshold_seconds,
@@ -107,9 +104,7 @@ class MetricGoalBreachService:
     def _count_waiting_time_breaches(
         self, goal: MetricGoal, filters: Optional[Filters]
     ) -> int:
-        threshold_cutoff = timezone.now() - timedelta(
-            seconds=goal.threshold_seconds
-        )
+        threshold_cutoff = timezone.now() - timedelta(seconds=goal.threshold_seconds)
         base_filter = Q(
             queue__sector__project=goal.project,
             is_active=True,
@@ -123,30 +118,29 @@ class MetricGoalBreachService:
     def _count_first_response_time_breaches(
         self, goal: MetricGoal, filters: Optional[Filters]
     ) -> int:
-        threshold_cutoff = timezone.now() - timedelta(
-            seconds=goal.threshold_seconds
-        )
+        threshold_cutoff = timezone.now() - timedelta(seconds=goal.threshold_seconds)
         no_response_yet = (
             Q(metric__isnull=True)
             | Q(metric__first_response_time=0)
             | Q(metric__first_response_time__isnull=True)
         )
-        base_filter = Q(
-            queue__sector__project=goal.project,
-            is_active=True,
-            user__isnull=False,
-            first_user_assigned_at__isnull=False,
-            first_user_assigned_at__lte=threshold_cutoff,
-        ) & no_response_yet
+        base_filter = (
+            Q(
+                queue__sector__project=goal.project,
+                is_active=True,
+                user__isnull=False,
+                first_user_assigned_at__isnull=False,
+                first_user_assigned_at__lte=threshold_cutoff,
+            )
+            & no_response_yet
+        )
         base_filter = _apply_filters_to_q(base_filter, filters)
         return Room.objects.filter(base_filter).count()
 
     def _count_conversation_duration_breaches(
         self, goal: MetricGoal, filters: Optional[Filters]
     ) -> int:
-        threshold_cutoff = timezone.now() - timedelta(
-            seconds=goal.threshold_seconds
-        )
+        threshold_cutoff = timezone.now() - timedelta(seconds=goal.threshold_seconds)
         base_filter = Q(
             queue__sector__project=goal.project,
             is_active=True,
