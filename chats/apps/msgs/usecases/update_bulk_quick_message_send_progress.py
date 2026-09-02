@@ -51,19 +51,24 @@ class UpdateBulkQuickMessageSendProgressUseCase:
         failed_total = stats["failed_total"] or 0
         processed = success_total + failed_total
         total_to_send = bulk_send.rooms_qty or 0
+        # A null rooms_qty means the room count has not been computed yet,
+        # while zero means no room matched and the send is already complete.
+        is_empty_send = bulk_send.rooms_qty == 0
 
         if total_to_send > 0:
             percentage = round(
                 (processed / total_to_send) * PERCENTAGE_MULTIPLIER, 2
             )
+        elif is_empty_send:
+            percentage = float(PERCENTAGE_MULTIPLIER)
         else:
             percentage = 0.0
 
-        if (
-            total_to_send > 0
-            and processed >= total_to_send
-            and bulk_send.status != BulkQuickMessageSendStatus.FINISHED
-        ):
+        is_complete = is_empty_send or (
+            total_to_send > 0 and processed >= total_to_send
+        )
+
+        if is_complete and bulk_send.status != BulkQuickMessageSendStatus.FINISHED:
             bulk_send.status = BulkQuickMessageSendStatus.FINISHED
             bulk_send.save(update_fields=["status", "modified_on"])
             logger.info(

@@ -86,9 +86,12 @@ class ProcessBulkQuickMessageSendTaskTests(TestCase):
         mock_delay.assert_any_call(self.bulk_send.uuid, self.room_one.uuid)
         mock_delay.assert_any_call(self.bulk_send.uuid, self.room_two.uuid)
 
+    @patch("chats.apps.msgs.tasks.update_bulk_quick_message_send_progress.delay")
     @patch("chats.apps.msgs.tasks.send_bulk_quick_message_to_room.delay")
     @patch("chats.apps.msgs.tasks.get_bulk_quick_message_send_rooms_usecase")
-    def test_does_not_dispatch_when_no_rooms(self, mock_usecase, mock_delay):
+    def test_does_not_dispatch_when_no_rooms(
+        self, mock_usecase, mock_delay, mock_progress_delay
+    ):
         mock_queryset = MagicMock()
         mock_queryset.count.return_value = 0
         mock_queryset.values_list.return_value = []
@@ -100,6 +103,7 @@ class ProcessBulkQuickMessageSendTaskTests(TestCase):
         self.assertEqual(self.bulk_send.status, BulkQuickMessageSendStatus.PROCESSING)
         self.assertEqual(self.bulk_send.rooms_qty, 0)
         mock_delay.assert_not_called()
+        mock_progress_delay.assert_called_once_with(self.bulk_send.uuid)
 
 
 class SendBulkQuickMessageToRoomTaskTests(TestCase):
