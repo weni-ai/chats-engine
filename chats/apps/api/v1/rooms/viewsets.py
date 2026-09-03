@@ -84,7 +84,6 @@ from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
 )
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
-from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
@@ -99,6 +98,7 @@ from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
 from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_room_export, generate_rooms_report
+from chats.apps.rooms.usecases.create_room_note import CreateRoomNoteUseCase
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
@@ -1349,26 +1349,10 @@ class RoomViewset(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create a blank message to attach the internal note
-        msg = Message.objects.create(
-            room=room,
-            user=request.user,
-            contact=None,
-            text="",
+        note = CreateRoomNoteUseCase().execute(
+            room, request.user, serializer.validated_data["text"]
         )
 
-        # Create the note attached to the message
-        note = RoomNote.objects.create(
-            room=room,
-            user=request.user,
-            text=serializer.validated_data["text"],
-            message=msg,
-        )
-
-        # Notify message creation for clients listening to messages
-        msg.notify_room("create", True)
-
-        # Return serialized note
         return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
     @action(
@@ -1632,13 +1616,14 @@ class RoomNoteMediaViewset(
             serializer.save()
             instance = serializer.instance
             note = instance.note
+            message = note.message
 
             # Re-notify the related message so clients receive the note with
             # its updated medias.
-            if note.message:
-                note.message.notify_room("update", True)
+            if message:
+                transaction.on_commit(lambda: message.notify_room("update", True))
             else:
-                note.notify_websocket("create")
+                transaction.on_commit(lambda: note.notify_websocket("create"))
 
 
 class RoomsCountView(APIView):

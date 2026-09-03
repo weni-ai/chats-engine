@@ -1,3 +1,26 @@
+# 3.77.0
+# Add
+  - Media messages with accompanying text
+# Fix
+  - File type detection after media conversion
+
+# 3.76.0
+# Add
+  - Internal endpoint for closed room message history
+
+# 3.75.1
+# Remove
+  - Media messages with accompanying text (reverted)
+
+# 3.75.0
+# Add
+  - Media messages with accompanying text
+  - Last message metadata on rooms for bulk send
+
+# 3.74.0
+# Add
+  - Bulk send of quick messages with async delivery, progress tracking, and HTTP endpoint
+
 # 3.73.6
 # Add
   - Message field to BulkSendHistorySerializer and update related test case
