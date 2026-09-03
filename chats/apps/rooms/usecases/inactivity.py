@@ -31,6 +31,18 @@ logger = logging.getLogger(__name__)
 INACTIVITY_END_BY = "inactivity"
 
 
+def _room_can_receive_message(room: "Room", user: Optional["User"]) -> bool:
+    """
+    Mirrors ``Message.save()``: closed rooms reject every write, and a
+    WhatsApp room outside the 24h window rejects writes attributed to a user.
+    """
+    if room.is_active is False:
+        return False
+    if user is not None and room.is_24h_valid is False:
+        return False
+    return True
+
+
 def _send_silent_automatic_message(
     room: "Room",
     text: str,
@@ -49,6 +61,14 @@ def _send_silent_automatic_message(
     or `inactive_close`) so the front can render a specific UI for each.
     """
     if not text:
+        return None
+
+    if not _room_can_receive_message(room, user):
+        logger.info(
+            "[INACTIVITY] Skipping silent automatic message for room %s: "
+            "room cannot receive messages",
+            room.pk,
+        )
         return None
 
     try:
@@ -258,14 +278,15 @@ class InactivityService:
     def _warn_room(self, room: "Room", config: dict) -> bool:
         text = config.get("message_timeout_text") or ""
 
-        message = _send_silent_automatic_message(
-            room,
-            text,
-            room.user,
-            message_type=AutomaticMessageType.INACTIVE_WARNING,
-        )
-        if message is None and text:
-            return False
+        if _room_can_receive_message(room, room.user):
+            message = _send_silent_automatic_message(
+                room,
+                text,
+                room.user,
+                message_type=AutomaticMessageType.INACTIVE_WARNING,
+            )
+            if message is None and text:
+                return False
 
         Room.objects.filter(pk=room.pk, is_inactive=False, is_active=True).update(
             is_inactive=True

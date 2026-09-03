@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -167,6 +167,28 @@ class InactivityWarnTests(TestCase):
         room.refresh_from_db()
         self.assertEqual(warned, 0)
         self.assertFalse(room.is_inactive)
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    def test_room_outside_24h_window_is_still_warned_without_message(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        room = self._create_eligible_room()
+
+        with patch.object(Room, "notify_inactivity"), patch(
+            "chats.apps.rooms.usecases.inactivity.capture_exception"
+        ) as mock_capture:
+            warned = InactivityService().warn_inactive_rooms()
+
+        room.refresh_from_db()
+        self.assertEqual(warned, 1)
+        self.assertTrue(room.is_inactive)
+        self.assertFalse(
+            Message.objects.filter(
+                room=room, text="Are you still there?", user=self.user
+            ).exists()
+        )
+        mock_capture.assert_not_called()
 
 
 class InactivityCloseTests(TestCase):
@@ -369,6 +391,42 @@ class InactivityCloseTests(TestCase):
         room.refresh_from_db()
         self.assertTrue(room.is_active)
 
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    def test_room_outside_24h_window_is_still_closed_without_human_message(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        room = self._create_already_warned_room(last_interaction_offset_seconds=700)
+
+        with self.settings(ACTIVATE_CALC_METRICS=False), patch.object(
+            Room, "notify_user"
+        ), patch.object(Room, "notify_queue"), patch.object(
+            Message, "notify_room"
+        ), patch(
+            "chats.apps.rooms.usecases.inactivity.capture_exception"
+        ) as mock_capture:
+            closed = InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        self.assertEqual(closed, 1)
+        self.assertFalse(room.is_active)
+        self.assertTrue(room.automatic_closed)
+        self.assertFalse(
+            Message.objects.filter(
+                room=room,
+                automatic_message__automatic_message_type=(
+                    AutomaticMessageType.INACTIVE_CLOSE
+                ),
+            ).exists()
+        )
+        self.assertTrue(
+            Message.objects.filter(
+                room=room,
+                text__contains='"action": "automatic_close"',
+            ).exists()
+        )
+        mock_capture.assert_not_called()
+
 
 class InactivityResetTests(TestCase):
     def setUp(self):
@@ -520,6 +578,54 @@ class SilentAutomaticMessageTests(TestCase):
             message.automatic_message_type,
             AutomaticMessageType.INACTIVE_WARNING,
         )
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    def test_returns_none_when_24h_window_expired_and_user_is_set(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.user = self.user
+        room.save()
+
+        with patch(
+            "chats.apps.rooms.usecases.inactivity.capture_exception"
+        ) as mock_capture:
+            result = _send_silent_automatic_message(room, "warn me", self.user)
+
+        self.assertIsNone(result)
+        self.assertFalse(Message.objects.filter(room=room).exists())
+        mock_capture.assert_not_called()
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    def test_creates_message_when_24h_window_expired_and_user_is_none(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.user = self.user
+        room.save()
+
+        with patch.object(Message, "notify_room"):
+            message = _send_silent_automatic_message(room, "warn me", user=None)
+
+        self.assertIsNotNone(message)
+        self.assertTrue(Message.objects.filter(pk=message.pk, user=None).exists())
+
+    def test_returns_none_when_room_is_closed(self):
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.user = self.user
+        room.is_active = False
+        room.save()
+
+        with patch(
+            "chats.apps.rooms.usecases.inactivity.capture_exception"
+        ) as mock_capture:
+            result = _send_silent_automatic_message(room, "warn me", self.user)
+
+        self.assertIsNone(result)
+        self.assertFalse(Message.objects.filter(room=room).exists())
+        mock_capture.assert_not_called()
 
 
 class RoomNotifyInactivityTests(TestCase):
