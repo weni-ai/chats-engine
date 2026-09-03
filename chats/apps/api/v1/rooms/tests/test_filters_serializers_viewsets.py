@@ -197,11 +197,14 @@ class RoomViewsetListTests(TestCase):
         response = self._list({"email": self.other_user.email, "limit": 10})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pinned = response.data["pinned_rooms"]
         results = response.data["results"]
-        self.assertGreaterEqual(len(results), 2)
 
-        self.assertEqual(results[0]["uuid"], str(pinned_room.uuid))
-        self.assertEqual(results[1]["uuid"], str(regular_room.uuid))
+        self.assertEqual(len(pinned), 1)
+        self.assertEqual(pinned[0]["uuid"], str(pinned_room.uuid))
+        self.assertTrue(pinned[0]["is_pinned"])
+        self.assertEqual(results[0]["uuid"], str(regular_room.uuid))
+        self.assertFalse(results[0]["is_pinned"])
 
     def test_list_handles_many_rooms_with_limited_queries(self):
         pinned_rooms = []
@@ -218,13 +221,14 @@ class RoomViewsetListTests(TestCase):
             response = self._list(params)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(len(response.data["results"]), 3)
-        # With the optimized pin version, query count should be much lower
-        # The key is filtering FIRST, then annotating only necessary rooms
-        # This prevents the O(N) annotation problem that caused production issues
+        pinned = response.data.get("pinned_rooms") or []
+        results = response.data["results"]
+        self.assertEqual(len(pinned), 3)
+        self.assertEqual(len(pinned) + len(results), 50)
+        # With the pin page-budget list, query count should stay bounded
         self.assertLessEqual(
             len(ctx), 50,
-            f"Query count too high: {len(ctx)}. The optimized version should stay under 50 queries."
+            f"Query count too high: {len(ctx)}. The pin list should stay under 50 queries."
         )
 
     def test_list_supports_common_filters(self):
@@ -249,10 +253,10 @@ class RoomViewsetListTests(TestCase):
             any(item["uuid"] == str(room_a.uuid) for item in search_response.data["results"])
         )
 
-    def test_optimized_pin_order_filters_before_annotating(self):
+    def test_pin_order_filters_before_serializing(self):
         """
-        Test that the optimized version filters BEFORE annotating,
-        which is critical for performance with large datasets.
+        Inactive pinned rooms must stay out of the ongoing list, and active
+        pins occupy pinned_rooms rather than results.
         """
         # Create rooms with different statuses
         active_pinned = self._create_room("ACTIVE-PINNED", is_active=True)
@@ -274,21 +278,18 @@ class RoomViewsetListTests(TestCase):
             response = self._list(params)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pinned = response.data.get("pinned_rooms") or []
         results = response.data["results"]
 
-        # Should include active pinned room first, then active regular
+        pinned_uuids = [r["uuid"] for r in pinned]
         result_uuids = [r["uuid"] for r in results]
-        self.assertIn(str(active_pinned.uuid), result_uuids)
+
+        self.assertEqual(pinned_uuids, [str(active_pinned.uuid)])
         self.assertIn(str(active_regular.uuid), result_uuids)
-
-        # Should NOT include inactive pinned room (filters applied correctly)
+        self.assertNotIn(str(active_pinned.uuid), result_uuids)
         self.assertNotIn(str(inactive_pinned.uuid), result_uuids)
+        self.assertNotIn(str(inactive_pinned.uuid), pinned_uuids)
 
-        # Pinned room should come first
-        if len(results) >= 2:
-            self.assertEqual(results[0]["uuid"], str(active_pinned.uuid))
-
-        # Query count should be reasonable even with filters
         self.assertLessEqual(
             len(ctx), 50,
             f"Too many queries with filters: {len(ctx)}"
