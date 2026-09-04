@@ -1,3 +1,19 @@
+# 3.79.1
+# Fix
+  - Inactivity automatic messages skipped for closed rooms and expired WhatsApp windows
+
+# 3.79.0
+# Add
+  - Unified pagination for pinned and unpinned rooms
+
+# 3.78.0
+# Add
+  - Channel filters and icons for rooms and dashboard
+# Fix
+  - Bulk quick message progress when no matching rooms are found
+# Refactor
+  - Internal notes creation with atomic transaction
+
 # 3.77.0
 # Add
   - Media messages with accompanying text
