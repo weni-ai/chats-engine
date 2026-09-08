@@ -12,6 +12,7 @@ from chats.apps.assisted_sales.tasks import (
 from chats.apps.assisted_sales.usecases import (
     CheckCopilotCreatePermissionUseCase,
     SetRoomCopilotChannelUseCase,
+    UpdateCopilotWwcChannelUseCase,
     user_can_create_copilot,
 )
 from chats.apps.contacts.models import Contact
@@ -216,3 +217,140 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.channel_uuid, self.channel_uuid)
+
+
+class UpdateCopilotWwcChannelUseCaseTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.channel_uuid = uuid4()
+
+    def _create_integration(self, *, sector=None, connection=None):
+        if connection is None:
+            connection = {
+                "socketUrl": "wss://websocket.weni.ai",
+                "channelUuid": "",
+                "host": "https://flows.weni.ai",
+                "connectOn": "mount",
+                "storage": "local",
+                "callbackUrl": "",
+            }
+        return CopilotIntegration.objects.create(
+            project=self.project,
+            sector=sector,
+            copilot_project_uuid=uuid4(),
+            name="copilot",
+            connection=connection,
+        )
+
+    def test_updates_project_integration_channel(self):
+        integration = self._create_integration()
+
+        UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], str(self.channel_uuid))
+        self.assertEqual(integration.connection["socketUrl"], "wss://websocket.weni.ai")
+        self.assertEqual(integration.connection["host"], "https://flows.weni.ai")
+        self.assertEqual(integration.connection["connectOn"], "mount")
+
+    def test_updates_sector_integration_only(self):
+        project_integration = self._create_integration()
+        sector_integration = self._create_integration(sector=self.sector)
+
+        UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+            sector_uuid=self.sector.uuid,
+        )
+
+        project_integration.refresh_from_db()
+        sector_integration.refresh_from_db()
+        self.assertEqual(project_integration.connection["channelUuid"], "")
+        self.assertEqual(
+            sector_integration.connection["channelUuid"], str(self.channel_uuid)
+        )
+
+    def test_does_not_update_sector_integration_without_sector_uuid(self):
+        sector_integration = self._create_integration(sector=self.sector)
+
+        UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        sector_integration.refresh_from_db()
+        self.assertEqual(sector_integration.connection["channelUuid"], "")
+
+    def test_does_nothing_without_integration(self):
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        self.assertIsNone(result)
+
+    def test_does_nothing_without_channel_uuid(self):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=None,
+            project_uuid=self.project.uuid,
+        )
+
+        self.assertIsNone(result)
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], "")
+
+    def test_does_nothing_without_project_uuid(self):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=None,
+        )
+
+        self.assertIsNone(result)
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], "")
+
+    def test_does_nothing_with_invalid_uuid(self):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid="not-a-uuid",
+            project_uuid=self.project.uuid,
+        )
+
+        self.assertIsNone(result)
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], "")
+
+    @override_settings(
+        WENI_WEBCHAT_HOST="https://flows.weni.ai",
+        WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
+    )
+    def test_builds_connection_when_empty(self):
+        integration = self._create_integration(connection={})
+
+        UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], str(self.channel_uuid))
+        self.assertEqual(integration.connection["socketUrl"], "wss://websocket.weni.ai")
+        self.assertEqual(integration.connection["host"], "https://flows.weni.ai")
+        self.assertEqual(integration.connection["connectOn"], "mount")
+        self.assertEqual(integration.connection["storage"], "local")
+        self.assertEqual(integration.connection["callbackUrl"], "")
