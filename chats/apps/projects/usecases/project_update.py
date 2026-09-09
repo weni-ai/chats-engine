@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+from django.db import transaction
+
+from chats.apps.sectors.utils import get_country_from_timezone
+
 from ..models import Project
 
 
@@ -19,12 +23,16 @@ class ProjectUpdateUseCase:
         project = Project.objects.get(uuid=project_dto.project_uuid)
 
         update_fields = []
+        country_changed = False
 
         if project_dto.name is not None:
             project.name = project_dto.name
             update_fields.append("name")
 
         if project_dto.timezone is not None:
+            old_country = get_country_from_timezone(str(project.timezone))
+            new_country = get_country_from_timezone(str(project_dto.timezone))
+            country_changed = old_country != new_country
             project.timezone = project_dto.timezone
             update_fields.append("timezone")
 
@@ -39,6 +47,9 @@ class ProjectUpdateUseCase:
             update_fields.append("config")
 
         if update_fields:
-            project.save(update_fields=update_fields + ["modified_on"])
+            with transaction.atomic():
+                project.save(update_fields=update_fields + ["modified_on"])
+                if country_changed:
+                    project.delete_sector_holidays()
 
         return project
