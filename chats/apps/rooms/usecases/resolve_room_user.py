@@ -40,8 +40,17 @@ class ResolveRoomUserUseCase:
 
         if not is_created:
             linked_user = contact.get_linked_user(self.project)
-            if linked_user is not None and linked_user.is_online:
-                return linked_user.user
+            if linked_user is not None and linked_user.user is not None:
+                if not self.queue.is_agent(linked_user.user):
+                    logger.info(
+                        "Linked user %s for contact %s is not an agent of queue"
+                        " %s; falling back to default routing",
+                        linked_user.user_id,
+                        contact.pk,
+                        self.queue.uuid,
+                    )
+                elif linked_user.is_online:
+                    return linked_user.user
 
         if user and self.project.permissions.filter(
             user=user, status="ONLINE"
