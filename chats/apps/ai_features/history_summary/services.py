@@ -2,8 +2,10 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from botocore.exceptions import ClientError
 from django.db.models import Q
 from sentry_sdk import capture_message
+
 from chats.apps.ai_features.history_summary.models import HistorySummaryStatus
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.integrations.dataclass import PromptMessage
@@ -19,6 +21,25 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+_TRANSIENT_BEDROCK_ERROR_CODES = frozenset(
+    {
+        "ServiceUnavailableException",
+        "InternalServerException",
+        "ThrottlingException",
+        "ModelTimeoutException",
+        "ModelNotReadyException",
+    }
+)
+
+
+def _is_transient_bedrock_error(exc: BaseException) -> bool:
+    if isinstance(exc, ClientError):
+        code = exc.response.get("Error", {}).get("Code", "")
+        if code in _TRANSIENT_BEDROCK_ERROR_CODES:
+            return True
+    text = str(exc)
+    return any(code in text for code in _TRANSIENT_BEDROCK_ERROR_CODES)
 
 
 class HistorySummaryService:
@@ -137,12 +158,19 @@ class HistorySummaryService:
 
         except Exception as e:
             history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
-            logger.error(
-                "Error generating history summary for room %s: %s", room.uuid, e
-            )
-            capture_message(
-                "Error generating history summary for room %s: %s" % (room.uuid, e),
-                level="error",
-            )
+            if _is_transient_bedrock_error(e):
+                logger.warning(
+                    "Transient Bedrock error generating history summary for room %s: %s",
+                    room.uuid,
+                    e,
+                )
+            else:
+                logger.error(
+                    "Error generating history summary for room %s: %s", room.uuid, e
+                )
+                capture_message(
+                    "Error generating history summary for room %s: %s" % (room.uuid, e),
+                    level="error",
+                )
 
         return history_summary

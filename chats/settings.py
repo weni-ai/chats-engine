@@ -489,10 +489,13 @@ CORS_ORIGIN_ALLOW_ALL = True
 USE_SENTRY = env.bool("USE_SENTRY", default=False)
 
 if USE_SENTRY:
+    from chats.core.sentry import sentry_before_send
+
     sentry_sdk.init(
         dsn=env.str("SENTRY_DSN"),
         integrations=[DjangoIntegration()],
         environment=env.str("ENVIRONMENT", default="develop"),
+        before_send=sentry_before_send,
     )
 
 # JWT

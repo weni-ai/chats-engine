@@ -125,3 +125,43 @@ class TestHistorySummaryService(TestCase):
         self.assertIsNone(result)
         self.assertEqual(self.history_summary.status, HistorySummaryStatus.UNAVAILABLE)
         self.mock_integration_client.generate_text.assert_not_called()
+
+    @patch("chats.apps.ai_features.history_summary.services.capture_message")
+    @patch("chats.apps.ai_features.history_summary.services.FeaturePrompt.objects")
+    def test_generate_summary_transient_bedrock_error_skips_sentry(
+        self, mock_feature_prompt_objects, mock_capture_message
+    ):
+        from botocore.exceptions import ClientError
+
+        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
+            self.feature_prompt
+        )
+        self.mock_integration_client.generate_text.side_effect = ClientError(
+            {
+                "Error": {
+                    "Code": "ServiceUnavailableException",
+                    "Message": "Bedrock is unable to process your request.",
+                }
+            },
+            "InvokeModel",
+        )
+
+        result = self.service.generate_summary(self.room, self.history_summary)
+
+        self.assertEqual(result.status, HistorySummaryStatus.UNAVAILABLE)
+        mock_capture_message.assert_not_called()
+
+    @patch("chats.apps.ai_features.history_summary.services.capture_message")
+    @patch("chats.apps.ai_features.history_summary.services.FeaturePrompt.objects")
+    def test_generate_summary_unexpected_error_reports_sentry(
+        self, mock_feature_prompt_objects, mock_capture_message
+    ):
+        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
+            self.feature_prompt
+        )
+        self.mock_integration_client.generate_text.side_effect = RuntimeError("boom")
+
+        result = self.service.generate_summary(self.room, self.history_summary)
+
+        self.assertEqual(result.status, HistorySummaryStatus.UNAVAILABLE)
+        mock_capture_message.assert_called_once()
