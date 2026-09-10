@@ -456,7 +456,9 @@ class CopilotRoomMessagesViewTests(APITestCase):
         )
         self.queue = Queue.objects.create(name="Queue", sector=self.sector)
         self.contact = Contact.objects.create(name="Contact", external_id="c-1")
-        self.room = Room.objects.create(queue=self.queue, contact=self.contact)
+        self.room = Room.objects.create(
+            queue=self.queue, contact=self.contact, urn="ext:57619149186@"
+        )
         self.copilot_uuid = uuid4()
         CopilotIntegration.objects.create(
             project=self.project,
