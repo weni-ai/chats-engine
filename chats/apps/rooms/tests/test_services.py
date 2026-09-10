@@ -10,6 +10,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.services import RoomsReportService, can_retrieve, requeue_agent_rooms
 from chats.apps.sectors.models import Sector, SectorAuthorization
@@ -94,6 +95,84 @@ class RequeueAgentRoomsTestCase(TestCase):
     def test_empty_queryset_does_nothing(self, mock_routing):
         requeue_agent_rooms(Room.objects.none())
         mock_routing.assert_not_called()
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_feedback_message_is_created_on_requeue(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        mock_feedback.assert_called_once()
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_no_feedback_for_rooms_without_user(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=None, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        mock_feedback.assert_not_called()
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_feedback_action_is_requeue(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        _, feedback_arg = mock_feedback.call_args.args
+        self.assertEqual(feedback_arg["action"], "requeue")
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_feedback_from_is_agent_to_is_queue(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        _, feedback_arg = mock_feedback.call_args.args
+        self.assertEqual(feedback_arg["from"]["type"], "user")
+        self.assertEqual(feedback_arg["from"]["email"], self.agent.email)
+        self.assertEqual(feedback_arg["to"]["type"], "queue")
+        self.assertEqual(feedback_arg["to"]["name"], self.queue.name)
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_feedback_uses_room_transfer_method(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        method_kwarg = mock_feedback.call_args.kwargs["method"]
+        self.assertEqual(method_kwarg, RoomFeedbackMethods.ROOM_TRANSFER)
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_transfer_history_is_updated_on_requeue(self, mock_routing, mock_feedback):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        room.refresh_from_db()
+        self.assertEqual(len(room.full_transfer_history), 1)
+        entry = room.full_transfer_history[0]
+        self.assertEqual(entry["action"], "requeue")
+        self.assertEqual(entry["from"]["email"], self.agent.email)
+        self.assertEqual(entry["to"]["name"], self.queue.name)
+
+    @patch("chats.apps.rooms.services.create_room_feedback_message")
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_feedback_is_created_for_each_room_with_user(self, mock_routing, mock_feedback):
+        contact_2 = Contact.objects.create(name="Client 2")
+        Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        Room.objects.create(
+            queue=self.queue, contact=contact_2, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(user=self.agent, is_active=True))
+        self.assertEqual(mock_feedback.call_count, 2)
 
 
 @override_settings(SEND_EMAILS=True)
