@@ -244,6 +244,59 @@ def parse_channel_uuid(raw) -> Optional[UUID]:
         return None
 
 
+def get_copilot_integration_for_room(
+    project: Project, room: Room = None
+) -> CopilotIntegration:
+    sector = None
+    if room and room.queue_id:
+        sector = room.queue.sector
+
+    if sector:
+        integration = CopilotIntegration.objects.filter(sector=sector).first()
+        if integration:
+            return integration
+
+    integration = CopilotIntegration.objects.filter(
+        project=project, sector__isnull=True
+    ).first()
+    if not integration:
+        raise CopilotIntegration.DoesNotExist()
+    return integration
+
+
+class ListCopilotRoomMessagesUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(
+        self,
+        *,
+        project: Project,
+        room_uuid,
+        cursor: str = None,
+        limit: int = None,
+    ) -> dict:
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(uuid=room_uuid)
+            .first()
+        )
+        if not room:
+            raise Room.DoesNotExist()
+
+        room_project = room.queue.sector.project if room.queue_id else None
+        if not room_project or room_project.uuid != project.uuid:
+            raise Room.DoesNotExist()
+
+        integration = get_copilot_integration_for_room(project, room)
+        return self.client.list_internal_messages(
+            project_uuid=str(integration.copilot_project_uuid),
+            contact_urn=str(room.uuid),
+            cursor=cursor,
+            limit=limit,
+        )
+
+
 def get_copilot_channel_uuid(room: Room) -> Optional[UUID]:
     if not room.queue_id:
         return None
@@ -278,3 +331,38 @@ class SetRoomCopilotChannelUseCase:
             return
 
         Room.objects.filter(pk=room.pk).update(channel_uuid=channel_uuid)
+
+
+class UpdateCopilotWwcChannelUseCase:
+    def execute(
+        self, *, channel_uuid, project_uuid, sector_uuid=None
+    ) -> Optional[CopilotIntegration]:
+        parsed_channel_uuid = parse_channel_uuid(channel_uuid)
+        parsed_project_uuid = parse_channel_uuid(project_uuid)
+        if not parsed_channel_uuid or not parsed_project_uuid:
+            return None
+
+        queryset = CopilotIntegration.objects.filter(project__uuid=parsed_project_uuid)
+        if sector_uuid:
+            parsed_sector_uuid = parse_channel_uuid(sector_uuid)
+            if not parsed_sector_uuid:
+                return None
+            queryset = queryset.filter(sector__uuid=parsed_sector_uuid)
+        else:
+            queryset = queryset.filter(sector__isnull=True)
+
+        integration = queryset.first()
+        if not integration:
+            return None
+
+        connection = dict(integration.connection or {})
+        if not connection:
+            connection = build_webchat_connection(
+                {"channelUuid": str(parsed_channel_uuid)}
+            )
+        else:
+            connection["channelUuid"] = str(parsed_channel_uuid)
+
+        integration.connection = connection
+        integration.save(update_fields=["connection", "modified_on"])
+        return integration
