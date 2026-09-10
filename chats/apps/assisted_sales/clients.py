@@ -193,6 +193,55 @@ class CopilotConnectClient(InternalAuthentication):
             return data.get("results") or data.get("projects") or data.get("data") or []
         return []
 
+    def list_internal_messages(
+        self,
+        *,
+        project_uuid: str,
+        contact_urn: str,
+        cursor: str = None,
+        limit: int = None,
+    ) -> dict:
+        base_url = (settings.FLOWS_API_URL or "").rstrip("/")
+        if not base_url:
+            raise CopilotConnectError(
+                status_code=502,
+                error="Flows API URL is not configured",
+            )
+
+        params = {
+            "project_uuid": project_uuid,
+            "contact_urn": contact_urn,
+        }
+        if cursor:
+            params["cursor"] = cursor
+        if limit:
+            params["limit"] = limit
+
+        url = f"{base_url}/api/v2/internals/messages"
+        try:
+            response = requests.get(
+                url=url,
+                headers=self.headers,
+                params=params,
+                timeout=15,
+            )
+        except requests.RequestException as exc:
+            logger.exception("Failed to list copilot messages on Flows")
+            raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+
+        if not response.ok:
+            raise CopilotConnectError(
+                status_code=response.status_code,
+                error=self._parse_error(response),
+            )
+
+        data = self._parse_json(response)
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list):
+            return {"next": None, "previous": None, "results": data}
+        return {"next": None, "previous": None, "results": []}
+
     def _parse_json(self, response):
         try:
             data = response.json()

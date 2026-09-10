@@ -38,6 +38,7 @@ from chats.apps.assisted_sales.views import (
     CopilotProjectCreateView,
     CopilotProjectRemoveView,
     CopilotProjectUpdateView,
+    CopilotRoomMessagesView,
 )
 
 urlpatterns = [
@@ -134,6 +135,11 @@ urlpatterns = [
         "project/copilot/list_existing_projects/<uuid:org_uuid>",
         CopilotExistingProjectsView.as_view(),
         name="copilot_list_existing_projects",
+    ),
+    path(
+        "room/<uuid:room_uuid>/copilot/messages/",
+        CopilotRoomMessagesView.as_view(),
+        name="copilot_room_messages",
     ),
     path(
         "project/<uuid:project_uuid>/all_agents/",
