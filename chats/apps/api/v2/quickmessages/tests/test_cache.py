@@ -57,9 +57,7 @@ class QuickMessagesCacheTests(SimpleTestCase):
 
         invalidate_personal_quick_messages_cache(7)
 
-        mock_cache.set.assert_called_once_with(
-            "personal_qm_version:7", 1, timeout=None
-        )
+        mock_cache.set.assert_called_once_with("personal_qm_version:7", 1, timeout=None)
 
     @patch("chats.apps.api.v2.quickmessages.cache.cache")
     def test_invalidate_sector_quick_messages_cache_bumps_sector_and_project(
@@ -84,6 +82,4 @@ class QuickMessagesCacheTests(SimpleTestCase):
 
         invalidate_personal_quick_messages_cache(1)
 
-        mock_cache.set.assert_called_once_with(
-            "personal_qm_version:1", 3, timeout=None
-        )
+        mock_cache.set.assert_called_once_with("personal_qm_version:1", 3, timeout=None)

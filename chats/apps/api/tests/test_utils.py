@@ -16,7 +16,6 @@ from chats.apps.api.utils import (
     ensure_timezone,
     verify_user_room,
 )
-from chats.apps.ai_features.history_summary.models import HistorySummaryStatus
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
@@ -62,9 +61,13 @@ class TestApiUtils(TestCase):
         self.assertTrue(c.external_id)
 
     def test_create_room_dto(self):
-        data = create_room_dto({"interact_time": 10, "response_time": 5, "waiting_time": 2})
+        data = create_room_dto(
+            {"interact_time": 10, "response_time": 5, "waiting_time": 2}
+        )
         self.assertIsInstance(data, list)
-        self.assertEqual(set(data[0].keys()), set(DashboardRoomSerializer().fields.keys()))
+        self.assertEqual(
+            set(data[0].keys()), set(DashboardRoomSerializer().fields.keys())
+        )
 
     def test_verify_user_room(self):
         req_email = "req@e.com"
@@ -93,11 +96,17 @@ class TestApiUtils(TestCase):
         self.assertFalse(ChatMessageReplyIndex.objects.exists())
         m_yes = Message.objects.create(room=self.room, text="y", external_id="ext-1")
         create_reply_index(m_yes)
-        self.assertTrue(ChatMessageReplyIndex.objects.filter(external_id="ext-1", message=m_yes).exists())
+        self.assertTrue(
+            ChatMessageReplyIndex.objects.filter(
+                external_id="ext-1", message=m_yes
+            ).exists()
+        )
 
     def test_calculate_in_service_time_active_online(self):
         created_on = (timezone.now() - timedelta(seconds=3)).isoformat()
-        lst = [{"status_type": "In-Service", "is_active": True, "created_on": created_on}]
+        lst = [
+            {"status_type": "In-Service", "is_active": True, "created_on": created_on}
+        ]
         total = calculate_in_service_time(lst, user_status="ONLINE")
         self.assertGreaterEqual(total, 2)
 

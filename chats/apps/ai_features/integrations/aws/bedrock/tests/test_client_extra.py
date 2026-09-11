@@ -31,4 +31,3 @@ class TestBedrockClientExtra(TestCase):
         client.model_id = "other.model"
         with self.assertRaises(ValueError):
             client.format_request_body({}, "p")
-
