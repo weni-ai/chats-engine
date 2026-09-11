@@ -107,7 +107,7 @@ def create_reply_index(message: Message):
                 defaults={"external_id_core": external_id_core},
             )
     except Exception as error:
-        logger.exception(
+        logger.info(
             "create_reply_index: failed to index message for replies",
             extra={
                 "message_uuid": str(message.pk),
