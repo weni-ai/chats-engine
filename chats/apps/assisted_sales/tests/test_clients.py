@@ -8,7 +8,7 @@ from chats.apps.assisted_sales.exceptions import CopilotConnectError
 
 
 @override_settings(
-    CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
+    CONNECT_API_URL="https://connect.example.com",
     NEXUS_API_URL="https://nexus.example.com",
 )
 @patch.object(CopilotConnectClient, "get_module_token", return_value="Bearer fake")
@@ -16,15 +16,35 @@ class CopilotConnectClientTests(TestCase):
     def setUp(self):
         self.client_rest = CopilotConnectClient()
 
+    def _create_kwargs(self):
+        return {
+            "name": "copilot",
+            "parent_project_uuid": "live-desk-uuid",
+            "organization_uuid": "org-uuid",
+            "timezone": "America/Sao_Paulo",
+            "date_format": "D",
+        }
+
     @patch("chats.apps.assisted_sales.clients.requests.post")
     def test_create_copilot_project(self, mock_post, _mock_token):
         mock_post.return_value = MagicMock(
             ok=True, json=lambda: {"uuid": "abc", "name": "copilot"}
         )
 
-        data = self.client_rest.create_copilot_project("copilot", "project-uuid")
+        data = self.client_rest.create_copilot_project(**self._create_kwargs())
 
-        mock_post.assert_called_once()
+        mock_post.assert_called_once_with(
+            url="https://connect.example.com/v2/organizations/org-uuid/projects/",
+            headers=self.client_rest.headers,
+            json={
+                "name": "copilot",
+                "timezone": "America/Sao_Paulo",
+                "is_live_desk_copilot": True,
+                "parent_project_uuid": "live-desk-uuid",
+                "date_format": "D",
+            },
+            timeout=15,
+        )
         self.assertEqual(data["name"], "copilot")
 
     @patch("chats.apps.assisted_sales.clients.requests.post")
@@ -34,10 +54,17 @@ class CopilotConnectClientTests(TestCase):
         )
 
         with self.assertRaises(CopilotConnectError) as ctx:
-            self.client_rest.create_copilot_project("copilot", "project-uuid")
+            self.client_rest.create_copilot_project(**self._create_kwargs())
 
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertEqual(ctx.exception.error, "invalid")
+
+    @override_settings(CONNECT_API_URL="")
+    def test_create_copilot_project_raises_when_url_missing(self, _mock_token):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.create_copilot_project(**self._create_kwargs())
+
+        self.assertEqual(ctx.exception.status_code, 502)
 
     @patch.object(NexusRESTClient, "get_projects_agents")
     def test_get_assigned_agents(self, mock_get, _mock_token):
