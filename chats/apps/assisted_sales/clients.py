@@ -16,19 +16,49 @@ FLOWS_REQUEST_TIMEOUT_SECONDS = 15
 
 
 class CopilotConnectClient(InternalAuthentication):
-    def create_copilot_project(self, name: str, project_uuid: str) -> dict:
-        url = settings.CONNECT_COPILOT_CREATE_URL
-        if not url:
-            raise CopilotConnectError(
-                status_code=502,
-                error="Connect copilot create URL is not configured",
+    def _copilot_create_url(self, organization_uuid: str) -> str:
+        base_url = (settings.CONNECT_API_URL or "").rstrip("/")
+        if base_url:
+            return f"{base_url}/v2/organizations/{organization_uuid}/projects/"
+
+        template = settings.CONNECT_COPILOT_CREATE_URL
+        if template:
+            return template.format(
+                org_uuid=organization_uuid,
+                organization_uuid=organization_uuid,
+                uuid=organization_uuid,
             )
+
+        raise CopilotConnectError(
+            status_code=502,
+            error="Connect API URL is not configured",
+        )
+
+    def create_copilot_project(
+        self,
+        *,
+        name: str,
+        parent_project_uuid: str,
+        organization_uuid: str,
+        timezone: str,
+        date_format: str = None,
+    ) -> dict:
+        url = self._copilot_create_url(organization_uuid)
+
+        payload = {
+            "name": name,
+            "timezone": timezone,
+            "is_live_desk_copilot": True,
+            "parent_project_uuid": parent_project_uuid,
+        }
+        if date_format:
+            payload["date_format"] = date_format
 
         try:
             response = requests.post(
                 url=url,
                 headers=self.headers,
-                json={"name": name, "project_uuid": project_uuid},
+                json=payload,
                 timeout=15,
             )
         except requests.RequestException as exc:
