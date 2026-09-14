@@ -266,6 +266,31 @@ class UpdateCopilotWwcChannelUseCaseTests(TestCase):
         self.assertEqual(integration.connection["host"], "https://flows.weni.ai")
         self.assertEqual(integration.connection["connectOn"], "mount")
 
+    def test_updates_integration_by_copilot_project_uuid(self):
+        integration = self._create_integration()
+
+        UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=integration.copilot_project_uuid,
+            is_live_desk_copilot=True,
+        )
+
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], str(self.channel_uuid))
+
+    def test_skips_when_not_live_desk_copilot(self):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=integration.copilot_project_uuid,
+            is_live_desk_copilot=False,
+        )
+
+        self.assertIsNone(result)
+        integration.refresh_from_db()
+        self.assertEqual(integration.connection["channelUuid"], "")
+
     def test_updates_sector_integration_only(self):
         project_integration = self._create_integration()
         sector_integration = self._create_integration(sector=self.sector)
