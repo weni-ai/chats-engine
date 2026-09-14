@@ -1,4 +1,5 @@
 import json
+
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
@@ -27,11 +28,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             "org",
             "room_routing_type",
             "is_chats_summary_enabled",
+            "is_live_desk_copilot",
+            "uuid_live_desk_project",
         ]
         read_only_fields = [
             "timezone",
             "room_routing_type",
             "is_chats_summary_enabled",
+            "is_live_desk_copilot",
+            "uuid_live_desk_project",
         ]
 
     def get_config(self, project: Project):

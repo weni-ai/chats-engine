@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from django.contrib.auth import get_user_model
 
@@ -19,6 +20,8 @@ class ProjectCreationDTO:
     template_type_uuid: str
     authorizations: list
     org: str
+    is_live_desk_copilot: bool = False
+    uuid_live_desk_project: Optional[str] = None
 
 
 class ProjectCreationUseCase:
@@ -58,6 +61,16 @@ class ProjectCreationUseCase:
         if Project.objects.filter(uuid=project_dto.uuid).exists():
             raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
 
+        is_live_desk_copilot = bool(project_dto.is_live_desk_copilot)
+        uuid_live_desk_project = (
+            project_dto.uuid_live_desk_project if is_live_desk_copilot else None
+        )
+        if is_live_desk_copilot and not uuid_live_desk_project:
+            raise InvalidProjectData(
+                "'uuid_live_desk_project' cannot be empty when "
+                "'is_live_desk_copilot' is True!"
+            )
+
         _config = self._config_its_principal(project_dto)
         project = Project.objects.create(
             uuid=project_dto.uuid,
@@ -67,6 +80,8 @@ class ProjectCreationUseCase:
             timezone=project_dto.timezone,
             org=project_dto.org,
             config=_config,
+            is_live_desk_copilot=is_live_desk_copilot,
+            uuid_live_desk_project=uuid_live_desk_project,
         )
 
         creator_permission, _ = ProjectPermission.all_objects.get_or_create(

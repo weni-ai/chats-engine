@@ -33,6 +33,8 @@ class ProjectConsumer(EDAConsumer):
             timezone=body.get("timezone"),
             authorizations=body.get("authorizations", []),
             org=body.get("organization_uuid"),
+            is_live_desk_copilot=body.get("is_live_desk_copilot", False),
+            uuid_live_desk_project=body.get("uuid_live_desk_project"),
         )
 
         sector_setup_handler = SectorSetupHandlerUseCase()

@@ -104,6 +104,17 @@ class Project(BaseConfigurableModel, BaseModel):
         default=True,
         help_text=_("Whether to enable the chats summary feature for this project"),
     )
+    is_live_desk_copilot = models.BooleanField(
+        _("Is Live Desk copilot?"),
+        default=False,
+        help_text=_("Whether this project is a Live Desk copilot project"),
+    )
+    uuid_live_desk_project = models.UUIDField(
+        _("Live Desk project UUID"),
+        null=True,
+        blank=True,
+        help_text=_("UUID of the Live Desk project this copilot belongs to"),
+    )
 
     class Meta:
         verbose_name = _("Project")
