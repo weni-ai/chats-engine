@@ -69,8 +69,25 @@ class CreateCopilotIntegrationUseCase:
         if existing.exists():
             raise CopilotIntegrationAlreadyExists()
 
+        if not project.org:
+            raise CopilotConnectError(
+                status_code=400,
+                error="Project has no organization uuid",
+            )
+
+        timezone = str(project.timezone) if project.timezone else ""
+        if not timezone:
+            raise CopilotConnectError(
+                status_code=400,
+                error="Project has no timezone",
+            )
+
         connect_data = self.client.create_copilot_project(
-            name=name, project_uuid=str(project.uuid)
+            name=name,
+            parent_project_uuid=str(project.uuid),
+            organization_uuid=str(project.org),
+            timezone=timezone,
+            date_format=project.date_format,
         )
 
         copilot_uuid = parse_copilot_uuid(connect_data)
