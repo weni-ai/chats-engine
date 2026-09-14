@@ -18,6 +18,10 @@ def _body_value(body: dict, *keys):
     return None
 
 
+def _is_false_flag(value) -> bool:
+    return value is False or value in (0, "0", "false", "False")
+
+
 class WwcChannelConsumer(EDAConsumer):
     @staticmethod
     @pyamqp_call_dlx_when_error(
@@ -40,7 +44,20 @@ class WwcChannelConsumer(EDAConsumer):
             channel.basic_ack(message.delivery_tag)
             return
 
-        channel_uuid = _body_value(body, "channel_uuid", "channelUuid")
+        is_live_desk_copilot = _body_value(
+            body, "is_live_desk_copilot", "isLiveDeskCopilot"
+        )
+        if _is_false_flag(is_live_desk_copilot):
+            logger.info(
+                "[WwcChannelConsumer] skipping preview WWC channel event",
+                extra={
+                    "project_uuid": _body_value(body, "project_uuid", "projectUuid")
+                },
+            )
+            channel.basic_ack(message.delivery_tag)
+            return
+
+        channel_uuid = _body_value(body, "uuid", "channel_uuid", "channelUuid")
         project_uuid = _body_value(body, "project_uuid", "projectUuid")
         sector_uuid = _body_value(body, "sector_uuid", "sectorUuid")
 
@@ -50,6 +67,7 @@ class WwcChannelConsumer(EDAConsumer):
                 "channel_uuid": channel_uuid,
                 "project_uuid": project_uuid,
                 "sector_uuid": sector_uuid,
+                "is_live_desk_copilot": is_live_desk_copilot,
             },
         )
 
@@ -69,5 +87,8 @@ class WwcChannelConsumer(EDAConsumer):
             channel_uuid=channel_uuid,
             project_uuid=project_uuid,
             sector_uuid=sector_uuid,
+            is_live_desk_copilot=(
+                True if is_live_desk_copilot not in (None, "") else None
+            ),
         )
         channel.basic_ack(message.delivery_tag)

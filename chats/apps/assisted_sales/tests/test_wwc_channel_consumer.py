@@ -35,6 +35,7 @@ class WwcChannelConsumerTests(SimpleTestCase):
             channel_uuid=channel_uuid,
             project_uuid=project_uuid,
             sector_uuid=None,
+            is_live_desk_copilot=None,
         )
         self.channel.basic_ack.assert_called_once_with("tag-1")
 
@@ -59,6 +60,7 @@ class WwcChannelConsumerTests(SimpleTestCase):
             channel_uuid=channel_uuid,
             project_uuid=project_uuid,
             sector_uuid=sector_uuid,
+            is_live_desk_copilot=None,
         )
         self.channel.basic_ack.assert_called_once_with("tag-1")
 
@@ -113,3 +115,48 @@ class WwcChannelConsumerTests(SimpleTestCase):
         mock_use_case_cls.assert_not_called()
         self.channel.basic_ack.assert_called_once_with("tag-1")
         self.assertTrue(any("invalid body" in line for line in logs.output))
+
+    @mock.patch(
+        "chats.apps.assisted_sales.consumers.wwc_channel_consumer.UpdateCopilotWwcChannelUseCase"
+    )
+    def test_dispatches_flows_copilot_payload(self, mock_use_case_cls):
+        channel_uuid = str(uuid4())
+        project_uuid = str(uuid4())
+        self.message.body = self._body(
+            {
+                "action": "create",
+                "uuid": channel_uuid,
+                "project_uuid": project_uuid,
+                "channel_type": "WWC",
+                "is_live_desk_copilot": True,
+            }
+        )
+
+        WwcChannelConsumer.consume(self.message)
+
+        mock_use_case_cls.return_value.execute.assert_called_once_with(
+            channel_uuid=channel_uuid,
+            project_uuid=project_uuid,
+            sector_uuid=None,
+            is_live_desk_copilot=True,
+        )
+        self.channel.basic_ack.assert_called_once_with("tag-1")
+
+    @mock.patch(
+        "chats.apps.assisted_sales.consumers.wwc_channel_consumer.UpdateCopilotWwcChannelUseCase"
+    )
+    def test_skips_preview_wwc_channel(self, mock_use_case_cls):
+        self.message.body = self._body(
+            {
+                "action": "create",
+                "uuid": str(uuid4()),
+                "project_uuid": str(uuid4()),
+                "channel_type": "WWC",
+                "is_live_desk_copilot": False,
+            }
+        )
+
+        WwcChannelConsumer.consume(self.message)
+
+        mock_use_case_cls.assert_not_called()
+        self.channel.basic_ack.assert_called_once_with("tag-1")
