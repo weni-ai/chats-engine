@@ -278,3 +278,38 @@ class SetRoomCopilotChannelUseCase:
             return
 
         Room.objects.filter(pk=room.pk).update(channel_uuid=channel_uuid)
+
+
+class UpdateCopilotWwcChannelUseCase:
+    def execute(
+        self, *, channel_uuid, project_uuid, sector_uuid=None
+    ) -> Optional[CopilotIntegration]:
+        parsed_channel_uuid = parse_channel_uuid(channel_uuid)
+        parsed_project_uuid = parse_channel_uuid(project_uuid)
+        if not parsed_channel_uuid or not parsed_project_uuid:
+            return None
+
+        queryset = CopilotIntegration.objects.filter(project__uuid=parsed_project_uuid)
+        if sector_uuid:
+            parsed_sector_uuid = parse_channel_uuid(sector_uuid)
+            if not parsed_sector_uuid:
+                return None
+            queryset = queryset.filter(sector__uuid=parsed_sector_uuid)
+        else:
+            queryset = queryset.filter(sector__isnull=True)
+
+        integration = queryset.first()
+        if not integration:
+            return None
+
+        connection = dict(integration.connection or {})
+        if not connection:
+            connection = build_webchat_connection(
+                {"channelUuid": str(parsed_channel_uuid)}
+            )
+        else:
+            connection["channelUuid"] = str(parsed_channel_uuid)
+
+        integration.connection = connection
+        integration.save(update_fields=["connection", "modified_on"])
+        return integration
