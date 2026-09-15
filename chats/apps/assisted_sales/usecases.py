@@ -359,23 +359,37 @@ class SetRoomCopilotChannelUseCase:
 
 class UpdateCopilotWwcChannelUseCase:
     def execute(
-        self, *, channel_uuid, project_uuid, sector_uuid=None
+        self,
+        *,
+        channel_uuid,
+        project_uuid,
+        sector_uuid=None,
+        is_live_desk_copilot=None,
     ) -> Optional[CopilotIntegration]:
+        if is_live_desk_copilot is False:
+            return None
+
         parsed_channel_uuid = parse_channel_uuid(channel_uuid)
         parsed_project_uuid = parse_channel_uuid(project_uuid)
         if not parsed_channel_uuid or not parsed_project_uuid:
             return None
 
-        queryset = CopilotIntegration.objects.filter(project__uuid=parsed_project_uuid)
-        if sector_uuid:
-            parsed_sector_uuid = parse_channel_uuid(sector_uuid)
-            if not parsed_sector_uuid:
-                return None
-            queryset = queryset.filter(sector__uuid=parsed_sector_uuid)
-        else:
-            queryset = queryset.filter(sector__isnull=True)
+        integration = CopilotIntegration.objects.filter(
+            copilot_project_uuid=parsed_project_uuid
+        ).first()
+        if integration is None:
+            queryset = CopilotIntegration.objects.filter(
+                project__uuid=parsed_project_uuid
+            )
+            if sector_uuid:
+                parsed_sector_uuid = parse_channel_uuid(sector_uuid)
+                if not parsed_sector_uuid:
+                    return None
+                queryset = queryset.filter(sector__uuid=parsed_sector_uuid)
+            else:
+                queryset = queryset.filter(sector__isnull=True)
+            integration = queryset.first()
 
-        integration = queryset.first()
         if not integration:
             return None
 
