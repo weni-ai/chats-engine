@@ -404,7 +404,7 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
             name="copilot",
         )
 
-    def test_proxies_using_copilot_uuid_and_room_urn_as_contact_urn(self):
+    def test_proxies_using_copilot_uuid_and_room_uuid_as_contact_urn(self):
         client = MagicMock()
         client.list_internal_messages.return_value = {
             "next": None,
@@ -420,7 +420,7 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
 
         client.list_internal_messages.assert_called_once_with(
             project_uuid=str(self.copilot_uuid),
-            contact_urn="ext:57619149186@",
+            contact_urn=str(self.room.uuid),
             cursor="next-page",
             limit=None,
         )
@@ -447,7 +447,7 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
 
         client.list_internal_messages.assert_called_once_with(
             project_uuid=str(sector_copilot),
-            contact_urn="ext:57619149186@",
+            contact_urn=str(self.room.uuid),
             cursor=None,
             limit=None,
         )
