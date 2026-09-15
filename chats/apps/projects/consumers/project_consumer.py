@@ -23,6 +23,8 @@ def _build_project_dto(body: dict) -> ProjectCreationDTO:
         timezone=body.get("timezone"),
         authorizations=body.get("authorizations", []),
         org=body.get("organization_uuid"),
+        is_live_desk_copilot=body.get("is_live_desk_copilot", False),
+        parent_project_uuid=body.get("parent_project_uuid"),
     )
 
 

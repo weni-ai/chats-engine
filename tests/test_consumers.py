@@ -74,7 +74,32 @@ class OldProjectConsumerTests(SimpleTestCase):
         # Assert
         # Ensure the creation usecase was instantiated with the mocked sector handler
         mock_proj_usecase_cls.assert_called_once_with(mock_sector_handler.return_value)
-        # Ensure execute path acked the message
+        mock_proj_usecase_cls.return_value.create_project.assert_called_once()
+        dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
+        self.assertFalse(dto.is_live_desk_copilot)
+        self.assertIsNone(dto.parent_project_uuid)
+        self.assertEqual(self.message.channel.acked, [1])
+
+    @mock.patch(
+        "chats.apps.projects.consumers.project_consumer.JSONParser.parse",
+        return_value={
+            "uuid": "p1",
+            "is_live_desk_copilot": True,
+            "parent_project_uuid": "live-desk-uuid",
+        },
+    )
+    @mock.patch("chats.apps.projects.consumers.project_consumer.ProjectCreationUseCase")
+    @mock.patch(
+        "chats.apps.projects.consumers.project_consumer.SectorSetupHandlerUseCase"
+    )
+    def test_project_consumer_passes_copilot_fields(
+        self, mock_sector_handler, mock_proj_usecase_cls, _
+    ):
+        OldProjectConsumer.consume(self.message)
+
+        dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
+        self.assertTrue(dto.is_live_desk_copilot)
+        self.assertEqual(dto.parent_project_uuid, "live-desk-uuid")
         self.assertEqual(self.message.channel.acked, [1])
 
 

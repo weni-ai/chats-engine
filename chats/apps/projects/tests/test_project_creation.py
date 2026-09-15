@@ -78,6 +78,8 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(project.is_template, self.project_dto.is_template)
         self.assertEqual(project.date_format, self.project_dto.date_format)
         self.assertEqual(project.org, self.project_dto.org)
+        self.assertFalse(project.is_live_desk_copilot)
+        self.assertIsNone(project.parent_project_uuid)
 
         self.assertEqual(project.config, {})
 
@@ -382,3 +384,40 @@ class TestProjectCreationUsecase(TestCase):
         )
         self.assertEqual(auth_perms.count(), 1)
         self.assertEqual(auth_perms.first().uuid, soft_perm.uuid)
+
+    def test_create_live_desk_copilot_project(self):
+        live_desk_uuid = uuid.uuid4()
+        project_dto = self._create_base_project_dto(
+            is_live_desk_copilot=True,
+            parent_project_uuid=str(live_desk_uuid),
+        )
+
+        self.use_case.create_project(project_dto)
+
+        project = Project.objects.get(uuid=project_dto.uuid)
+        self.assertTrue(project.is_live_desk_copilot)
+        self.assertEqual(project.parent_project_uuid, live_desk_uuid)
+
+    def test_create_live_desk_copilot_project_without_uuid(self):
+        project_dto = self._create_base_project_dto(is_live_desk_copilot=True)
+
+        with self.assertRaises(InvalidProjectData) as context:
+            self.use_case.create_project(project_dto)
+
+        self.assertEqual(
+            str(context.exception),
+            "'parent_project_uuid' cannot be empty when "
+            "'is_live_desk_copilot' is True!",
+        )
+
+    def test_create_project_ignores_parent_project_uuid_when_not_copilot(self):
+        project_dto = self._create_base_project_dto(
+            is_live_desk_copilot=False,
+            parent_project_uuid=str(uuid.uuid4()),
+        )
+
+        self.use_case.create_project(project_dto)
+
+        project = Project.objects.get(uuid=project_dto.uuid)
+        self.assertFalse(project.is_live_desk_copilot)
+        self.assertIsNone(project.parent_project_uuid)

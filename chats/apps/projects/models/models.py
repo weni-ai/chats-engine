@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
@@ -12,9 +13,6 @@ from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
-from django.utils import timezone
-
-import logging
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
@@ -112,6 +110,17 @@ class Project(BaseConfigurableModel, BaseModel):
         _("Is chats summary enabled?"),
         default=True,
         help_text=_("Whether to enable the chats summary feature for this project"),
+    )
+    is_live_desk_copilot = models.BooleanField(
+        _("Is Live Desk copilot?"),
+        default=False,
+        help_text=_("Whether this project is a Live Desk copilot project"),
+    )
+    parent_project_uuid = models.UUIDField(
+        _("Parent project UUID"),
+        null=True,
+        blank=True,
+        help_text=_("UUID of the Live Desk project this copilot belongs to"),
     )
 
     class Meta:

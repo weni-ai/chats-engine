@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import IntegrityError
 from rest_framework.test import APITestCase
 
@@ -138,6 +139,12 @@ class PropertyTests(APITestCase):
         )
 
         self.assertEqual(project.has_chats_summary, True)
+
+    def test_live_desk_copilot_defaults(self):
+        project = Project.objects.create(name="Test Project")
+
+        self.assertFalse(project.is_live_desk_copilot)
+        self.assertIsNone(project.parent_project_uuid)
 
     def test_get_and_set_internal_flag(self):
         self.assertEqual(self.project.internal_flags, {})
