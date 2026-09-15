@@ -79,7 +79,7 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(project.date_format, self.project_dto.date_format)
         self.assertEqual(project.org, self.project_dto.org)
         self.assertFalse(project.is_live_desk_copilot)
-        self.assertIsNone(project.uuid_live_desk_project)
+        self.assertIsNone(project.parent_project_uuid)
 
         self.assertEqual(project.config, {})
 
@@ -388,14 +388,14 @@ class TestProjectCreationUsecase(TestCase):
         live_desk_uuid = uuid.uuid4()
         project_dto = self._create_base_project_dto(
             is_live_desk_copilot=True,
-            uuid_live_desk_project=str(live_desk_uuid),
+            parent_project_uuid=str(live_desk_uuid),
         )
 
         self.use_case.create_project(project_dto)
 
         project = Project.objects.get(uuid=project_dto.uuid)
         self.assertTrue(project.is_live_desk_copilot)
-        self.assertEqual(project.uuid_live_desk_project, live_desk_uuid)
+        self.assertEqual(project.parent_project_uuid, live_desk_uuid)
 
     def test_create_live_desk_copilot_project_without_uuid(self):
         project_dto = self._create_base_project_dto(is_live_desk_copilot=True)
@@ -405,18 +405,18 @@ class TestProjectCreationUsecase(TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'uuid_live_desk_project' cannot be empty when "
+            "'parent_project_uuid' cannot be empty when "
             "'is_live_desk_copilot' is True!",
         )
 
-    def test_create_project_ignores_uuid_live_desk_when_not_copilot(self):
+    def test_create_project_ignores_parent_project_uuid_when_not_copilot(self):
         project_dto = self._create_base_project_dto(
             is_live_desk_copilot=False,
-            uuid_live_desk_project=str(uuid.uuid4()),
+            parent_project_uuid=str(uuid.uuid4()),
         )
 
         self.use_case.create_project(project_dto)
 
         project = Project.objects.get(uuid=project_dto.uuid)
         self.assertFalse(project.is_live_desk_copilot)
-        self.assertIsNone(project.uuid_live_desk_project)
+        self.assertIsNone(project.parent_project_uuid)

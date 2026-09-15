@@ -34,7 +34,7 @@ class ProjectConsumer(EDAConsumer):
             authorizations=body.get("authorizations", []),
             org=body.get("organization_uuid"),
             is_live_desk_copilot=body.get("is_live_desk_copilot", False),
-            uuid_live_desk_project=body.get("uuid_live_desk_project"),
+            parent_project_uuid=body.get("parent_project_uuid"),
         )
 
         sector_setup_handler = SectorSetupHandlerUseCase()

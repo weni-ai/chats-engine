@@ -144,7 +144,7 @@ class PropertyTests(APITestCase):
         project = Project.objects.create(name="Test Project")
 
         self.assertFalse(project.is_live_desk_copilot)
-        self.assertIsNone(project.uuid_live_desk_project)
+        self.assertIsNone(project.parent_project_uuid)
 
     def test_csat_flow_uuid_when_csat_flow_project_config_is_not_set(self):
         project = Project.objects.create(

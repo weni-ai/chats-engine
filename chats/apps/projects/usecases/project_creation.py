@@ -21,7 +21,7 @@ class ProjectCreationDTO:
     authorizations: list
     org: str
     is_live_desk_copilot: bool = False
-    uuid_live_desk_project: Optional[str] = None
+    parent_project_uuid: Optional[str] = None
 
 
 class ProjectCreationUseCase:
@@ -62,12 +62,12 @@ class ProjectCreationUseCase:
             raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
 
         is_live_desk_copilot = bool(project_dto.is_live_desk_copilot)
-        uuid_live_desk_project = (
-            project_dto.uuid_live_desk_project if is_live_desk_copilot else None
+        parent_project_uuid = (
+            project_dto.parent_project_uuid if is_live_desk_copilot else None
         )
-        if is_live_desk_copilot and not uuid_live_desk_project:
+        if is_live_desk_copilot and not parent_project_uuid:
             raise InvalidProjectData(
-                "'uuid_live_desk_project' cannot be empty when "
+                "'parent_project_uuid' cannot be empty when "
                 "'is_live_desk_copilot' is True!"
             )
 
@@ -81,7 +81,7 @@ class ProjectCreationUseCase:
             org=project_dto.org,
             config=_config,
             is_live_desk_copilot=is_live_desk_copilot,
-            uuid_live_desk_project=uuid_live_desk_project,
+            parent_project_uuid=parent_project_uuid,
         )
 
         creator_permission, _ = ProjectPermission.all_objects.get_or_create(

@@ -29,14 +29,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             "room_routing_type",
             "is_chats_summary_enabled",
             "is_live_desk_copilot",
-            "uuid_live_desk_project",
+            "parent_project_uuid",
         ]
         read_only_fields = [
             "timezone",
             "room_routing_type",
             "is_chats_summary_enabled",
             "is_live_desk_copilot",
-            "uuid_live_desk_project",
+            "parent_project_uuid",
         ]
 
     def get_config(self, project: Project):

@@ -109,8 +109,8 @@ class Project(BaseConfigurableModel, BaseModel):
         default=False,
         help_text=_("Whether this project is a Live Desk copilot project"),
     )
-    uuid_live_desk_project = models.UUIDField(
-        _("Live Desk project UUID"),
+    parent_project_uuid = models.UUIDField(
+        _("Parent project UUID"),
         null=True,
         blank=True,
         help_text=_("UUID of the Live Desk project this copilot belongs to"),

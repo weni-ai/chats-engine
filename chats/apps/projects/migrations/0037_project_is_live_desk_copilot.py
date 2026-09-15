@@ -21,12 +21,12 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="project",
-            name="uuid_live_desk_project",
+            name="parent_project_uuid",
             field=models.UUIDField(
                 blank=True,
                 help_text="UUID of the Live Desk project this copilot belongs to",
                 null=True,
-                verbose_name="Live Desk project UUID",
+                verbose_name="Parent project UUID",
             ),
         ),
     ]

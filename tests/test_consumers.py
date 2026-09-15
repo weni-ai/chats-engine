@@ -77,7 +77,7 @@ class ProjectConsumerTests(SimpleTestCase):
         mock_proj_usecase_cls.return_value.create_project.assert_called_once()
         dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
         self.assertFalse(dto.is_live_desk_copilot)
-        self.assertIsNone(dto.uuid_live_desk_project)
+        self.assertIsNone(dto.parent_project_uuid)
         self.assertEqual(self.message.channel.acked, [1])
 
     @mock.patch(
@@ -85,7 +85,7 @@ class ProjectConsumerTests(SimpleTestCase):
         return_value={
             "uuid": "p1",
             "is_live_desk_copilot": True,
-            "uuid_live_desk_project": "live-desk-uuid",
+            "parent_project_uuid": "live-desk-uuid",
         },
     )
     @mock.patch("chats.apps.projects.consumers.project_consumer.ProjectCreationUseCase")
@@ -99,7 +99,7 @@ class ProjectConsumerTests(SimpleTestCase):
 
         dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
         self.assertTrue(dto.is_live_desk_copilot)
-        self.assertEqual(dto.uuid_live_desk_project, "live-desk-uuid")
+        self.assertEqual(dto.parent_project_uuid, "live-desk-uuid")
         self.assertEqual(self.message.channel.acked, [1])
 
 
