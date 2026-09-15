@@ -310,17 +310,10 @@ class ListCopilotRoomMessagesUseCase:
         if not room_project or room_project.uuid != project.uuid:
             raise Room.DoesNotExist()
 
-        contact_urn = (room.urn or "").strip()
-        if not contact_urn:
-            raise CopilotConnectError(
-                status_code=400,
-                error="Room URN is not set",
-            )
-
         integration = get_copilot_integration_for_room(project, room)
         return self.client.list_internal_messages(
             project_uuid=str(integration.copilot_project_uuid),
-            contact_urn=contact_urn,
+            contact_urn=str(room.uuid),
             cursor=cursor,
             limit=limit,
         )
