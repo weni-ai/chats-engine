@@ -11,6 +11,7 @@ from chats.apps.assisted_sales.tasks import (
 )
 from chats.apps.assisted_sales.usecases import (
     CheckCopilotCreatePermissionUseCase,
+    ListCopilotRoomMessagesUseCase,
     SetRoomCopilotChannelUseCase,
     UpdateCopilotWwcChannelUseCase,
     user_can_create_copilot,
@@ -354,3 +355,97 @@ class UpdateCopilotWwcChannelUseCaseTests(TestCase):
         self.assertEqual(integration.connection["connectOn"], "mount")
         self.assertEqual(integration.connection["storage"], "local")
         self.assertEqual(integration.connection["callbackUrl"], "")
+
+
+class ListCopilotRoomMessagesUseCaseTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+        self.room = Room.objects.create(
+            queue=self.queue, contact=self.contact, urn="ext:57619149186@"
+        )
+        self.copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="copilot",
+        )
+
+    def test_proxies_using_copilot_uuid_and_room_urn_as_contact_urn(self):
+        client = MagicMock()
+        client.list_internal_messages.return_value = {
+            "next": None,
+            "previous": None,
+            "results": [],
+        }
+
+        ListCopilotRoomMessagesUseCase(client=client).execute(
+            project=self.project,
+            room_uuid=self.room.uuid,
+            cursor="next-page",
+        )
+
+        client.list_internal_messages.assert_called_once_with(
+            project_uuid=str(self.copilot_uuid),
+            contact_urn="ext:57619149186@",
+            cursor="next-page",
+            limit=None,
+        )
+
+    def test_prefers_sector_integration(self):
+        sector_copilot = uuid4()
+        CopilotIntegration.objects.create(
+            project=self.project,
+            sector=self.sector,
+            copilot_project_uuid=sector_copilot,
+            name="sector copilot",
+        )
+        client = MagicMock()
+        client.list_internal_messages.return_value = {
+            "next": None,
+            "previous": None,
+            "results": [],
+        }
+
+        ListCopilotRoomMessagesUseCase(client=client).execute(
+            project=self.project,
+            room_uuid=self.room.uuid,
+        )
+
+        client.list_internal_messages.assert_called_once_with(
+            project_uuid=str(sector_copilot),
+            contact_urn="ext:57619149186@",
+            cursor=None,
+            limit=None,
+        )
+
+    def test_raises_when_room_does_not_exist(self):
+        with self.assertRaises(Room.DoesNotExist):
+            ListCopilotRoomMessagesUseCase(client=MagicMock()).execute(
+                project=self.project,
+                room_uuid=uuid4(),
+            )
+
+    def test_raises_when_room_belongs_to_another_project(self):
+        other_project = Project.objects.create(name="Other", timezone="UTC")
+        with self.assertRaises(Room.DoesNotExist):
+            ListCopilotRoomMessagesUseCase(client=MagicMock()).execute(
+                project=other_project,
+                room_uuid=self.room.uuid,
+            )
+
+    def test_raises_when_integration_is_missing(self):
+        CopilotIntegration.objects.all().delete()
+        with self.assertRaises(CopilotIntegration.DoesNotExist):
+            ListCopilotRoomMessagesUseCase(client=MagicMock()).execute(
+                project=self.project,
+                room_uuid=self.room.uuid,
+            )

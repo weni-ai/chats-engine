@@ -131,7 +131,7 @@ class CopilotConnectClientTests(TestCase):
         )
 
         mock_get.assert_called_once_with(
-            url="https://connect.example.com/projects/project-uuid/authorization",
+            url="https://connect.example.com/v2/projects/project-uuid/authorization",
             headers=self.client_rest.headers,
             params={"user": "member@example.com"},
             timeout=15,
@@ -161,6 +161,63 @@ class CopilotConnectClientTests(TestCase):
         with self.assertRaises(CopilotConnectError) as ctx:
             self.client_rest.get_project_authorization(
                 "project-uuid", "member@example.com"
+            )
+
+        self.assertEqual(ctx.exception.status_code, 502)
+
+    @override_settings(FLOWS_API_URL="https://flows.example.com")
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_internal_messages(self, mock_get, _mock_token):
+        payload = {
+            "next": "https://flows.example.com/api/v2/internals/messages?cursor=abc&project_uuid=copilot",
+            "previous": None,
+            "results": [{"id": 1, "text": "hello", "direction": "in"}],
+        }
+        mock_get.return_value = MagicMock(ok=True, json=lambda: payload)
+
+        data = self.client_rest.list_internal_messages(
+            project_uuid="copilot-uuid",
+            contact_urn="room-uuid",
+            cursor="page-1",
+        )
+
+        mock_get.assert_called_once_with(
+            url="https://flows.example.com/api/v2/internals/messages",
+            headers=self.client_rest.headers,
+            params={
+                "project_uuid": "copilot-uuid",
+                "contact_urn": "room-uuid",
+                "cursor": "page-1",
+            },
+            timeout=15,
+        )
+        self.assertEqual(data["results"][0]["text"], "hello")
+
+    @override_settings(FLOWS_API_URL="https://flows.example.com")
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_internal_messages_raises_on_error(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(
+            ok=False,
+            status_code=400,
+            text="bad urn",
+            json=lambda: {"error": "Invalid URN"},
+        )
+
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.list_internal_messages(
+                project_uuid="copilot-uuid",
+                contact_urn="bad",
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.error, "Invalid URN")
+
+    @override_settings(FLOWS_API_URL="")
+    def test_list_internal_messages_raises_when_url_missing(self, _mock_token):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.list_internal_messages(
+                project_uuid="copilot-uuid",
+                contact_urn="room-uuid",
             )
 
         self.assertEqual(ctx.exception.status_code, 502)
