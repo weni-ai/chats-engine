@@ -26,7 +26,11 @@ class CopilotProjectCreateViewTests(APITestCase):
         self.user, self.token = create_user_and_token("edu")
         self.user.first_name = "edu"
         self.user.save(update_fields=["first_name"])
-        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        self.project = Project.objects.create(
+            name="Live Desk",
+            timezone="UTC",
+            org=str(uuid4()),
+        )
         ProjectPermission.objects.create(
             project=self.project,
             user=self.user,
@@ -68,7 +72,13 @@ class CopilotProjectCreateViewTests(APITestCase):
         self.assertEqual(
             integration.connection["channelUuid"], connect_data["channel_uuid"]
         )
-        mock_client.create_copilot_project.assert_called_once()
+        mock_client.create_copilot_project.assert_called_once_with(
+            name="projeto copilot teste",
+            parent_project_uuid=str(self.project.uuid),
+            organization_uuid=str(self.project.org),
+            timezone="UTC",
+            date_format=self.project.date_format,
+        )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_create_fails_when_connect_fails(self, mock_client_cls):
