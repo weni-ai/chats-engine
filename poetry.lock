@@ -4815,14 +4815,14 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.5.2"
+version = "1.6.0"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "weni_commons-1.5.2-py3-none-any.whl", hash = "sha256:ae930a460d3be7e29c768ac3759938b473b45a7eb334d87700f8c493982f3be3"},
-    {file = "weni_commons-1.5.2.tar.gz", hash = "sha256:561ad6d3d8c7d55862266b8c87674f1c71c266e91093c7b672fbf2b2ba2dbadf"},
+    {file = "weni_commons-1.6.0-py3-none-any.whl", hash = "sha256:7a10018107898c6dc556b0400da648372f821689d9e1ed7655d2bae623449e5e"},
+    {file = "weni_commons-1.6.0.tar.gz", hash = "sha256:b1ad780dee1410ee86284f98849484e86d82aeeb29ec1844698e79ef4cf382ca"},
 ]
 
 [package.dependencies]
@@ -5174,4 +5174,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "e4627a76a3829abb790b3c439997411bc5bb6fa0e5a9895e642fcc8baf9c7d7c"
+content-hash = "9e6a84e33eadfa6bba837947eeb60586d5dccc88788c6483f211be000dfb77aa"
