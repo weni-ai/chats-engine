@@ -71,10 +71,12 @@ class MessageFlowViewset(
 
     @cached_property
     def authentication_classes(self):
-        classes = list(get_token_auth_classes(self.request))
-        if SessionTokenAuthentication not in classes:
-            classes.insert(0, SessionTokenAuthentication)
-        return classes
+        classes = [
+            cls
+            for cls in get_token_auth_classes(self.request)
+            if cls is not SessionTokenAuthentication
+        ]
+        return [SessionTokenAuthentication] + classes
 
     @cached_property
     def permission_classes(self):
