@@ -36,6 +36,8 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "ticketer",
             "queue",
             "is_csat_enabled",
+            "is_live_desk_copilot",
+            "parent_project_uuid",
         ]
 
         extra_kwargs = {field: {"required": False} for field in fields}
