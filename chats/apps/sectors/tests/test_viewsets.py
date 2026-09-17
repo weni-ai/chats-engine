@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from django.urls import reverse
 from rest_framework import status
@@ -9,11 +9,10 @@ from rest_framework.test import APITestCase
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue
+from chats.apps.projects.tests.decorators import with_project_permission
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
-
-from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class SectorTests(APITestCase):
@@ -75,15 +74,27 @@ class SectorTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.get(url, data={"project": self.project.pk})
         results = response.json().get("results")
+        results_by_uuid = {result.get("uuid"): result for result in results}
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(results[0].get("uuid"), str(self.sector.pk))
-        self.assertEqual(results[0].get("automatic_message")["is_active"], False)
-        self.assertIsNone(results[0].get("automatic_message")["text"])
-        self.assertEqual(results[1].get("uuid"), str(self.sector_2.pk))
-        self.assertEqual(results[1].get("automatic_message")["is_active"], True)
+        self.assertIn(str(self.sector.pk), results_by_uuid)
         self.assertEqual(
-            results[1].get("automatic_message")["text"], "Hello, how can I help you?"
+            results_by_uuid[str(self.sector.pk)].get("automatic_message")["is_active"],
+            False,
+        )
+        self.assertIsNone(
+            results_by_uuid[str(self.sector.pk)].get("automatic_message")["text"]
+        )
+        self.assertIn(str(self.sector_2.pk), results_by_uuid)
+        self.assertEqual(
+            results_by_uuid[str(self.sector_2.pk)].get("automatic_message")[
+                "is_active"
+            ],
+            True,
+        )
+        self.assertEqual(
+            results_by_uuid[str(self.sector_2.pk)].get("automatic_message")["text"],
+            "Hello, how can I help you?",
         )
 
     def test_get_sector_list_with_wrong_project_token(self):
@@ -96,6 +107,36 @@ class SectorTests(APITestCase):
         response = client.get(url, data={"project": self.project.pk})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_sector_list_for_attendant_with_queue_authorization(self):
+        """
+        Attendants with only QueueAuthorization should see the sector of that queue,
+        but not other sectors in the same project.
+        """
+        attendant = User.objects.create(email="attendant-sector-list@chats.weni.ai")
+        attendant_token = Token.objects.create(user=attendant)
+        queue = Queue.objects.get(pk="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+        permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=attendant,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        QueueAuthorization.objects.create(
+            permission=permission,
+            queue=queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + attendant_token.key)
+        response = client.get(url, data={"project": self.project.pk})
+        results = response.json().get("results")
+        result_uuids = {result.get("uuid") for result in results}
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(str(self.sector.pk), result_uuids)
+        self.assertNotIn(str(self.sector_2.pk), result_uuids)
 
     def test_create_sector_with_right_project_token(self):
         """
@@ -614,7 +655,10 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
-    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes",
+        return_value=False,
+    )
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room(self, mock_get_room, mock_is_attending, _mock_flag):
@@ -637,7 +681,10 @@ class RoomsExternalTests(APITestCase):
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes",
+        return_value=False,
+    )
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_external_uuid(
@@ -668,7 +715,10 @@ class RoomsExternalTests(APITestCase):
             "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
-    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes",
+        return_value=False,
+    )
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_editing_contact(
@@ -901,7 +951,6 @@ class SectorTicketerCreationTests(APITestCase):
 
 
 class SectorEndAllChatsTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -912,15 +961,9 @@ class SectorEndAllChatsTests(APITestCase):
             work_end="18:00",
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.queue_2 = Queue.objects.create(
-            name="Test Queue 2", sector=self.sector
-        )
-        self.contact = Contact.objects.create(
-            external_id="ext-1", name="Contact 1"
-        )
-        self.contact_2 = Contact.objects.create(
-            external_id="ext-2", name="Contact 2"
-        )
+        self.queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        self.contact = Contact.objects.create(external_id="ext-1", name="Contact 1")
+        self.contact_2 = Contact.objects.create(external_id="ext-2", name="Contact 2")
 
         self.user = User.objects.create(email="admin@endall.test")
         self.agent = User.objects.create(email="agent@endall.test")
@@ -1022,7 +1065,6 @@ class SectorEndAllChatsTests(APITestCase):
 
 
 class SectorTransferOnDeleteTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -1032,12 +1074,8 @@ class SectorTransferOnDeleteTests(APITestCase):
             work_start="09:00",
             work_end="18:00",
         )
-        self.queue_1 = Queue.objects.create(
-            name="Queue 1", sector=self.sector
-        )
-        self.queue_2 = Queue.objects.create(
-            name="Queue 2", sector=self.sector
-        )
+        self.queue_1 = Queue.objects.create(name="Queue 1", sector=self.sector)
+        self.queue_2 = Queue.objects.create(name="Queue 2", sector=self.sector)
 
         self.other_sector = Sector.objects.create(
             project=self.project,
@@ -1064,9 +1102,7 @@ class SectorTransferOnDeleteTests(APITestCase):
         self.agent = User.objects.create(email="agent@transfer-sector.test")
         self.client.force_authenticate(user=self.user)
 
-    def _delete_sector(
-        self, sector_uuid, transfer_to_queue=None, end_all_chats=False
-    ):
+    def _delete_sector(self, sector_uuid, transfer_to_queue=None, end_all_chats=False):
         url = reverse("sector-detail", args=[sector_uuid])
         params = []
         if transfer_to_queue:
@@ -1158,9 +1194,7 @@ class SectorTransferOnDeleteTests(APITestCase):
             work_start="09:00",
             work_end="18:00",
         )
-        foreign_queue = Queue.objects.create(
-            name="Foreign Queue", sector=other_sector
-        )
+        foreign_queue = Queue.objects.create(name="Foreign Queue", sector=other_sector)
         response = self._delete_sector(
             self.sector.uuid, transfer_to_queue=foreign_queue.uuid
         )
