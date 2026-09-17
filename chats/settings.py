@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
+    "weni_commons",
     "channels",
     "drf_yasg",
     "django_filters",
@@ -614,9 +615,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "check-metric-goal-violations": {
         "task": "check_metric_goal_violations",
-        "schedule": env.float(
-            "METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0
-        ),
+        "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
         "options": {"queue": RISK_ALERT_CELERY_QUEUE},
     },
     "finish-stale-bulk-message-sends": {
@@ -636,9 +635,7 @@ METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
     "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
 )
 # Base URL of the Weni dashboard used as the CTA link in risk alert emails.
-WENI_DASHBOARD_URL = env.str(
-    "WENI_DASHBOARD_URL", default="https://dash.weni.ai"
-)
+WENI_DASHBOARD_URL = env.str("WENI_DASHBOARD_URL", default="https://dash.weni.ai")
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
@@ -995,6 +992,12 @@ ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
     default=2,
 )
 
+
+# Kong API Gateway (weni-commons)
+KONG_ADMIN_URL = env.str("KONG_ADMIN_URL", default="http://localhost:8001")
+KONG_SERVICE = env.str("KONG_SERVICE", default="chats-service")
+KONG_SERVICE_URL = env.str("KONG_SERVICE_URL", default=ENGINE_BASE_URL)
+KONG_URL_PREFIX = env.str("KONG_URL_PREFIX", default="/chats")
 
 # Meta
 META_GRAPH_API_BASE_HOST_URL = env.str(
