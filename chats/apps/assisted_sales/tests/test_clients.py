@@ -1,0 +1,68 @@
+from unittest.mock import MagicMock, patch
+
+from django.test import TestCase, override_settings
+
+from chats.apps.assisted_sales.clients import CopilotConnectClient
+from chats.apps.assisted_sales.exceptions import CopilotConnectError
+
+
+@override_settings(
+    CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
+    CONNECT_COPILOT_AGENTS_COUNT_URL="https://connect.example.com/copilot/{uuid}/agents",
+)
+@patch.object(CopilotConnectClient, "get_module_token", return_value="Bearer fake")
+class CopilotConnectClientTests(TestCase):
+    def setUp(self):
+        self.client_rest = CopilotConnectClient()
+
+    @patch("chats.apps.assisted_sales.clients.requests.post")
+    def test_create_copilot_project(self, mock_post, _mock_token):
+        mock_post.return_value = MagicMock(
+            ok=True, json=lambda: {"uuid": "abc", "name": "copilot"}
+        )
+
+        data = self.client_rest.create_copilot_project("copilot", "project-uuid")
+
+        mock_post.assert_called_once()
+        self.assertEqual(data["name"], "copilot")
+
+    @patch("chats.apps.assisted_sales.clients.requests.post")
+    def test_create_copilot_project_raises_on_error(self, mock_post, _mock_token):
+        mock_post.return_value = MagicMock(
+            ok=False, status_code=400, text="bad", json=lambda: {"error": "invalid"}
+        )
+
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.create_copilot_project("copilot", "project-uuid")
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.error, "invalid")
+
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_get_assigned_agents(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(
+            ok=True, json=lambda: {"assigned_agents": 5}
+        )
+
+        count = self.client_rest.get_assigned_agents("copilot-uuid")
+
+        self.assertEqual(count, 5)
+        mock_get.assert_called_once()
+
+    @override_settings(CONNECT_COPILOT_AGENTS_COUNT_URL="")
+    def test_get_assigned_agents_returns_zero_when_url_missing(self, _mock_token):
+        self.assertEqual(self.client_rest.get_assigned_agents("copilot-uuid"), 0)
+
+    @override_settings(
+        CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}"
+    )
+    @patch("chats.apps.assisted_sales.clients.requests.put")
+    def test_update_copilot_project(self, mock_put, _mock_token):
+        mock_put.return_value = MagicMock(
+            ok=True, json=lambda: {"uuid": "new-uuid", "name": "copilot novo"}
+        )
+
+        data = self.client_rest.switch_copilot_project("old-uuid", "new-uuid")
+
+        mock_put.assert_called_once()
+        self.assertEqual(data["uuid"], "new-uuid")
