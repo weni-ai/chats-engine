@@ -614,9 +614,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "check-metric-goal-violations": {
         "task": "check_metric_goal_violations",
-        "schedule": env.float(
-            "METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0
-        ),
+        "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
         "options": {"queue": RISK_ALERT_CELERY_QUEUE},
     },
     "finish-stale-bulk-message-sends": {
@@ -636,9 +634,7 @@ METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
     "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
 )
 # Base URL of the Weni dashboard used as the CTA link in risk alert emails.
-WENI_DASHBOARD_URL = env.str(
-    "WENI_DASHBOARD_URL", default="https://dash.weni.ai"
-)
+WENI_DASHBOARD_URL = env.str("WENI_DASHBOARD_URL", default="https://dash.weni.ai")
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
@@ -804,9 +800,6 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
-    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
-)
 WS_PING_TIMEOUT_SECONDS = env.int("WS_PING_TIMEOUT_SECONDS", default=60)
 WS_PING_CHECK_INTERVAL_SECONDS = env.int("WS_PING_CHECK_INTERVAL_SECONDS", default=10)
 WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
@@ -839,14 +832,6 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
-)
-LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
-    "LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY",
-    default="weniChatsLeastRoomsClosedToday",
-)
-WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
-    "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
-    default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
 INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY = env.str(
     "INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY",

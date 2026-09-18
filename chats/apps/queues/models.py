@@ -105,16 +105,6 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
             project_permissions__is_deleted=False,
         )
 
-    def _is_ping_timeout_feature_enabled(self) -> bool:
-        """Check if the ping timeout feature is enabled for this queue's project."""
-        try:
-            return is_feature_active_for_attributes(
-                settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-                {"projectUUID": str(self.sector.project.uuid)},
-            )
-        except Exception:
-            return False
-
     def _is_agents_management_feature_enabled(self) -> bool:
         """Check if the agents management feature is enabled for this queue's project."""
         try:
@@ -136,12 +126,10 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
             "project_permissions__queue_authorizations__is_deleted": False,
         }
 
-        # If ping timeout feature is enabled, also filter by last_seen
-        if self._is_ping_timeout_feature_enabled():
-            last_seen_threshold = timezone.now() - timedelta(
-                seconds=LAST_SEEN_THRESHOLD_SECONDS
-            )
-            base_filter["project_permissions__last_seen__gte"] = last_seen_threshold
+        last_seen_threshold = timezone.now() - timedelta(
+            seconds=LAST_SEEN_THRESHOLD_SECONDS
+        )
+        base_filter["project_permissions__last_seen__gte"] = last_seen_threshold
 
         agents = self.agents.filter(**base_filter)
 
@@ -290,13 +278,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         if len(eligible_agents) == 1:
             return eligible_agents[0]
 
-        if is_feature_active_for_attributes(
-            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
-            {"projectUUID": str(self.project.uuid)},
-        ):
-            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
-
-        return random.choice(eligible_agents)
+        return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()
