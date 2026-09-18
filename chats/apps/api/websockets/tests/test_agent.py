@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
-from django.conf import settings
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -545,8 +544,8 @@ class PingTimeoutUnitTestCase(TestCase):
         self.assertTrue(result)
 
 
-class PingTimeoutFeatureFlagTestCase(TestCase):
-    """Tests for ping timeout feature flag integration"""
+class PingTimeoutConnectTestCase(TestCase):
+    """Tests for ping timeout on websocket connect"""
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -567,46 +566,12 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         )
         self.queue = self.sector.queues.create(name="Test queue FF")
 
-    @patch(
-        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
-    )
-    async def test_ping_timeout_task_not_created_when_feature_disabled(
-        self, mock_is_feature_active_for_attributes
-    ):
-        """Test that ping_timeout_task is not created when feature flag is disabled"""
-        mock_is_feature_active_for_attributes.return_value = False
-
+    async def test_connect_starts_ping_timeout_task(self):
         communicator = WebsocketCommunicator(
             self.application,
             f"/ws/agent/rooms?Token={self.token.pk}&project={self.project.pk}",
         )
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
-
-        mock_is_feature_active_for_attributes.assert_called_once()
-        call_args = mock_is_feature_active_for_attributes.call_args
-        self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
-
-        await communicator.disconnect()
-
-    @patch(
-        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
-    )
-    async def test_ping_timeout_task_created_when_feature_enabled(
-        self, mock_is_feature_active_for_attributes
-    ):
-        """Test that ping_timeout_task is created when feature flag is enabled"""
-        mock_is_feature_active_for_attributes.return_value = True
-
-        communicator = WebsocketCommunicator(
-            self.application,
-            f"/ws/agent/rooms?Token={self.token.pk}&project={self.project.pk}",
-        )
-        connected, _ = await communicator.connect()
-        self.assertTrue(connected)
-
-        mock_is_feature_active_for_attributes.assert_called_once()
-        call_args = mock_is_feature_active_for_attributes.call_args
-        self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
 
         await communicator.disconnect()

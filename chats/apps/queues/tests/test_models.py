@@ -395,7 +395,9 @@ class QueueAuthorizationSoftDeleteTestCase(QueueSetUpMixin, TestCase):
     def test_authorizations_manager_excludes_soft_deleted(self):
         self.agent_auth.delete()
 
-        self.assertFalse(QueueAuthorization.objects.filter(pk=self.agent_auth.pk).exists())
+        self.assertFalse(
+            QueueAuthorization.objects.filter(pk=self.agent_auth.pk).exists()
+        )
         self.assertTrue(
             QueueAuthorization.all_objects.filter(pk=self.agent_auth.pk).exists()
         )
@@ -514,15 +516,10 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
-    )
-    def test_online_agents_excludes_agents_with_old_last_seen_when_feature_enabled(
-        self, mock_feature_flag
-    ):
+    def test_online_agents_excludes_agents_with_old_last_seen(self):
         """
         Test that agents with last_seen older than the threshold
-        are not returned in online_agents when ping timeout feature is enabled.
+        are not returned in online_agents.
         """
         self.assertEqual(self.queue.online_agents.count(), 3)
 
@@ -533,15 +530,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
-    )
-    def test_online_agents_excludes_agents_with_null_last_seen_when_feature_enabled(
-        self, mock_feature_flag
-    ):
+    def test_online_agents_excludes_agents_with_null_last_seen(self):
         """
-        Test that agents with null last_seen are not returned in online_agents
-        when ping timeout feature is enabled.
+        Test that agents with null last_seen are not returned in online_agents.
         """
         self.assertEqual(self.queue.online_agents.count(), 3)
 
@@ -550,45 +541,6 @@ class TestQueueOnlineAgents(TestCase):
 
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
-
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
-    )
-    def test_online_agents_includes_agents_with_old_last_seen_when_feature_disabled(
-        self, mock_feature_flag
-    ):
-        """
-        Test that agents with old last_seen ARE returned in online_agents
-        when ping timeout feature is disabled (legacy behavior).
-        """
-        self.assertEqual(self.queue.online_agents.count(), 3)
-
-        # Set agent_1's last_seen to 2 minutes ago
-        old_last_seen = timezone.now() - timedelta(seconds=120)
-        self.agent_1.project_permissions.update(last_seen=old_last_seen)
-
-        # Agent should still be returned because feature is disabled
-        self.assertEqual(self.queue.online_agents.count(), 3)
-        self.assertIn(self.agent_1, self.queue.online_agents)
-
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
-    )
-    def test_online_agents_includes_agents_with_null_last_seen_when_feature_disabled(
-        self, mock_feature_flag
-    ):
-        """
-        Test that agents with null last_seen ARE returned in online_agents
-        when ping timeout feature is disabled (legacy behavior).
-        """
-        self.assertEqual(self.queue.online_agents.count(), 3)
-
-        # Set agent_1's last_seen to None
-        self.agent_1.project_permissions.update(last_seen=None)
-
-        # Agent should still be returned because feature is disabled
-        self.assertEqual(self.queue.online_agents.count(), 3)
-        self.assertIn(self.agent_1, self.queue.online_agents)
 
 
 class TestQueueGetAvailableAgent(TestCase):
@@ -634,11 +586,8 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
-    )
-    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(
-        self, mock_is_feature_active_for_attributes
+    def test_get_available_agent_returns_random_agent_if_rooms_count_and_closed_today_are_equal(
+        self,
     ):
         for i in range(3):
             # Agent 1 has 3 active rooms
@@ -675,11 +624,8 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
-    )
-    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
-        self, mock_is_feature_active_for_attributes
+    def test_get_available_agent_tiebreaker_by_rooms_closed_today_for_general_routing_option(
+        self,
     ):
         self.project.config = {"routing_option": "general"}
         self.project.save()
@@ -700,35 +646,10 @@ class TestQueueGetAvailableAgent(TestCase):
             # Agent 3 has 3 active rooms
             Room.objects.create(user=self.agent_3, queue=self.queue, is_active=True)
 
-        num_trials = 100
-        picked_agents_results = []
-        for _ in range(num_trials):
-            available_agent = self.queue.get_available_agent()
-            self.assertIsNotNone(
-                available_agent, "get_available_agent should return an agent."
-            )
-            self.assertIn(available_agent, [self.agent_2, self.agent_3])
-            picked_agents_results.append(available_agent)
+        available_agent = self.queue.get_available_agent()
+        self.assertEqual(available_agent, self.agent_3)
 
-        # Verify that both eligible agents were picked at least once over the trials.
-        picked_agents_set = set(picked_agents_results)
-        self.assertIn(
-            self.agent_2,
-            picked_agents_set,
-            "Agent 2 was never picked, suggesting non-random selection.",
-        )
-        self.assertIn(
-            self.agent_3,
-            picked_agents_set,
-            "Agent 3 was never picked, suggesting non-random selection.",
-        )
-
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
-    )
-    def test_get_available_agent_tiebreaker_by_rooms_closed_today(
-        self, mock_is_feature_active_for_attributes
-    ):
+    def test_get_available_agent_tiebreaker_by_rooms_closed_today(self):
         """
         When agents have the same number of active rooms,
         the agent with fewer rooms closed today should be selected.
@@ -757,12 +678,7 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch(
-        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
-    )
-    def test_get_available_agent_random_when_all_tiebreakers_equal(
-        self, mock_is_feature_active_for_attributes
-    ):
+    def test_get_available_agent_random_when_all_tiebreakers_equal(self):
         """
         When agents have the same number of active rooms AND the same number
         of rooms closed today, the selection should be random.
