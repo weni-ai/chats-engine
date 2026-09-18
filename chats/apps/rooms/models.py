@@ -343,6 +343,15 @@ class Room(BaseModel, BaseConfigurableModel):
                     last_message_user__isnull=False,
                 ),
             ),
+            # Prefix btree for Insights/dashboard channel filters
+            # (`urn LIKE 'whatsapp:%'` via `urn__startswith`). Default btree
+            # collations do not support LIKE prefix scans; text_pattern_ops does.
+            models.Index(
+                fields=["urn"],
+                name="rooms_room_urn_prefix_idx",
+                opclasses=["text_pattern_ops"],
+                condition=Q(urn__isnull=False) & ~Q(urn=""),
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -948,16 +957,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
     @property
     def is_archived(self) -> bool:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         return RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
         ).exists()
 
     def get_archived_conversation_file_url(self) -> Optional[str]:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         archive = RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
