@@ -139,6 +139,11 @@ class ResolveRoomUserLinkedUserTests(TestCase):
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
         )
+        self.queue_authorization = QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=self.permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
         LinkContact.objects.create(
             user=self.linked_agent,
             contact=self.contact,
@@ -168,6 +173,54 @@ class ResolveRoomUserLinkedUserTests(TestCase):
     def test_skips_linked_user_when_linked_user_offline(self):
         self.permission.status = "OFFLINE"
         self.permission.save(update_fields=["status"])
+
+        result = self.usecase.execute(
+            contact=self.contact,
+            user=None,
+            is_created=False,
+        )
+
+        self.assertIsNone(result)
+
+    def test_skips_linked_user_when_not_agent_of_queue(self):
+        self.queue_authorization.delete()
+
+        result = self.usecase.execute(
+            contact=self.contact,
+            user=None,
+            is_created=False,
+        )
+
+        self.assertIsNone(result)
+
+    def test_falls_back_to_default_routing_when_linked_user_not_in_queue(self):
+        self.queue_authorization.delete()
+
+        other_agent = User.objects.create(email="other@example.com")
+        other_permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=other_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=other_permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        result = self.usecase.execute(
+            contact=self.contact,
+            user=None,
+            is_created=False,
+        )
+
+        self.assertEqual(result, other_agent)
+
+    def test_skips_linked_user_when_link_has_no_user(self):
+        LinkContact.objects.filter(contact=self.contact, project=self.project).update(
+            user=None
+        )
 
         result = self.usecase.execute(
             contact=self.contact,
