@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 COPILOT_REQUEST_TIMEOUT_SECONDS = 15
 FLOWS_REQUEST_TIMEOUT_SECONDS = 15
+HTTP_502_BAD_GATEWAY = 502
 
 
 class CopilotConnectClient(InternalAuthentication):
@@ -30,7 +31,7 @@ class CopilotConnectClient(InternalAuthentication):
             )
 
         raise CopilotConnectError(
-            status_code=502,
+            status_code=HTTP_502_BAD_GATEWAY,
             error="Connect API URL is not configured",
         )
 
