@@ -20,6 +20,9 @@ from chats.apps.assisted_sales.usecases import (
 )
 from chats.apps.projects.models import ProjectPermission
 
+HTTP_CLIENT_ERROR_MIN = 400
+HTTP_SERVER_ERROR_MAX = 600
+
 
 class CopilotProjectCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -72,7 +75,7 @@ class CopilotProjectCreateView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
         except (TypeError, ValueError, KeyError) as exc:
@@ -95,9 +98,9 @@ class CopilotProjectUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            integration = CopilotIntegration.objects.select_related("project").get(
-                Q(uuid=uuid) | Q(copilot_project_uuid=uuid)
-            )
+            integration = CopilotIntegration.objects.select_related(
+                "project", "connected_by"
+            ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
         except CopilotIntegration.DoesNotExist:
             return Response(
                 {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
@@ -122,7 +125,7 @@ class CopilotProjectUpdateView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
         except (TypeError, ValueError, KeyError) as exc:
