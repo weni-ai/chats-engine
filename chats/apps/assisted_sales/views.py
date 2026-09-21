@@ -169,7 +169,7 @@ class CopilotProjectRemoveView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
 
