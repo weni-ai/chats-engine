@@ -24,6 +24,7 @@ from chats.apps.api.v1.dashboard.viewsets import (
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
 from chats.apps.assisted_sales.views import (
     CopilotProjectCreateView,
+    CopilotProjectRemoveView,
     CopilotProjectUpdateView,
 )
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
@@ -110,6 +111,11 @@ urlpatterns = [
         "project/copilot/update/<uuid:uuid>",
         CopilotProjectUpdateView.as_view(),
         name="copilot_project_update",
+    ),
+    path(
+        "project/copilot/remove/<uuid:uuid>",
+        CopilotProjectRemoveView.as_view(),
+        name="copilot_project_remove",
     ),
     path(
         "project/<uuid:project_uuid>/all_agents/",

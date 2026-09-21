@@ -10,6 +10,8 @@ from chats.apps.assisted_sales.exceptions import CopilotConnectError
 
 logger = logging.getLogger(__name__)
 
+COPILOT_REQUEST_TIMEOUT_SECONDS = 15
+
 
 class CopilotConnectClient(InternalAuthentication):
     def create_copilot_project(self, name: str, project_uuid: str) -> dict:
@@ -68,6 +70,28 @@ class CopilotConnectClient(InternalAuthentication):
             )
 
         return self._parse_json(response)
+
+    def remove_copilot_project(self, copilot_project_uuid: str) -> None:
+        url = settings.CONNECT_COPILOT_REMOVE_URL
+        if not url:
+            return
+
+        request_url = url.format(uuid=copilot_project_uuid)
+        try:
+            response = requests.delete(
+                url=request_url,
+                headers=self.headers,
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            logger.exception("Failed to remove copilot project on Connect")
+            raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+
+        if not response.ok:
+            raise CopilotConnectError(
+                status_code=response.status_code,
+                error=self._parse_error(response),
+            )
 
     def get_assigned_agents(self, copilot_project_uuid: str) -> int:
         url = settings.CONNECT_COPILOT_AGENTS_COUNT_URL
