@@ -16,6 +16,8 @@ from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+HTTP_400_BAD_REQUEST = 400
+
 
 def build_webchat_connection(connect_data: dict) -> dict:
     channel_uuid = (
@@ -72,14 +74,14 @@ class CreateCopilotIntegrationUseCase:
 
         if not project.org:
             raise CopilotConnectError(
-                status_code=400,
+                status_code=HTTP_400_BAD_REQUEST,
                 error="Project has no organization uuid",
             )
 
         timezone = str(project.timezone) if project.timezone else ""
         if not timezone:
             raise CopilotConnectError(
-                status_code=400,
+                status_code=HTTP_400_BAD_REQUEST,
                 error="Project has no timezone",
             )
 
