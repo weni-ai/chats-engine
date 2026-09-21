@@ -144,7 +144,7 @@ class CopilotConnectClient(InternalAuthentication):
                 url=url,
                 headers=self.headers,
                 params={"user": user_email},
-                timeout=15,
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to fetch project authorization on Connect")
