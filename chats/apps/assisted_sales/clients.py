@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 COPILOT_REQUEST_TIMEOUT_SECONDS = 15
 FLOWS_REQUEST_TIMEOUT_SECONDS = 15
 HTTP_502_BAD_GATEWAY = 502
+HTTP_UNAUTHORIZED = 401
 
 
 class CopilotConnectClient(InternalAuthentication):
@@ -38,7 +39,7 @@ class CopilotConnectClient(InternalAuthentication):
     def _user_headers(self, authorization: str) -> dict:
         if not authorization or not str(authorization).strip():
             raise CopilotConnectError(
-                status_code=401,
+                status_code=HTTP_UNAUTHORIZED,
                 error="User authorization is required to create a copilot project",
             )
         return {
