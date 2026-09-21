@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -100,10 +101,13 @@ class UpdateCopilotIntegrationUseCase:
                 error="New copilot uuid is the same as the current one",
             )
 
-        connect_data = self.client.switch_copilot_project(
-            old_copilot_uuid=str(integration.copilot_project_uuid),
-            new_copilot_uuid=str(new_uuid),
-        ) or {}
+        connect_data = (
+            self.client.switch_copilot_project(
+                old_copilot_uuid=str(integration.copilot_project_uuid),
+                new_copilot_uuid=str(new_uuid),
+            )
+            or {}
+        )
 
         copilot_uuid = new_uuid
         if connect_data.get("uuid") or connect_data.get("project_uuid"):
@@ -111,14 +115,15 @@ class UpdateCopilotIntegrationUseCase:
 
         assigned_agents = self.client.get_assigned_agents(str(copilot_uuid))
 
-        integration.copilot_project_uuid = copilot_uuid
-        integration.name = connect_data.get("name") or integration.name
-        integration.assigned_agents = assigned_agents
-        integration.connection = build_webchat_connection(connect_data)
-        integration.connected_by = user
-        integration.connected_on = timezone.now()
-        created_on = parse_created_on(connect_data)
-        if created_on:
-            integration.copilot_created_on = created_on
-        integration.save()
+        with transaction.atomic():
+            integration.copilot_project_uuid = copilot_uuid
+            integration.name = connect_data.get("name") or integration.name
+            integration.assigned_agents = assigned_agents
+            integration.connection = build_webchat_connection(connect_data)
+            integration.connected_by = user
+            integration.connected_on = timezone.now()
+            created_on = parse_created_on(connect_data)
+            if created_on:
+                integration.copilot_created_on = created_on
+            integration.save()
         return integration
