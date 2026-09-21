@@ -12,6 +12,7 @@ from chats.apps.assisted_sales.exceptions import CopilotConnectError
 logger = logging.getLogger(__name__)
 
 COPILOT_REQUEST_TIMEOUT_SECONDS = 15
+FLOWS_REQUEST_TIMEOUT_SECONDS = 15
 
 
 class CopilotConnectClient(InternalAuthentication):
@@ -223,7 +224,7 @@ class CopilotConnectClient(InternalAuthentication):
                 url=url,
                 headers=self.headers,
                 params=params,
-                timeout=15,
+                timeout=FLOWS_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to list copilot messages on Flows")
