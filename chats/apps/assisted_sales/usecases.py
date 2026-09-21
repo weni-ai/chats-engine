@@ -313,6 +313,7 @@ class UpdateCopilotWwcChannelUseCase:
         else:
             connection["channelUuid"] = str(parsed_channel_uuid)
 
-        integration.connection = connection
-        integration.save(update_fields=["connection", "modified_on"])
+        with transaction.atomic():
+            integration.connection = connection
+            integration.save(update_fields=["connection", "modified_on"])
         return integration
