@@ -35,6 +35,17 @@ class CopilotConnectClient(InternalAuthentication):
             error="Connect API URL is not configured",
         )
 
+    def _user_headers(self, authorization: str) -> dict:
+        if not authorization or not str(authorization).strip():
+            raise CopilotConnectError(
+                status_code=401,
+                error="User authorization is required to create a copilot project",
+            )
+        return {
+            "Content-Type": "application/json; charset: utf-8",
+            "Authorization": str(authorization).strip(),
+        }
+
     def create_copilot_project(
         self,
         *,
@@ -43,6 +54,7 @@ class CopilotConnectClient(InternalAuthentication):
         organization_uuid: str,
         timezone: str,
         date_format: str = None,
+        authorization: str,
     ) -> dict:
         url = self._copilot_create_url(organization_uuid)
 
@@ -58,7 +70,7 @@ class CopilotConnectClient(InternalAuthentication):
         try:
             response = requests.post(
                 url=url,
-                headers=self.headers,
+                headers=self._user_headers(authorization),
                 json=payload,
                 timeout=15,
             )

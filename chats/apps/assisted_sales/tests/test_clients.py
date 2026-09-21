@@ -23,6 +23,7 @@ class CopilotConnectClientTests(TestCase):
             "organization_uuid": "org-uuid",
             "timezone": "America/Sao_Paulo",
             "date_format": "D",
+            "authorization": "Bearer user-token",
         }
 
     @patch("chats.apps.assisted_sales.clients.requests.post")
@@ -35,7 +36,10 @@ class CopilotConnectClientTests(TestCase):
 
         mock_post.assert_called_once_with(
             url="https://connect.example.com/v2/organizations/org-uuid/projects/",
-            headers=self.client_rest.headers,
+            headers={
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer user-token",
+            },
             json={
                 "name": "copilot",
                 "timezone": "America/Sao_Paulo",
@@ -65,6 +69,19 @@ class CopilotConnectClientTests(TestCase):
             self.client_rest.create_copilot_project(**self._create_kwargs())
 
         self.assertEqual(ctx.exception.status_code, 502)
+
+    @patch("chats.apps.assisted_sales.clients.requests.post")
+    def test_create_copilot_project_requires_user_authorization(
+        self, mock_post, _mock_token
+    ):
+        kwargs = self._create_kwargs()
+        kwargs["authorization"] = ""
+
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.create_copilot_project(**kwargs)
+
+        self.assertEqual(ctx.exception.status_code, 401)
+        mock_post.assert_not_called()
 
     @patch.object(NexusRESTClient, "get_projects_agents")
     def test_get_assigned_agents(self, mock_get, _mock_token):
