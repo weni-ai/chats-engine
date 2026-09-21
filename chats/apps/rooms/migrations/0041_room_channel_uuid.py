@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0039_rooms_violation_indexes"),
+        ("rooms", "0040_room_last_message_metadata"),
     ]
 
     operations = [
