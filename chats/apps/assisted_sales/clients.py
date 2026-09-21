@@ -145,7 +145,7 @@ class CopilotConnectClient(InternalAuthentication):
                 url=request_url,
                 headers=self.headers,
                 params=params,
-                timeout=15,
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to list copilot projects on Connect")
