@@ -11,6 +11,7 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
     CopilotIntegrationAlreadyExists,
 )
+from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
@@ -391,6 +392,9 @@ class UpdateCopilotWwcChannelUseCase:
             integration = queryset.first()
 
         if not integration:
+            return None
+
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
             return None
 
         connection = dict(integration.connection or {})

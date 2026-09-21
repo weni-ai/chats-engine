@@ -224,6 +224,13 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
 
 class UpdateCopilotWwcChannelUseCaseTests(TestCase):
     def setUp(self):
+        super().setUp()
+        patcher = patch(
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+            return_value=True,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.project = Project.objects.create(name="Live Desk", timezone="UTC")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -251,6 +258,22 @@ class UpdateCopilotWwcChannelUseCaseTests(TestCase):
             name="copilot",
             connection=connection,
         )
+
+    @patch(
+        "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+        return_value=False,
+    )
+    def test_does_not_update_channel_when_feature_flag_is_off(self, _flag):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        integration.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(integration.connection["channelUuid"], "")
 
     def test_updates_project_integration_channel(self):
         integration = self._create_integration()

@@ -15,14 +15,26 @@ from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
+class CopilotFeatureFlagMixin:
+    def setUp(self):
+        super().setUp()
+        patcher = patch(
+            "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+            return_value=True,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
 @override_settings(
     CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
     NEXUS_API_URL="https://nexus.example.com",
     WENI_WEBCHAT_HOST="https://flows.weni.ai",
     WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
 )
-class CopilotProjectCreateViewTests(APITestCase):
+class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.user.first_name = "edu"
         self.user.save(update_fields=["first_name"])
@@ -131,13 +143,30 @@ class CopilotProjectCreateViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_client_cls.return_value.create_copilot_project.assert_not_called()
 
+    @patch(
+        "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+        return_value=False,
+    )
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_create_forbidden_when_feature_flag_is_off(self, mock_client_cls, _flag):
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_client_cls.return_value.create_copilot_project.assert_not_called()
+        self.assertFalse(CopilotIntegration.objects.exists())
+
 
 @override_settings(
     CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
     NEXUS_API_URL="https://nexus.example.com",
 )
-class CopilotProjectUpdateViewTests(APITestCase):
+class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.user.first_name = "edu"
         self.user.save(update_fields=["first_name"])
@@ -210,8 +239,9 @@ class CopilotProjectUpdateViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class CopilotProjectRemoveViewTests(APITestCase):
+class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.project = Project.objects.create(name="Live Desk", timezone="UTC")
         ProjectPermission.objects.create(
@@ -270,8 +300,9 @@ class CopilotProjectRemoveViewTests(APITestCase):
         )
 
 
-class CopilotLinkedProjectViewTests(APITestCase):
+class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.user.first_name = "edu"
         self.user.save(update_fields=["first_name"])
@@ -318,8 +349,9 @@ class CopilotLinkedProjectViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class CopilotExistingProjectsViewTests(APITestCase):
+class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.org_uuid = uuid4()
         self.project = Project.objects.create(
@@ -368,8 +400,9 @@ class CopilotExistingProjectsViewTests(APITestCase):
 
 
 @override_settings(CONNECT_API_URL="https://connect.example.com")
-class CopilotCreatePermissionViewTests(APITestCase):
+class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.project = Project.objects.create(name="Live Desk", timezone="UTC")
         ProjectPermission.objects.create(
@@ -449,8 +482,9 @@ class CopilotCreatePermissionViewTests(APITestCase):
         self.assertEqual(response.data["error"], "Connect unavailable")
 
 
-class CopilotRoomMessagesViewTests(APITestCase):
+class CopilotRoomMessagesViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.user, self.token = create_user_and_token("edu")
         self.project = Project.objects.create(name="Live Desk", timezone="UTC")
         ProjectPermission.objects.create(
