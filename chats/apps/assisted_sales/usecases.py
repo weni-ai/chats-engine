@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from django.conf import settings
@@ -10,9 +11,13 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
     CopilotIntegrationAlreadyExists,
 )
+from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+
+HTTP_400_BAD_REQUEST = 400
 
 
 def build_webchat_connection(connect_data: dict) -> dict:
@@ -58,6 +63,7 @@ class CreateCopilotIntegrationUseCase:
         name: str,
         project: Project,
         user,
+        authorization: str,
         sector: Sector = None,
     ) -> CopilotIntegration:
         existing = CopilotIntegration.objects.filter(project=project)
@@ -68,8 +74,26 @@ class CreateCopilotIntegrationUseCase:
         if existing.exists():
             raise CopilotIntegrationAlreadyExists()
 
+        if not project.org:
+            raise CopilotConnectError(
+                status_code=HTTP_400_BAD_REQUEST,
+                error="Project has no organization uuid",
+            )
+
+        timezone = str(project.timezone) if project.timezone else ""
+        if not timezone:
+            raise CopilotConnectError(
+                status_code=HTTP_400_BAD_REQUEST,
+                error="Project has no timezone",
+            )
+
         connect_data = self.client.create_copilot_project(
-            name=name, project_uuid=str(project.uuid)
+            name=name,
+            parent_project_uuid=str(project.uuid),
+            organization_uuid=str(project.org),
+            timezone=timezone,
+            date_format=project.date_format,
+            authorization=authorization,
         )
 
         copilot_uuid = parse_copilot_uuid(connect_data)
@@ -165,6 +189,37 @@ class GetLinkedCopilotUseCase:
         return integration
 
 
+CONNECT_MODERATOR_ROLE_LABEL = "moderator"
+
+
+def user_can_create_copilot(authorization_data: dict) -> bool:
+    available_roles = authorization_data.get("available_roles") or {}
+    moderator_role = None
+    for key, label in available_roles.items():
+        if str(label).strip().lower() == CONNECT_MODERATOR_ROLE_LABEL:
+            try:
+                moderator_role = int(key)
+            except (TypeError, ValueError):
+                return False
+            break
+    if moderator_role is None:
+        return False
+    try:
+        current_role = int(authorization_data.get("project_authorization"))
+    except (TypeError, ValueError):
+        return False
+    return current_role == moderator_role
+
+
+class CheckCopilotCreatePermissionUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(self, *, project_uuid: str, user_email: str) -> bool:
+        data = self.client.get_project_authorization(project_uuid, user_email)
+        return user_can_create_copilot(data)
+
+
 class ListExistingCopilotsUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
@@ -203,3 +258,154 @@ class ListExistingCopilotsUseCase:
             "uuid": copilot_uuid,
             "project_uuid": copilot_uuid,
         }
+
+
+def parse_channel_uuid(raw) -> Optional[UUID]:
+    if not raw:
+        return None
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def get_copilot_integration_for_room(
+    project: Project, room: Room = None
+) -> CopilotIntegration:
+    sector = None
+    if room and room.queue_id:
+        sector = room.queue.sector
+
+    if sector:
+        integration = CopilotIntegration.objects.filter(sector=sector).first()
+        if integration:
+            return integration
+
+    integration = CopilotIntegration.objects.filter(
+        project=project, sector__isnull=True
+    ).first()
+    if not integration:
+        raise CopilotIntegration.DoesNotExist()
+    return integration
+
+
+class ListCopilotRoomMessagesUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(
+        self,
+        *,
+        project: Project,
+        room_uuid,
+        cursor: str = None,
+        limit: int = None,
+    ) -> dict:
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(uuid=room_uuid)
+            .first()
+        )
+        if not room:
+            raise Room.DoesNotExist()
+
+        room_project = room.queue.sector.project if room.queue_id else None
+        if not room_project or room_project.uuid != project.uuid:
+            raise Room.DoesNotExist()
+
+        integration = get_copilot_integration_for_room(project, room)
+        return self.client.list_internal_messages(
+            project_uuid=str(integration.copilot_project_uuid),
+            contact_urn=str(room.uuid),
+            cursor=cursor,
+            limit=limit,
+        )
+
+
+def get_copilot_channel_uuid(room: Room) -> Optional[UUID]:
+    if not room.queue_id:
+        return None
+
+    sector = room.queue.sector
+    integration = CopilotIntegration.objects.filter(sector=sector).first()
+    if not integration:
+        integration = CopilotIntegration.objects.filter(
+            project=sector.project, sector__isnull=True
+        ).first()
+    if not integration:
+        return None
+
+    connection = integration.connection or {}
+    return parse_channel_uuid(
+        connection.get("channelUuid") or connection.get("channel_uuid")
+    )
+
+
+class SetRoomCopilotChannelUseCase:
+    def execute(self, room_pk: str) -> None:
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(pk=room_pk)
+            .first()
+        )
+        if not room:
+            return
+
+        channel_uuid = get_copilot_channel_uuid(room)
+        if not channel_uuid:
+            return
+
+        Room.objects.filter(pk=room.pk).update(channel_uuid=channel_uuid)
+
+
+class UpdateCopilotWwcChannelUseCase:
+    def execute(
+        self,
+        *,
+        channel_uuid,
+        project_uuid,
+        sector_uuid=None,
+        is_live_desk_copilot=None,
+    ) -> Optional[CopilotIntegration]:
+        if is_live_desk_copilot is False:
+            return None
+
+        parsed_channel_uuid = parse_channel_uuid(channel_uuid)
+        parsed_project_uuid = parse_channel_uuid(project_uuid)
+        if not parsed_channel_uuid or not parsed_project_uuid:
+            return None
+
+        integration = CopilotIntegration.objects.filter(
+            copilot_project_uuid=parsed_project_uuid
+        ).first()
+        if integration is None:
+            queryset = CopilotIntegration.objects.filter(
+                project__uuid=parsed_project_uuid
+            )
+            if sector_uuid:
+                parsed_sector_uuid = parse_channel_uuid(sector_uuid)
+                if not parsed_sector_uuid:
+                    return None
+                queryset = queryset.filter(sector__uuid=parsed_sector_uuid)
+            else:
+                queryset = queryset.filter(sector__isnull=True)
+            integration = queryset.first()
+
+        if not integration:
+            return None
+
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return None
+
+        connection = dict(integration.connection or {})
+        if not connection:
+            connection = build_webchat_connection(
+                {"channelUuid": str(parsed_channel_uuid)}
+            )
+        else:
+            connection["channelUuid"] = str(parsed_channel_uuid)
+
+        with transaction.atomic():
+            integration.connection = connection
+            integration.save(update_fields=["connection", "modified_on"])
+        return integration

@@ -976,6 +976,11 @@ AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     default="weniChatsAgentsManagement",
 )
 
+ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY = env.str(
+    "ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY",
+    default="weniChatsAssistedSalesCopilot",
+)
+
 # Metric Goal Alerts (risk alerts)
 METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY = env.str(
     "METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY",

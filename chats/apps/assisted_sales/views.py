@@ -1,3 +1,6 @@
+from urllib.parse import parse_qs, urlparse
+
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +11,7 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
     CopilotIntegrationAlreadyExists,
 )
+from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.assisted_sales.serializers import (
     CopilotExistingProjectSerializer,
@@ -17,17 +21,27 @@ from chats.apps.assisted_sales.serializers import (
     UpdateCopilotIntegrationSerializer,
 )
 from chats.apps.assisted_sales.usecases import (
+    CheckCopilotCreatePermissionUseCase,
     CreateCopilotIntegrationUseCase,
     GetLinkedCopilotUseCase,
+    ListCopilotRoomMessagesUseCase,
     ListExistingCopilotsUseCase,
     RemoveCopilotIntegrationUseCase,
     UpdateCopilotIntegrationUseCase,
 )
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 HTTP_CLIENT_ERROR_MIN = 400
 HTTP_SERVER_ERROR_MAX = 600
+
+
+def _copilot_feature_forbidden():
+    return Response(
+        {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 class CopilotProjectCreateView(APIView):
@@ -52,6 +66,9 @@ class CopilotProjectCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
         sector = serializer.validated_data.get("sector")
         if sector and sector.project_id != project.uuid:
             return Response(
@@ -67,6 +84,7 @@ class CopilotProjectCreateView(APIView):
                 name=serializer.validated_data["name"],
                 project=project,
                 user=request.user,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
                 sector=sector,
             )
         except CopilotIntegrationAlreadyExists:
@@ -121,6 +139,9 @@ class CopilotProjectUpdateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return _copilot_feature_forbidden()
+
         try:
             integration = UpdateCopilotIntegrationUseCase().execute(
                 integration=integration,
@@ -168,6 +189,9 @@ class CopilotProjectRemoveView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return _copilot_feature_forbidden()
+
         try:
             RemoveCopilotIntegrationUseCase().execute(integration=integration)
         except CopilotConnectError as exc:
@@ -201,6 +225,9 @@ class CopilotLinkedProjectView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
         sector = None
         sector_uuid = request.query_params.get("sector")
         if sector_uuid:
@@ -228,17 +255,62 @@ class CopilotLinkedProjectView(APIView):
         )
 
 
-class CopilotExistingProjectsView(APIView):
+class CopilotCreatePermissionView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, org_uuid):
+    def get(self, request, project_uuid):
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         if not ProjectPermission.objects.filter(
-            user=request.user, project__org=str(org_uuid)
+            user=request.user, project=project
         ).exists():
             return Response(
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
+        try:
+            can_create = CheckCopilotCreatePermissionUseCase().execute(
+                project_uuid=str(project.uuid),
+                user_email=request.user.email,
+            )
+        except CopilotConnectError as exc:
+            return Response(
+                {"status_code": exc.status_code, "error": exc.error},
+                status=exc.status_code
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
+                else status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({"can_create": can_create}, status=status.HTTP_200_OK)
+
+
+class CopilotExistingProjectsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, org_uuid):
+        project_ids = ProjectPermission.objects.filter(
+            user=request.user, project__org=str(org_uuid)
+        ).values_list("project_id", flat=True)
+        if not project_ids:
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not any(
+            is_assisted_sales_copilot_enabled(project_id) for project_id in project_ids
+        ):
+            return _copilot_feature_forbidden()
 
         try:
             projects = ListExistingCopilotsUseCase().execute(
@@ -257,3 +329,78 @@ class CopilotExistingProjectsView(APIView):
             CopilotExistingProjectSerializer(projects, many=True).data,
             status=status.HTTP_200_OK,
         )
+
+
+def _rewrite_pagination_url(request, flows_url):
+    if not flows_url:
+        return None
+    cursor = parse_qs(urlparse(str(flows_url)).query).get("cursor", [None])[0]
+    if not cursor:
+        return None
+    params = request.query_params.copy()
+    params["cursor"] = cursor
+    return request.build_absolute_uri(f"{request.path}?{params.urlencode()}")
+
+
+class CopilotRoomMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, room_uuid):
+        project_uuid = request.query_params.get("project")
+        if not project_uuid:
+            return Response(
+                {
+                    "status_code": status.HTTP_400_BAD_REQUEST,
+                    "error": "Project not provided",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+        except (Project.DoesNotExist, ValueError, ValidationError):
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
+        try:
+            data = ListCopilotRoomMessagesUseCase().execute(
+                project=project,
+                room_uuid=room_uuid,
+                cursor=request.query_params.get("cursor") or None,
+            )
+        except Room.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except CopilotIntegration.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except CopilotConnectError as exc:
+            return Response(
+                {"status_code": exc.status_code, "error": exc.error},
+                status=exc.status_code
+                if 400 <= exc.status_code < 600
+                else status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if isinstance(data, dict):
+            data["next"] = _rewrite_pagination_url(request, data.get("next"))
+            data["previous"] = _rewrite_pagination_url(request, data.get("previous"))
+
+        return Response(data, status=status.HTTP_200_OK)
