@@ -183,7 +183,11 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
         self.assertEqual(self.room.channel_uuid, self.channel_uuid)
 
     @override_settings(USE_CELERY=False)
-    def test_close_sets_channel_inline_when_celery_is_disabled(self):
+    @patch(
+        "chats.apps.assisted_sales.feature_flags.is_assisted_sales_copilot_enabled",
+        return_value=True,
+    )
+    def test_close_sets_channel_inline_when_celery_is_disabled(self, _mock_flag):
         self._create_integration()
 
         self.room.close()
@@ -194,7 +198,11 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
 
     @override_settings(USE_CELERY=True)
     @patch("chats.apps.assisted_sales.tasks.set_room_copilot_channel.delay")
-    def test_close_enqueues_task_when_celery_is_enabled(self, mock_delay):
+    @patch(
+        "chats.apps.assisted_sales.feature_flags.is_assisted_sales_copilot_enabled",
+        return_value=True,
+    )
+    def test_close_enqueues_task_when_celery_is_enabled(self, _mock_flag, mock_delay):
         self._create_integration()
 
         with self.captureOnCommitCallbacks(execute=True):
