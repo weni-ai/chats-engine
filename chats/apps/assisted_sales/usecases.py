@@ -158,9 +158,10 @@ class GetLinkedCopilotUseCase:
         assigned_agents = self.client.get_assigned_agents(
             str(integration.copilot_project_uuid)
         )
-        if assigned_agents != integration.assigned_agents:
-            integration.assigned_agents = assigned_agents
-            integration.save(update_fields=["assigned_agents", "modified_on"])
+        with transaction.atomic():
+            if assigned_agents != integration.assigned_agents:
+                integration.assigned_agents = assigned_agents
+                integration.save(update_fields=["assigned_agents", "modified_on"])
         return integration
 
 
