@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
+    "chats.apps.assisted_sales",
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
@@ -423,6 +424,15 @@ INTERNAL_CLIENTS_PERM_CACHE_TTL = env.int(
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
+CONNECT_COPILOT_CREATE_URL = env.str("CONNECT_COPILOT_CREATE_URL", default="")
+CONNECT_COPILOT_UPDATE_URL = env.str("CONNECT_COPILOT_UPDATE_URL", default="")
+CONNECT_COPILOT_AGENTS_COUNT_URL = env.str(
+    "CONNECT_COPILOT_AGENTS_COUNT_URL", default=""
+)
+WENI_WEBCHAT_HOST = env.str("WENI_WEBCHAT_HOST", default="https://flows.weni.ai")
+WENI_WEBCHAT_SOCKET_URL = env.str(
+    "WENI_WEBCHAT_SOCKET_URL", default="wss://websocket.weni.ai"
+)
 
 INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
