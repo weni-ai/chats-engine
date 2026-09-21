@@ -62,6 +62,7 @@ class CreateCopilotIntegrationUseCase:
         name: str,
         project: Project,
         user,
+        authorization: str,
         sector: Sector = None,
     ) -> CopilotIntegration:
         existing = CopilotIntegration.objects.filter(project=project)
@@ -91,6 +92,7 @@ class CreateCopilotIntegrationUseCase:
             organization_uuid=str(project.org),
             timezone=timezone,
             date_format=project.date_format,
+            authorization=authorization,
         )
 
         copilot_uuid = parse_copilot_uuid(connect_data)
