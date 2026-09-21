@@ -4,9 +4,7 @@ from django.test import SimpleTestCase
 
 from chats.apps.msgs.consumers.msg_consumer import MsgConsumer
 from chats.apps.projects.consumers.project_consumer import ProjectConsumer
-from chats.apps.projects.consumers.project_update_consumer import (
-    ProjectUpdateConsumer,
-)
+from chats.apps.projects.consumers.project_update_consumer import ProjectUpdateConsumer
 from chats.apps.projects.consumers.sector_consumer import SectorConsumer
 
 
@@ -76,7 +74,32 @@ class ProjectConsumerTests(SimpleTestCase):
         # Assert
         # Ensure the creation usecase was instantiated with the mocked sector handler
         mock_proj_usecase_cls.assert_called_once_with(mock_sector_handler.return_value)
-        # Ensure execute path acked the message
+        mock_proj_usecase_cls.return_value.create_project.assert_called_once()
+        dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
+        self.assertFalse(dto.is_live_desk_copilot)
+        self.assertIsNone(dto.parent_project_uuid)
+        self.assertEqual(self.message.channel.acked, [1])
+
+    @mock.patch(
+        "chats.apps.projects.consumers.project_consumer.JSONParser.parse",
+        return_value={
+            "uuid": "p1",
+            "is_live_desk_copilot": True,
+            "parent_project_uuid": "live-desk-uuid",
+        },
+    )
+    @mock.patch("chats.apps.projects.consumers.project_consumer.ProjectCreationUseCase")
+    @mock.patch(
+        "chats.apps.projects.consumers.project_consumer.SectorSetupHandlerUseCase"
+    )
+    def test_project_consumer_passes_copilot_fields(
+        self, mock_sector_handler, mock_proj_usecase_cls, _
+    ):
+        ProjectConsumer.consume(self.message)
+
+        dto = mock_proj_usecase_cls.return_value.create_project.call_args[0][0]
+        self.assertTrue(dto.is_live_desk_copilot)
+        self.assertEqual(dto.parent_project_uuid, "live-desk-uuid")
         self.assertEqual(self.message.channel.acked, [1])
 
 
@@ -98,9 +121,7 @@ class ProjectUpdateConsumerTests(SimpleTestCase):
     @mock.patch(
         "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
     )
-    def test_project_update_consumer_triggers_update(
-        self, mock_usecase_cls, _
-    ):
+    def test_project_update_consumer_triggers_update(self, mock_usecase_cls, _):
         ProjectUpdateConsumer.consume(self.message)
 
         mock_usecase_cls.assert_called_once()
@@ -117,9 +138,7 @@ class ProjectUpdateConsumerTests(SimpleTestCase):
     @mock.patch(
         "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
     )
-    def test_project_update_consumer_with_partial_fields(
-        self, mock_usecase_cls, _
-    ):
+    def test_project_update_consumer_with_partial_fields(self, mock_usecase_cls, _):
         ProjectUpdateConsumer.consume(self.message)
 
         mock_usecase_cls.return_value.update_project.assert_called_once()
