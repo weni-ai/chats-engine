@@ -21,6 +21,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 5
+
 AVAILABLE_ROLES = {
     "0": "not set",
     "1": "viewer",
@@ -225,7 +227,7 @@ class UpdateCopilotWwcChannelUseCaseTests(TestCase):
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
