@@ -24,6 +24,7 @@ from chats.apps.assisted_sales.usecases import (
     CheckCopilotCreatePermissionUseCase,
     CreateCopilotIntegrationUseCase,
     GetLinkedCopilotUseCase,
+    LinkExistingCopilotUseCase,
     ListCopilotRoomMessagesUseCase,
     ListExistingCopilotsUseCase,
     RemoveCopilotIntegrationUseCase,
@@ -120,16 +121,68 @@ class CopilotProjectUpdateView(APIView):
     def put(self, request, uuid):
         serializer = UpdateCopilotIntegrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        new_uuid = serializer.validated_data["new_uuid"]
 
         try:
             integration = CopilotIntegration.objects.select_related(
                 "project", "connected_by"
             ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
         except CopilotIntegration.DoesNotExist:
-            return Response(
-                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
-                status=status.HTTP_404_NOT_FOUND,
+            integration = None
+
+        if integration is None:
+            try:
+                project = Project.objects.get(uuid=uuid)
+            except Project.DoesNotExist:
+                return Response(
+                    {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not ProjectPermission.objects.filter(
+                user=request.user, project=project
+            ).exists():
+                return Response(
+                    {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if not is_assisted_sales_copilot_enabled(project.uuid):
+                return _copilot_feature_forbidden()
+
+            integration = (
+                CopilotIntegration.objects.filter(project=project, sector__isnull=True)
+                .select_related("project", "connected_by")
+                .first()
             )
+            if integration is None:
+                try:
+                    integration = LinkExistingCopilotUseCase().execute(
+                        project=project,
+                        copilot_uuid=new_uuid,
+                        user=request.user,
+                    )
+                except CopilotIntegrationAlreadyExists:
+                    return Response(
+                        {
+                            "status_code": status.HTTP_400_BAD_REQUEST,
+                            "error": (
+                                "Copilot integration already exists for this project"
+                            ),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                except CopilotConnectError as exc:
+                    return Response(
+                        {"status_code": exc.status_code, "error": exc.error},
+                        status=exc.status_code
+                        if HTTP_CLIENT_ERROR_MIN
+                        <= exc.status_code
+                        < HTTP_SERVER_ERROR_MAX
+                        else status.HTTP_502_BAD_GATEWAY,
+                    )
+                return Response(
+                    CopilotIntegrationResponseSerializer(integration).data,
+                    status=status.HTTP_200_OK,
+                )
 
         if not ProjectPermission.objects.filter(
             user=request.user, project=integration.project
