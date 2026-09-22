@@ -238,6 +238,49 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_with_live_desk_uuid_links_existing_copilot(self, mock_client_cls):
+        self.integration.delete()
+        mock_client = MagicMock()
+        mock_client.get_assigned_agents.return_value = 3
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            f"/v1/project/copilot/update/{self.project.uuid}",
+            {"new_uuid": str(self.new_copilot_uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_client.create_copilot_project.assert_not_called()
+        mock_client.switch_copilot_project.assert_not_called()
+        integration = CopilotIntegration.objects.get(project=self.project)
+        self.assertEqual(integration.copilot_project_uuid, self.new_copilot_uuid)
+        self.assertEqual(integration.assigned_agents, 3)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_with_live_desk_uuid_switches_when_integration_exists(
+        self, mock_client_cls
+    ):
+        mock_client = MagicMock()
+        mock_client.switch_copilot_project.return_value = {
+            "uuid": str(self.new_copilot_uuid),
+            "name": "copilot novo",
+        }
+        mock_client.get_assigned_agents.return_value = 1
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            f"/v1/project/copilot/update/{self.project.uuid}",
+            {"new_uuid": str(self.new_copilot_uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_client.switch_copilot_project.assert_called_once()
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
+
 
 class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):

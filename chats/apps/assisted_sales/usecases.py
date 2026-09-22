@@ -112,6 +112,33 @@ class CreateCopilotIntegrationUseCase:
         )
 
 
+class LinkExistingCopilotUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(
+        self, *, project: Project, copilot_uuid: UUID, user, sector: Sector = None
+    ) -> CopilotIntegration:
+        existing = CopilotIntegration.objects.filter(project=project)
+        if sector:
+            existing = existing.filter(sector=sector)
+        else:
+            existing = existing.filter(sector__isnull=True)
+        if existing.exists():
+            raise CopilotIntegrationAlreadyExists()
+
+        assigned_agents = self.client.get_assigned_agents(str(copilot_uuid))
+        return CopilotIntegration.objects.create(
+            project=project,
+            sector=sector,
+            copilot_project_uuid=copilot_uuid,
+            name="",
+            assigned_agents=assigned_agents,
+            connection=build_webchat_connection({}),
+            connected_by=user,
+        )
+
+
 class UpdateCopilotIntegrationUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
