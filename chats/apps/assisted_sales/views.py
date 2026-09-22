@@ -85,7 +85,6 @@ class CopilotProjectCreateView(APIView):
                 name=serializer.validated_data["name"],
                 project=project,
                 user=request.user,
-                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
                 sector=sector,
             )
         except CopilotIntegrationAlreadyExists:
@@ -244,10 +243,7 @@ class CopilotLinkedProjectView(APIView):
                 project=project, sector=sector
             )
         except CopilotIntegration.DoesNotExist:
-            return Response(
-                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({}, status=status.HTTP_200_OK)
 
         return Response(
             CopilotLinkedProjectSerializer(integration).data,

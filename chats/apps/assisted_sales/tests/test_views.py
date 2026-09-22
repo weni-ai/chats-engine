@@ -18,12 +18,13 @@ from chats.apps.sectors.models import Sector
 class CopilotFeatureFlagMixin:
     def setUp(self):
         super().setUp()
-        patcher = patch(
+        for target in (
             "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
-            return_value=True,
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+        ):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 @override_settings(
@@ -90,7 +91,6 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
             organization_uuid=str(self.project.org),
             timezone="UTC",
             date_format=self.project.date_format,
-            authorization=f"Token {self.token.key}",
         )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
@@ -395,6 +395,14 @@ class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_linked_returns_empty_when_integration_is_missing(self):
+        self.integration.delete()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
 
 
 class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
