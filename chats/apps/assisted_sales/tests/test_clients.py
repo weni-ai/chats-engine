@@ -165,7 +165,7 @@ class CopilotConnectClientTests(TestCase):
                     },
                     {
                         "uuid": "other",
-                        "name": "outro copiloto",
+                        "name": "agente de vendas",
                         "is_live_desk_copilot": True,
                     },
                 ],
