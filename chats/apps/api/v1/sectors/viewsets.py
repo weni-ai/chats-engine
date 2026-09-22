@@ -652,6 +652,11 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             )
         except OfficialHolidayRequestError as error:
             return Response({"detail": error.detail}, status=error.status_code)
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "Invalid year parameter"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return Response(
             payload,

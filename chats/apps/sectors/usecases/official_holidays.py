@@ -1,5 +1,7 @@
+import logging
 from datetime import datetime
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 
@@ -7,6 +9,8 @@ from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.sectors.models import Sector, SectorHoliday
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
+
+logger = logging.getLogger(__name__)
 
 
 class OfficialHolidayRequestError(Exception):
@@ -99,22 +103,23 @@ class UpdateOfficialHolidaysUseCase:
 
         enabled_count, disabled_count, errors = 0, 0, []
 
-        for date_str in enabled_dates:
-            holiday_date = self._parse_date_str(date_str)
-            if not holiday_date:
-                errors.append(f"Invalid date format: {date_str}")
-                continue
-            name = official_by_year.get(holiday_date.year, {}).get(holiday_date, "")
-            self._enable_holiday(sector, holiday_date, name)
-            enabled_count += 1
+        with transaction.atomic():
+            for date_str in enabled_dates:
+                holiday_date = self._parse_date_str(date_str)
+                if not holiday_date:
+                    errors.append(f"Invalid date format: {date_str}")
+                    continue
+                name = official_by_year.get(holiday_date.year, {}).get(holiday_date, "")
+                self._enable_holiday(sector, holiday_date, name)
+                enabled_count += 1
 
-        for date_str in disabled_dates:
-            holiday_date = self._parse_date_str(date_str)
-            if not holiday_date:
-                errors.append(f"Invalid date format: {date_str}")
-                continue
-            if self._disable_holiday(sector, holiday_date):
-                disabled_count += 1
+            for date_str in disabled_dates:
+                holiday_date = self._parse_date_str(date_str)
+                if not holiday_date:
+                    errors.append(f"Invalid date format: {date_str}")
+                    continue
+                if self._disable_holiday(sector, holiday_date):
+                    disabled_count += 1
 
         return {
             "enabled": enabled_count,
@@ -223,6 +228,9 @@ class ImportOfficialHolidaysUseCase:
             except ValueError:
                 errors.append(f"Invalid date format: {holiday_date_str}")
             except Exception as exc:
+                logger.exception(
+                    "Unexpected error creating holiday for %s", holiday_date_str
+                )
                 errors.append(
                     f"Error creating holiday for {holiday_date_str}: {str(exc)}"
                 )
