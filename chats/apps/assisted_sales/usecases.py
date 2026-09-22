@@ -224,8 +224,12 @@ class ListExistingCopilotsUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
 
-    def execute(self, *, org_uuid: str, name: str = None) -> list:
-        connect_projects = self.client.list_copilot_projects(org_uuid, name=name)
+    def execute(
+        self, *, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        connect_projects = self.client.list_copilot_projects(
+            org_uuid, name=name, authorization=authorization
+        )
         if connect_projects is not None:
             return [
                 self._from_connect(item)
