@@ -1,7 +1,9 @@
 import json
 import logging
+from datetime import date
 
 import pendulum
+import requests
 from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
@@ -300,10 +302,87 @@ class WorkingHoursValidator:
 
 working_hours_validator = WorkingHoursValidator()
 
+BRASIL_API_HOLIDAYS_URL = "https://brasilapi.com.br/api/feriados/v1/{year}"
+BRASIL_API_HOLIDAYS_TIMEOUT = 10
+BRASIL_HOLIDAYS_CACHE_KEY = "official_holidays:BR:{year}"
+BRASIL_HOLIDAYS_FALLBACK_KEY = "official_holidays:BR:{year}:fallback"
+BRASIL_HOLIDAYS_CACHE_SECONDS = 60 * 60 * 24
+BRASIL_HOLIDAYS_FALLBACK_SECONDS = 60 * 60 * 24 * 30
+
+
+def _parse_brasil_api_holidays(payload):
+    if not isinstance(payload, list):
+        raise ValueError("Brasil API holidays payload is not a list")
+
+    holidays = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        try:
+            holiday_date = date.fromisoformat(item.get("date"))
+        except (TypeError, ValueError):
+            continue
+        holidays[holiday_date] = item.get("name") or ""
+    return holidays
+
+
+def _serialize_holidays(holidays):
+    return [
+        {"date": holiday_date.isoformat(), "name": name}
+        for holiday_date, name in holidays.items()
+    ]
+
+
+def _deserialize_holidays(payload):
+    if not isinstance(payload, list):
+        return {}
+
+    holidays = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        try:
+            holiday_date = date.fromisoformat(item["date"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        holidays[holiday_date] = item.get("name") or ""
+    return holidays
+
+
+def _get_brazil_official_holidays(year):
+    cache_key = BRASIL_HOLIDAYS_CACHE_KEY.format(year=year)
+    fallback_key = BRASIL_HOLIDAYS_FALLBACK_KEY.format(year=year)
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return _deserialize_holidays(cached)
+
+    try:
+        response = requests.get(
+            BRASIL_API_HOLIDAYS_URL.format(year=year),
+            timeout=BRASIL_API_HOLIDAYS_TIMEOUT,
+        )
+        response.raise_for_status()
+        holidays = _parse_brasil_api_holidays(response.json())
+    except Exception as exc:
+        logger.warning(f"Error getting Brazil holidays for {year}: {str(exc)}")
+        fallback = cache.get(fallback_key)
+        if fallback is not None:
+            return _deserialize_holidays(fallback)
+        return {}
+
+    payload = _serialize_holidays(holidays)
+    cache.set(cache_key, payload, BRASIL_HOLIDAYS_CACHE_SECONDS)
+    cache.set(fallback_key, payload, BRASIL_HOLIDAYS_FALLBACK_SECONDS)
+    return holidays
+
 
 def get_country_holidays(country_code, year=None, language="en"):
     """
-    Search official holidays of the country using the workalendar library
+    Search official holidays of the country.
+
+    Brazil comes from the Brasil API, with a short cache and a longer fallback
+    copy. Other countries still use workalendar.
 
     Args:
         country_code: Código do país (BR, US, etc.)
@@ -320,6 +399,9 @@ def get_country_holidays(country_code, year=None, language="en"):
         if not country_code:
             logger.warning("No country code provided; returning empty holidays.")
             return {}
+
+        if str(country_code).upper() == "BR":
+            return _get_brazil_official_holidays(int(year))
 
         calendar_class = registry.get(country_code.upper())
 
