@@ -364,8 +364,8 @@ def _get_brazil_official_holidays(year):
         )
         response.raise_for_status()
         holidays = _parse_brasil_api_holidays(response.json())
-    except Exception as exc:
-        logger.warning(f"Error getting Brazil holidays for {year}: {str(exc)}")
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning(f"Error getting Brazil holidays for {year}: {exc}")
         fallback = cache.get(fallback_key)
         if fallback is not None:
             return _deserialize_holidays(fallback)

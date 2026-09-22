@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from chats.apps.sectors.utils import (
+    BRASIL_API_HOLIDAYS_TIMEOUT,
     BRASIL_API_HOLIDAYS_URL,
     BRASIL_HOLIDAYS_CACHE_KEY,
     get_country_holidays,
@@ -50,7 +51,7 @@ class BrazilOfficialHolidaysTests(SimpleTestCase):
         )
         mock_get.assert_called_once_with(
             BRASIL_API_HOLIDAYS_URL.format(year=2026),
-            timeout=10,
+            timeout=BRASIL_API_HOLIDAYS_TIMEOUT,
         )
 
     @patch("chats.apps.sectors.utils.requests.get")
