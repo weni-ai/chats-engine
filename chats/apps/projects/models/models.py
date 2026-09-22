@@ -130,6 +130,41 @@ class Project(BaseConfigurableModel, BaseModel):
     def __str__(self):
         return self.name
 
+    def delete_sector_holidays(self):
+        """
+        Soft-delete official sector holidays after the project country changes.
+
+        Official holidays are inferred from timezone country; leftover dates
+        from a previous country would keep blocking room creation. Custom
+        holidays (its_custom=True) and custom-hours days are kept.
+        """
+        from chats.apps.sectors.models import SectorHoliday
+        from chats.apps.sectors.utils import CacheClient
+
+        holidays = list(
+            SectorHoliday.objects.filter(
+                sector__project=self,
+                is_deleted=False,
+                its_custom=False,
+                day_type=SectorHoliday.CLOSED,
+            ).select_related("sector")
+        )
+        if not holidays:
+            return
+
+        SectorHoliday.objects.filter(
+            pk__in=[holiday.pk for holiday in holidays]
+        ).update(is_deleted=True)
+
+        try:
+            cache_client = CacheClient()
+            for holiday in holidays:
+                sector_uuid = str(holiday.sector.uuid)
+                for holiday_date in holiday._iter_dates():
+                    cache_client.delete(f"holiday:{sector_uuid}:{holiday_date}")
+        except Exception:
+            pass
+
     def get_cached_config(self):
         """Try to get config from cache first"""
         from chats.core.cache_utils import get_project_config_cached

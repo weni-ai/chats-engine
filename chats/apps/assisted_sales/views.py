@@ -11,6 +11,7 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
     CopilotIntegrationAlreadyExists,
 )
+from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.assisted_sales.serializers import (
     CopilotExistingProjectSerializer,
@@ -31,6 +32,16 @@ from chats.apps.assisted_sales.usecases import (
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+
+HTTP_CLIENT_ERROR_MIN = 400
+HTTP_SERVER_ERROR_MAX = 600
+
+
+def _copilot_feature_forbidden():
+    return Response(
+        {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 class CopilotProjectCreateView(APIView):
@@ -55,6 +66,9 @@ class CopilotProjectCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
         sector = serializer.validated_data.get("sector")
         if sector and sector.project_id != project.uuid:
             return Response(
@@ -70,6 +84,7 @@ class CopilotProjectCreateView(APIView):
                 name=serializer.validated_data["name"],
                 project=project,
                 user=request.user,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
                 sector=sector,
             )
         except CopilotIntegrationAlreadyExists:
@@ -84,7 +99,7 @@ class CopilotProjectCreateView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
         except (TypeError, ValueError, KeyError) as exc:
@@ -107,9 +122,9 @@ class CopilotProjectUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            integration = CopilotIntegration.objects.select_related("project").get(
-                Q(uuid=uuid) | Q(copilot_project_uuid=uuid)
-            )
+            integration = CopilotIntegration.objects.select_related(
+                "project", "connected_by"
+            ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
         except CopilotIntegration.DoesNotExist:
             return Response(
                 {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
@@ -124,6 +139,9 @@ class CopilotProjectUpdateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return _copilot_feature_forbidden()
+
         try:
             integration = UpdateCopilotIntegrationUseCase().execute(
                 integration=integration,
@@ -134,7 +152,7 @@ class CopilotProjectUpdateView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
         except (TypeError, ValueError, KeyError) as exc:
@@ -171,13 +189,16 @@ class CopilotProjectRemoveView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return _copilot_feature_forbidden()
+
         try:
             RemoveCopilotIntegrationUseCase().execute(integration=integration)
         except CopilotConnectError as exc:
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -203,6 +224,9 @@ class CopilotLinkedProjectView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
 
         sector = None
         sector_uuid = request.query_params.get("sector")
@@ -251,6 +275,9 @@ class CopilotCreatePermissionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
         try:
             can_create = CheckCopilotCreatePermissionUseCase().execute(
                 project_uuid=str(project.uuid),
@@ -260,7 +287,7 @@ class CopilotCreatePermissionView(APIView):
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -271,24 +298,31 @@ class CopilotExistingProjectsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, org_uuid):
-        if not ProjectPermission.objects.filter(
+        project_ids = ProjectPermission.objects.filter(
             user=request.user, project__org=str(org_uuid)
-        ).exists():
+        ).values_list("project_id", flat=True)
+        if not project_ids:
             return Response(
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if not any(
+            is_assisted_sales_copilot_enabled(project_id) for project_id in project_ids
+        ):
+            return _copilot_feature_forbidden()
+
         try:
             projects = ListExistingCopilotsUseCase().execute(
                 org_uuid=str(org_uuid),
                 name=request.query_params.get("name") or None,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
             )
         except CopilotConnectError as exc:
             return Response(
                 {"status_code": exc.status_code, "error": exc.error},
                 status=exc.status_code
-                if 400 <= exc.status_code < 600
+                if HTTP_CLIENT_ERROR_MIN <= exc.status_code < HTTP_SERVER_ERROR_MAX
                 else status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -338,6 +372,9 @@ class CopilotRoomMessagesView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
 
         try:
             data = ListCopilotRoomMessagesUseCase().execute(

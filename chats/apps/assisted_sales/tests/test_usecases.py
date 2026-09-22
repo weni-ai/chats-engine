@@ -22,6 +22,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 5
+
 AVAILABLE_ROLES = {
     "0": "not set",
     "1": "viewer",
@@ -181,7 +183,11 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
         self.assertEqual(self.room.channel_uuid, self.channel_uuid)
 
     @override_settings(USE_CELERY=False)
-    def test_close_sets_channel_inline_when_celery_is_disabled(self):
+    @patch(
+        "chats.apps.assisted_sales.feature_flags.is_assisted_sales_copilot_enabled",
+        return_value=True,
+    )
+    def test_close_sets_channel_inline_when_celery_is_disabled(self, _mock_flag):
         self._create_integration()
 
         self.room.close()
@@ -192,7 +198,11 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
 
     @override_settings(USE_CELERY=True)
     @patch("chats.apps.assisted_sales.tasks.set_room_copilot_channel.delay")
-    def test_close_enqueues_task_when_celery_is_enabled(self, mock_delay):
+    @patch(
+        "chats.apps.assisted_sales.feature_flags.is_assisted_sales_copilot_enabled",
+        return_value=True,
+    )
+    def test_close_enqueues_task_when_celery_is_enabled(self, _mock_flag, mock_delay):
         self._create_integration()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -222,11 +232,18 @@ class SetRoomCopilotChannelUseCaseTests(TestCase):
 
 class UpdateCopilotWwcChannelUseCaseTests(TestCase):
     def setUp(self):
+        super().setUp()
+        patcher = patch(
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+            return_value=True,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.project = Project.objects.create(name="Live Desk", timezone="UTC")
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -249,6 +266,22 @@ class UpdateCopilotWwcChannelUseCaseTests(TestCase):
             name="copilot",
             connection=connection,
         )
+
+    @patch(
+        "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+        return_value=False,
+    )
+    def test_does_not_update_channel_when_feature_flag_is_off(self, _flag):
+        integration = self._create_integration()
+
+        result = UpdateCopilotWwcChannelUseCase().execute(
+            channel_uuid=self.channel_uuid,
+            project_uuid=self.project.uuid,
+        )
+
+        integration.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(integration.connection["channelUuid"], "")
 
     def test_updates_project_integration_channel(self):
         integration = self._create_integration()

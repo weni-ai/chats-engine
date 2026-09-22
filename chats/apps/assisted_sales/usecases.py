@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -10,10 +11,13 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
     CopilotIntegrationAlreadyExists,
 )
+from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+
+HTTP_400_BAD_REQUEST = 400
 
 
 def build_webchat_connection(connect_data: dict) -> dict:
@@ -59,6 +63,7 @@ class CreateCopilotIntegrationUseCase:
         name: str,
         project: Project,
         user,
+        authorization: str,
         sector: Sector = None,
     ) -> CopilotIntegration:
         existing = CopilotIntegration.objects.filter(project=project)
@@ -71,14 +76,14 @@ class CreateCopilotIntegrationUseCase:
 
         if not project.org:
             raise CopilotConnectError(
-                status_code=400,
+                status_code=HTTP_400_BAD_REQUEST,
                 error="Project has no organization uuid",
             )
 
         timezone = str(project.timezone) if project.timezone else ""
         if not timezone:
             raise CopilotConnectError(
-                status_code=400,
+                status_code=HTTP_400_BAD_REQUEST,
                 error="Project has no timezone",
             )
 
@@ -88,6 +93,7 @@ class CreateCopilotIntegrationUseCase:
             organization_uuid=str(project.org),
             timezone=timezone,
             date_format=project.date_format,
+            authorization=authorization,
         )
 
         copilot_uuid = parse_copilot_uuid(connect_data)
@@ -133,16 +139,17 @@ class UpdateCopilotIntegrationUseCase:
 
         assigned_agents = self.client.get_assigned_agents(str(copilot_uuid))
 
-        integration.copilot_project_uuid = copilot_uuid
-        integration.name = connect_data.get("name") or integration.name
-        integration.assigned_agents = assigned_agents
-        integration.connection = build_webchat_connection(connect_data)
-        integration.connected_by = user
-        integration.connected_on = timezone.now()
-        created_on = parse_created_on(connect_data)
-        if created_on:
-            integration.copilot_created_on = created_on
-        integration.save()
+        with transaction.atomic():
+            integration.copilot_project_uuid = copilot_uuid
+            integration.name = connect_data.get("name") or integration.name
+            integration.assigned_agents = assigned_agents
+            integration.connection = build_webchat_connection(connect_data)
+            integration.connected_by = user
+            integration.connected_on = timezone.now()
+            created_on = parse_created_on(connect_data)
+            if created_on:
+                integration.copilot_created_on = created_on
+            integration.save()
         return integration
 
 
@@ -175,9 +182,10 @@ class GetLinkedCopilotUseCase:
         assigned_agents = self.client.get_assigned_agents(
             str(integration.copilot_project_uuid)
         )
-        if assigned_agents != integration.assigned_agents:
-            integration.assigned_agents = assigned_agents
-            integration.save(update_fields=["assigned_agents", "modified_on"])
+        with transaction.atomic():
+            if assigned_agents != integration.assigned_agents:
+                integration.assigned_agents = assigned_agents
+                integration.save(update_fields=["assigned_agents", "modified_on"])
         return integration
 
 
@@ -216,8 +224,12 @@ class ListExistingCopilotsUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
 
-    def execute(self, *, org_uuid: str, name: str = None) -> list:
-        connect_projects = self.client.list_copilot_projects(org_uuid, name=name)
+    def execute(
+        self, *, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        connect_projects = self.client.list_copilot_projects(
+            org_uuid, name=name, authorization=authorization
+        )
         if connect_projects is not None:
             return [
                 self._from_connect(item)
@@ -386,6 +398,9 @@ class UpdateCopilotWwcChannelUseCase:
         if not integration:
             return None
 
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            return None
+
         connection = dict(integration.connection or {})
         if not connection:
             connection = build_webchat_connection(
@@ -394,6 +409,7 @@ class UpdateCopilotWwcChannelUseCase:
         else:
             connection["channelUuid"] = str(parsed_channel_uuid)
 
-        integration.connection = connection
-        integration.save(update_fields=["connection", "modified_on"])
+        with transaction.atomic():
+            integration.connection = connection
+            integration.save(update_fields=["connection", "modified_on"])
         return integration

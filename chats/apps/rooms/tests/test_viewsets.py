@@ -422,7 +422,6 @@ class TestRoomsViewSet(APITestCase):
 
     @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
     def test_room_order_with_pin(self, mock_is_feature_active):
-        # Create rooms
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -451,117 +450,6 @@ class TestRoomsViewSet(APITestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-        # Room from a different project, should be excluded
-        room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
-        RoomPin.objects.create(
-            room=room_5, user=self.user, project=queue.sector.project
-        )
-
-        response = self.list_rooms(
-            filters={
-                "project": str(self.project.uuid),
-                "is_active": True,
-                "ordering": "-created_on",
-            }
-        )
-
-        self.assertIn("max_pin_limit", response.data)
-        self.assertEqual(
-            response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
-        )
-
-        results = response.data.get("results")
-        rooms_uuids = [room["uuid"] for room in results]
-
-        self.assertNotIn(str(room_5.uuid), rooms_uuids)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
-        self.assertEqual(results[0].get("is_pinned"), True)
-
-        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
-        self.assertEqual(results[1].get("is_pinned"), True)
-
-        self.assertEqual(rooms_uuids[2], str(room_4.uuid))
-        self.assertEqual(results[2].get("is_pinned"), False)
-
-        self.assertEqual(rooms_uuids[3], str(room_1.uuid))
-        self.assertEqual(results[3].get("is_pinned"), False)
-
-    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
-    def test_room_order_with_email(self, mock_is_feature_active):
-        another_user = User.objects.create(email="another_user@example.com")
-        QueueAuthorization.objects.create(
-            permission=ProjectPermission.objects.create(
-                user=another_user,
-                project=self.project,
-                role=ProjectPermission.ROLE_ADMIN,
-            ),
-            queue=self.queue,
-            role=QueueAuthorization.ROLE_AGENT,
-        )
-
-        rooms = []
-
-        for i in range(3):
-            room = Room.objects.create(
-                queue=self.queue, contact=Contact.objects.create(), user=another_user
-            )
-            rooms.append(room)
-
-        RoomPin.objects.create(room=rooms[1], user=another_user, project=self.project)
-
-        response = self.list_rooms(
-            filters={
-                "project": str(self.project.uuid),
-                "is_active": True,
-                "ordering": "-created_on",
-                "email": another_user.email,
-            }
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        results = response.data.get("results")
-
-        self.assertEqual(results[0]["uuid"], str(rooms[1].uuid))
-        self.assertEqual(results[0].get("is_pinned"), True)
-        self.assertEqual(results[1]["uuid"], str(rooms[2].uuid))
-        self.assertEqual(results[1].get("is_pinned"), False)
-        self.assertEqual(results[2]["uuid"], str(rooms[0].uuid))
-        self.assertEqual(results[2].get("is_pinned"), False)
-
-    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True)
-    def test_room_order_with_pin_optimized(self, mock_is_feature_active):
-        room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-        room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-        room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-        room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-
-        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
-        RoomPin.objects.create(room=room_2, user=self.user, project=self.project)
-
-        queue = Queue.objects.create(
-            name="Test Queue",
-            sector=Sector.objects.create(
-                name="Test Sector",
-                project=Project.objects.create(name="Test Project"),
-                rooms_limit=10,
-                work_start="09:00",
-                work_end="18:00",
-            ),
-        )
-        QueueAuthorization.objects.create(
-            permission=ProjectPermission.objects.create(
-                user=self.user,
-                project=queue.sector.project,
-                role=ProjectPermission.ROLE_ATTENDANT,
-            ),
-            queue=queue,
-            role=QueueAuthorization.ROLE_AGENT,
-        )
-
-        # Room from a different project, should be excluded even when pinned
         room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
         RoomPin.objects.create(
             room=room_5, user=self.user, project=queue.sector.project
@@ -576,11 +464,11 @@ class TestRoomsViewSet(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         self.assertIn("max_pin_limit", response.data)
         self.assertEqual(
             response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
         )
+        self.assertEqual(response.data.get("count"), 4)
 
         pinned = response.data.get("pinned_rooms")
         pinned_uuids = [room["uuid"] for room in pinned]
@@ -595,6 +483,7 @@ class TestRoomsViewSet(APITestCase):
         results_uuids = [room["uuid"] for room in results]
 
         self.assertNotIn(str(room_5.uuid), results_uuids)
+        self.assertNotIn(str(room_5.uuid), pinned_uuids)
         self.assertNotIn(str(room_2.uuid), results_uuids)
         self.assertNotIn(str(room_3.uuid), results_uuids)
 
@@ -603,8 +492,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results_uuids[1], str(room_1.uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True)
-    def test_room_order_with_email_optimized(self, mock_is_feature_active):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_email(self, mock_is_feature_active):
         another_user = User.objects.create(email="another_user@example.com")
         QueueAuthorization.objects.create(
             permission=ProjectPermission.objects.create(
@@ -648,8 +537,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results[1]["uuid"], str(rooms[0].uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True)
-    def test_optimized_pins_returned_separately(self, mock_is_feature_active):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pins_returned_separately(self, mock_is_feature_active):
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -679,37 +568,132 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(results_uuids[1], str(room_2.uuid))
         self.assertEqual(results[1].get("is_pinned"), False)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True)
-    def test_optimized_pins_excluded_when_include_pinned_false(
-        self, mock_is_feature_active
-    ):
-        room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-        room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
-        room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pin_page_budget_fills_remaining_with_unpinned(self, mock_is_feature_active):
+        pinned = []
+        for _i in range(5):
+            room = Room.objects.create(
+                queue=self.queue, contact=Contact.objects.create()
+            )
+            RoomPin.objects.create(room=room, user=self.user, project=self.project)
+            pinned.append(room)
 
-        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
+        unpinned = [
+            Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+            for _i in range(25)
+        ]
 
         response = self.list_rooms(
             filters={
                 "project": str(self.project.uuid),
                 "is_active": True,
                 "ordering": "created_on",
-                "include_pinned": "false",
+                "limit": 20,
             }
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("count"), 30)
+        self.assertIsNotNone(response.data.get("next"))
 
-        pinned = response.data.get("pinned_rooms")
-        self.assertEqual(pinned, [])
-
+        pinned_payload = response.data.get("pinned_rooms")
         results = response.data.get("results")
-        results_uuids = [room["uuid"] for room in results]
 
-        self.assertNotIn(str(room_3.uuid), results_uuids)
-        self.assertEqual(len(results), 2)
-        self.assertEqual(results_uuids[0], str(room_1.uuid))
-        self.assertEqual(results_uuids[1], str(room_2.uuid))
+        self.assertEqual(len(pinned_payload), 5)
+        self.assertEqual(len(results), 15)
+        self.assertEqual(len(pinned_payload) + len(results), 20)
+        self.assertEqual(
+            [room["uuid"] for room in pinned_payload],
+            [str(room.uuid) for room in reversed(pinned)],
+        )
+        self.assertEqual(
+            [room["uuid"] for room in results],
+            [str(room.uuid) for room in unpinned[:15]],
+        )
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_pin_page_budget_paginates_when_pins_exceed_limit(
+        self, mock_is_feature_active
+    ):
+        pinned = []
+        for _i in range(30):
+            room = Room.objects.create(
+                queue=self.queue, contact=Contact.objects.create()
+            )
+            RoomPin.objects.create(room=room, user=self.user, project=self.project)
+            pinned.append(room)
+
+        unpinned = [
+            Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+            for _i in range(20)
+        ]
+
+        page_1 = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "created_on",
+                "limit": 20,
+            }
+        )
+        page_2 = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "created_on",
+                "limit": 20,
+                "offset": 20,
+            }
+        )
+        page_3 = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "created_on",
+                "limit": 20,
+                "offset": 40,
+            }
+        )
+
+        pinned_newest_first = list(reversed(pinned))
+
+        self.assertEqual(page_1.status_code, status.HTTP_200_OK)
+        self.assertEqual(page_1.data.get("count"), 50)
+        self.assertIsNotNone(page_1.data.get("next"))
+        self.assertEqual(len(page_1.data.get("pinned_rooms")), 20)
+        self.assertEqual(page_1.data.get("results"), [])
+        self.assertEqual(
+            len(page_1.data.get("pinned_rooms")) + len(page_1.data.get("results")),
+            20,
+        )
+        self.assertEqual(
+            [room["uuid"] for room in page_1.data.get("pinned_rooms")],
+            [str(room.uuid) for room in pinned_newest_first[:20]],
+        )
+
+        self.assertEqual(page_2.status_code, status.HTTP_200_OK)
+        self.assertEqual(page_2.data.get("count"), 50)
+        self.assertIsNotNone(page_2.data.get("next"))
+        self.assertEqual(len(page_2.data.get("pinned_rooms")), 10)
+        self.assertEqual(len(page_2.data.get("results")), 10)
+        self.assertEqual(
+            [room["uuid"] for room in page_2.data.get("pinned_rooms")],
+            [str(room.uuid) for room in pinned_newest_first[20:]],
+        )
+        self.assertEqual(
+            [room["uuid"] for room in page_2.data.get("results")],
+            [str(room.uuid) for room in unpinned[:10]],
+        )
+
+        self.assertEqual(page_3.status_code, status.HTTP_200_OK)
+        self.assertEqual(page_3.data.get("count"), 50)
+        self.assertIsNone(page_3.data.get("next"))
+        self.assertEqual(page_3.data.get("pinned_rooms"), [])
+        self.assertEqual(len(page_3.data.get("results")), 10)
+        self.assertEqual(
+            [room["uuid"] for room in page_3.data.get("results")],
+            [str(room.uuid) for room in unpinned[10:]],
+        )
 
 
 class RoomPickTests(APITestCase):

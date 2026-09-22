@@ -11,6 +11,11 @@ from chats.apps.assisted_sales.exceptions import CopilotConnectError
 
 logger = logging.getLogger(__name__)
 
+COPILOT_REQUEST_TIMEOUT_SECONDS = 15
+FLOWS_REQUEST_TIMEOUT_SECONDS = 15
+HTTP_502_BAD_GATEWAY = 502
+HTTP_UNAUTHORIZED = 401
+
 
 class CopilotConnectClient(InternalAuthentication):
     def _copilot_create_url(self, organization_uuid: str) -> str:
@@ -27,9 +32,20 @@ class CopilotConnectClient(InternalAuthentication):
             )
 
         raise CopilotConnectError(
-            status_code=502,
+            status_code=HTTP_502_BAD_GATEWAY,
             error="Connect API URL is not configured",
         )
+
+    def _user_headers(self, authorization: str) -> dict:
+        if not authorization or not str(authorization).strip():
+            raise CopilotConnectError(
+                status_code=HTTP_UNAUTHORIZED,
+                error="User authorization is required to create a copilot project",
+            )
+        return {
+            "Content-Type": "application/json; charset: utf-8",
+            "Authorization": str(authorization).strip(),
+        }
 
     def create_copilot_project(
         self,
@@ -39,6 +55,7 @@ class CopilotConnectClient(InternalAuthentication):
         organization_uuid: str,
         timezone: str,
         date_format: str = None,
+        authorization: str,
     ) -> dict:
         url = self._copilot_create_url(organization_uuid)
 
@@ -54,7 +71,7 @@ class CopilotConnectClient(InternalAuthentication):
         try:
             response = requests.post(
                 url=url,
-                headers=self.headers,
+                headers=self._user_headers(authorization),
                 json=payload,
                 timeout=15,
             )
@@ -110,7 +127,7 @@ class CopilotConnectClient(InternalAuthentication):
             response = requests.delete(
                 url=request_url,
                 headers=self.headers,
-                timeout=15,
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to remove copilot project on Connect")
@@ -172,7 +189,7 @@ class CopilotConnectClient(InternalAuthentication):
                 url=url,
                 headers=self.headers,
                 params={"user": user_email},
-                timeout=15,
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to fetch project authorization on Connect")
@@ -187,39 +204,84 @@ class CopilotConnectClient(InternalAuthentication):
         data = self._parse_json(response)
         return data if isinstance(data, dict) else {}
 
-    def list_copilot_projects(self, org_uuid: str, name: str = None) -> list:
-        url = settings.CONNECT_COPILOT_LIST_URL
-        if not url:
+    def list_copilot_projects(
+        self, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        request_url, headers = self._copilot_list_request(org_uuid, authorization)
+        if not request_url:
             return None
 
-        request_url = url.format(org_uuid=org_uuid, uuid=org_uuid)
-        params = {"org_uuid": org_uuid}
+        items = self._fetch_connect_project_pages(request_url, headers)
+        copilots = [item for item in items if self._is_live_desk_copilot(item)]
         if name:
-            params["name"] = name
+            needle = str(name).strip().lower()
+            copilots = [
+                item
+                for item in copilots
+                if needle in str(item.get("name") or "").lower()
+            ]
+        return copilots
 
+    def _copilot_list_request(self, org_uuid: str, authorization: str):
         try:
-            response = requests.get(
-                url=request_url,
-                headers=self.headers,
-                params=params,
-                timeout=15,
+            url = self._copilot_create_url(org_uuid)
+        except CopilotConnectError:
+            template = settings.CONNECT_COPILOT_LIST_URL
+            if not template:
+                return None, None
+            return (
+                template.format(org_uuid=org_uuid, uuid=org_uuid),
+                self.headers,
             )
-        except requests.RequestException as exc:
-            logger.exception("Failed to list copilot projects on Connect")
-            raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+        return url, self._user_headers(authorization)
 
-        if not response.ok:
-            raise CopilotConnectError(
-                status_code=response.status_code,
-                error=self._parse_error(response),
+    def _fetch_connect_project_pages(self, request_url: str, headers: dict) -> list:
+        items = []
+        next_url = request_url
+        while next_url:
+            try:
+                response = requests.get(
+                    url=next_url,
+                    headers=headers,
+                    timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
+                )
+            except requests.RequestException as exc:
+                logger.exception("Failed to list copilot projects on Connect")
+                raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+
+            if not response.ok:
+                raise CopilotConnectError(
+                    status_code=response.status_code,
+                    error=self._parse_error(response),
+                )
+
+            page_items, next_url = self._parse_project_list_page(
+                self._parse_json(response)
             )
+            items.extend(page_items)
+        return items
 
-        data = self._parse_json(response)
+    def _parse_project_list_page(self, data):
         if isinstance(data, list):
-            return data
+            return data, None
         if isinstance(data, dict):
-            return data.get("results") or data.get("projects") or data.get("data") or []
-        return []
+            page_items = (
+                data.get("results") or data.get("projects") or data.get("data") or []
+            )
+            if not isinstance(page_items, list):
+                page_items = []
+            return page_items, data.get("next") or None
+        return [], None
+
+    def _is_live_desk_copilot(self, item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        flag = item.get("is_live_desk_copilot")
+        if flag is True:
+            return True
+        if isinstance(flag, str):
+            return flag.strip().lower() in ("true", "1")
+        return False
 
     def list_internal_messages(
         self,
@@ -251,7 +313,7 @@ class CopilotConnectClient(InternalAuthentication):
                 url=url,
                 headers=self.headers,
                 params=params,
-                timeout=15,
+                timeout=FLOWS_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
             logger.exception("Failed to list copilot messages on Flows")

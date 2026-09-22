@@ -33,7 +33,10 @@ class WwcChannelConsumer(EDAConsumer):
     )
     def consume(message: amqp.Message):
         channel = message.channel
-        print(f"[WwcChannelConsumer] - Consuming a message. Body: {message.body}")
+        logger.debug(
+            "[WwcChannelConsumer] consuming a message",
+            extra={"body": message.body},
+        )
         body = JSONParser.parse(message.body)
 
         if not isinstance(body, dict):

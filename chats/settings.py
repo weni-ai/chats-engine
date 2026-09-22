@@ -10,8 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 import environ
@@ -19,8 +19,6 @@ import sentry_sdk
 from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
-from celery.schedules import crontab
-
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -894,10 +892,6 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
 )
 
 # Keys
-WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
-    "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
-    default="weniChatsPinRoomsOptimization",
-)
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
@@ -1041,6 +1035,11 @@ AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY = env.str(
 AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
+)
+
+ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY = env.str(
+    "ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY",
+    default="weniChatsAssistedSalesCopilot",
 )
 
 # Metric Goal Alerts (risk alerts)

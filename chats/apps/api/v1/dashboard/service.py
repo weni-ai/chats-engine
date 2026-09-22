@@ -321,8 +321,6 @@ class TimeMetricsService:
 
         rooms_filter = merge_channels_q(rooms_filter, filters.channels)
 
-        print("[get_time_metrics_for_analysis] rooms_filter: ", rooms_filter)
-
         max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
             Max("metric__waiting_time")
         )["metric__waiting_time__max"]

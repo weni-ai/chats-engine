@@ -4,13 +4,15 @@ from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector
 
+COPILOT_NAME_MAX_LENGTH = 255
+
 
 class UpdateCopilotIntegrationSerializer(serializers.Serializer):
     new_uuid = serializers.UUIDField()
 
 
 class CreateCopilotIntegrationSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=255)
+    name = serializers.CharField(max_length=COPILOT_NAME_MAX_LENGTH)
     project = serializers.UUIDField()
     sector = serializers.UUIDField(required=False, allow_null=True)
 
