@@ -189,6 +189,28 @@ class GetLinkedCopilotUseCase:
         return integration
 
 
+class ListCopilotConnectionsUseCase:
+    def execute(self, *, project: Project, is_principal: bool) -> list:
+        if is_principal:
+            if not project.org:
+                queryset = CopilotIntegration.objects.filter(project=project)
+            else:
+                queryset = CopilotIntegration.objects.filter(
+                    project__org=str(project.org)
+                )
+            return list(queryset)
+
+        queryset = CopilotIntegration.objects.filter(
+            project=project, sector__isnull=True
+        )
+        if not queryset.exists():
+            queryset = CopilotIntegration.objects.filter(project=project)
+        integration = queryset.first()
+        if not integration:
+            return []
+        return [integration]
+
+
 CONNECT_MODERATOR_ROLE_LABEL = "moderator"
 
 
