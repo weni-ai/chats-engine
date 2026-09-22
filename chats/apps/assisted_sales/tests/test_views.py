@@ -165,6 +165,9 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
     NEXUS_API_URL="https://nexus.example.com",
 )
 class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
+    EXPECTED_ASSIGNED_AGENTS = 3
+    EXPECTED_ASSIGNED_AGENTS_SWITCH = 1
+
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -242,7 +245,7 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
     def test_update_with_live_desk_uuid_links_existing_copilot(self, mock_client_cls):
         self.integration.delete()
         mock_client = MagicMock()
-        mock_client.get_assigned_agents.return_value = 3
+        mock_client.get_assigned_agents.return_value = self.EXPECTED_ASSIGNED_AGENTS
         mock_client_cls.return_value = mock_client
 
         response = self.client.put(
@@ -256,7 +259,7 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
         mock_client.switch_copilot_project.assert_not_called()
         integration = CopilotIntegration.objects.get(project=self.project)
         self.assertEqual(integration.copilot_project_uuid, self.new_copilot_uuid)
-        self.assertEqual(integration.assigned_agents, 3)
+        self.assertEqual(integration.assigned_agents, self.EXPECTED_ASSIGNED_AGENTS)
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_update_with_live_desk_uuid_switches_when_integration_exists(
@@ -267,7 +270,9 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
             "uuid": str(self.new_copilot_uuid),
             "name": "copilot novo",
         }
-        mock_client.get_assigned_agents.return_value = 1
+        mock_client.get_assigned_agents.return_value = (
+            self.EXPECTED_ASSIGNED_AGENTS_SWITCH
+        )
         mock_client_cls.return_value = mock_client
 
         response = self.client.put(
