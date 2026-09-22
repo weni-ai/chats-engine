@@ -91,6 +91,7 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
             organization_uuid=str(self.project.org),
             timezone="UTC",
             date_format=self.project.date_format,
+            authorization=f"Token {self.token.key}",
         )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")

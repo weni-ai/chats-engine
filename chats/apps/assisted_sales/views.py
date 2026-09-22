@@ -85,6 +85,7 @@ class CopilotProjectCreateView(APIView):
                 name=serializer.validated_data["name"],
                 project=project,
                 user=request.user,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
                 sector=sector,
             )
         except CopilotIntegrationAlreadyExists:
