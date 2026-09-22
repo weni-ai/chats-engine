@@ -18,12 +18,13 @@ from chats.apps.sectors.models import Sector
 class CopilotFeatureFlagMixin:
     def setUp(self):
         super().setUp()
-        patcher = patch(
+        for target in (
             "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
-            return_value=True,
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+        ):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 @override_settings(
