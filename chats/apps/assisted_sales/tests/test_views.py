@@ -373,7 +373,7 @@ class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.url = f"/v1/project/copilot/list_existing_projects/{self.org_uuid}"
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
 
-    @override_settings(CONNECT_COPILOT_LIST_URL="")
+    @override_settings(CONNECT_API_URL="", CONNECT_COPILOT_LIST_URL="")
     def test_list_existing_from_local_integrations(self):
         response = self.client.get(self.url)
 
@@ -383,7 +383,7 @@ class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data[0]["assigned_agents"], 5)
         self.assertEqual(str(response.data[0]["uuid"]), str(self.copilot_uuid))
 
-    @override_settings(CONNECT_COPILOT_LIST_URL="")
+    @override_settings(CONNECT_API_URL="", CONNECT_COPILOT_LIST_URL="")
     def test_list_existing_filters_by_name(self):
         response = self.client.get(self.url, {"name": "inexistente"})
 

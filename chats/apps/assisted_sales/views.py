@@ -316,6 +316,7 @@ class CopilotExistingProjectsView(APIView):
             projects = ListExistingCopilotsUseCase().execute(
                 org_uuid=str(org_uuid),
                 name=request.query_params.get("name") or None,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
             )
         except CopilotConnectError as exc:
             return Response(
