@@ -437,6 +437,30 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return self.message.project
 
 
+class MessageCatalog(BaseModel):
+    """Product catalog/carousel payload attached to a Message.
+
+    Kept in its own table (instead of a column on ``Message``) because the
+    messages table has billions of rows and we want to avoid ``ALTER TABLE``
+    and backfills there. Only rows for catalog-carrying messages exist here.
+    """
+
+    message = models.OneToOneField(
+        Message,
+        related_name="catalog",
+        verbose_name=_("Message"),
+        on_delete=models.CASCADE,
+    )
+    data = models.JSONField(_("catalog data"), default=dict)
+
+    class Meta:
+        verbose_name = _("Message catalog")
+        verbose_name_plural = _("Message catalogs")
+
+    def __str__(self):
+        return f"{self.message_id} - catalog"
+
+
 class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=255, unique=True, db_index=True
