@@ -22,8 +22,8 @@ class SectorHolidayOfficialHolidaysTests(APITestCase):
         self.wrong_user = User.objects.get(pk=1)
         self.wrong_login_token = Token.objects.get_or_create(user=self.wrong_user)[0]
 
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_holidays")
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_from_timezone")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_holidays")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_from_timezone")
     def test_get_official_holidays_success(self, mock_tz, mock_holidays):
         mock_tz.return_value = "BR"
         mock_holidays.return_value = {
@@ -81,8 +81,8 @@ class SectorHolidayOfficialHolidaysTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_holidays")
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_from_timezone")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_holidays")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_from_timezone")
     def test_patch_official_holidays_enable(self, mock_tz, mock_holidays):
         mock_tz.return_value = "BR"
         mock_holidays.return_value = {date(2025, 1, 1): "Ano Novo"}
@@ -104,8 +104,8 @@ class SectorHolidayOfficialHolidaysTests(APITestCase):
             ).exists()
         )
 
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_holidays")
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_from_timezone")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_holidays")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_from_timezone")
     def test_patch_official_holidays_disable(self, mock_tz, mock_holidays):
         mock_tz.return_value = "BR"
         mock_holidays.return_value = {date(2025, 1, 1): "Ano Novo"}
@@ -169,8 +169,8 @@ class SectorHolidayOfficialHolidaysTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_holidays")
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_from_timezone")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_holidays")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_from_timezone")
     def test_patch_official_holidays_invalid_date_format(self, mock_tz, mock_holidays):
         mock_tz.return_value = "BR"
         mock_holidays.return_value = {}
@@ -187,8 +187,8 @@ class SectorHolidayOfficialHolidaysTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Invalid date format: invalid-date", response.data["errors"])
 
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_holidays")
-    @patch("chats.apps.api.v1.sectors.viewsets.get_country_from_timezone")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_holidays")
+    @patch("chats.apps.sectors.usecases.official_holidays.get_country_from_timezone")
     def test_patch_official_holidays_update_existing_not_deleted(
         self, mock_tz, mock_holidays
     ):
