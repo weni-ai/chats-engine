@@ -349,6 +349,78 @@ class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        self.connection = {
+            "socketUrl": "wss://websocket.weni.ai",
+            "channelUuid": "channel-uuid",
+            "host": "https://flows.weni.ai",
+            "connectOn": "mount",
+            "storage": "local",
+            "callbackUrl": "",
+        }
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/{self.project.uuid}/copilot/list_connections"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def test_list_connections_returns_one_item_when_not_principal(self):
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["sector"], None)
+        self.assertEqual(str(response.data[0]["project_uuid"]), str(self.copilot_uuid))
+        self.assertEqual(response.data[0]["conection"], self.connection)
+
+    def test_list_connections_returns_org_integrations_when_principal(self):
+        other_project = Project.objects.create(
+            name="Other Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        other_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=other_project,
+            copilot_project_uuid=other_uuid,
+            name="Outro copiloto",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+
+        response = self.client.get(self.url, {"is_principal": "true"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(
+            {str(item["project_uuid"]) for item in response.data},
+            {str(self.copilot_uuid), str(other_uuid)},
+        )
+
+    def test_list_connections_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
         super().setUp()
