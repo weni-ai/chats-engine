@@ -247,7 +247,9 @@ class CopilotConnectClient(InternalAuthentication):
                 )
             except requests.RequestException as exc:
                 logger.exception("Failed to list copilot projects on Connect")
-                raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+                raise CopilotConnectError(
+                    status_code=HTTP_502_BAD_GATEWAY, error=str(exc)
+                ) from exc
 
             if not response.ok:
                 raise CopilotConnectError(
