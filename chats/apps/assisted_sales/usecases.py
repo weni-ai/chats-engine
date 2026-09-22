@@ -2,18 +2,21 @@ from typing import Optional
 from uuid import UUID
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from chats.apps.assisted_sales.clients import CopilotConnectClient
 from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
+    CopilotFeatureDisabled,
     CopilotIntegrationAlreadyExists,
 )
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
@@ -110,6 +113,74 @@ class CreateCopilotIntegrationUseCase:
             connected_by=user,
             copilot_created_on=parse_created_on(connect_data),
         )
+
+
+class LinkExistingCopilotUseCase:
+    def __init__(self, client: CopilotConnectClient = None):
+        self.client = client or CopilotConnectClient()
+
+    def execute(
+        self, *, project: Project, copilot_uuid: UUID, user, sector: Sector = None
+    ) -> CopilotIntegration:
+        existing = CopilotIntegration.objects.filter(project=project)
+        if sector:
+            existing = existing.filter(sector=sector)
+        else:
+            existing = existing.filter(sector__isnull=True)
+        if existing.exists():
+            raise CopilotIntegrationAlreadyExists()
+
+        assigned_agents = self.client.get_assigned_agents(str(copilot_uuid))
+        return CopilotIntegration.objects.create(
+            project=project,
+            sector=sector,
+            copilot_project_uuid=copilot_uuid,
+            name="",
+            assigned_agents=assigned_agents,
+            connection=build_webchat_connection({}),
+            connected_by=user,
+        )
+
+
+class UpdateOrLinkCopilotUseCase:
+    def execute(self, *, uuid, new_uuid, user) -> CopilotIntegration:
+        integration = self._integration_by_uuid(uuid)
+        if integration is None:
+            project = Project.objects.get(uuid=uuid)
+            self._ensure_can_manage(user, project)
+            integration = (
+                CopilotIntegration.objects.filter(project=project, sector__isnull=True)
+                .select_related("project", "connected_by")
+                .first()
+            )
+            if integration is None:
+                return LinkExistingCopilotUseCase().execute(
+                    project=project,
+                    copilot_uuid=new_uuid,
+                    user=user,
+                )
+
+        self._ensure_can_manage(user, integration.project)
+        return UpdateCopilotIntegrationUseCase().execute(
+            integration=integration,
+            new_uuid=new_uuid,
+            user=user,
+        )
+
+    def _integration_by_uuid(self, uuid):
+        try:
+            return CopilotIntegration.objects.select_related(
+                "project", "connected_by"
+            ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
+        except CopilotIntegration.DoesNotExist:
+            return None
+
+    def _ensure_can_manage(self, user, project):
+        if not ProjectPermission.objects.filter(user=user, project=project).exists():
+            raise PermissionDenied()
+        project_uuid = getattr(project, "uuid", project)
+        if not is_assisted_sales_copilot_enabled(project_uuid):
+            raise CopilotFeatureDisabled()
 
 
 class UpdateCopilotIntegrationUseCase:

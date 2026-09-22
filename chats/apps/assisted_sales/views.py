@@ -1,6 +1,6 @@
 from urllib.parse import parse_qs, urlparse
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
+    CopilotFeatureDisabled,
     CopilotIntegrationAlreadyExists,
 )
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
@@ -29,7 +30,7 @@ from chats.apps.assisted_sales.usecases import (
     ListCopilotRoomMessagesUseCase,
     ListExistingCopilotsUseCase,
     RemoveCopilotIntegrationUseCase,
-    UpdateCopilotIntegrationUseCase,
+    UpdateOrLinkCopilotUseCase,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -124,31 +125,30 @@ class CopilotProjectUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            integration = CopilotIntegration.objects.select_related(
-                "project", "connected_by"
-            ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
-        except CopilotIntegration.DoesNotExist:
+            integration = UpdateOrLinkCopilotUseCase().execute(
+                uuid=uuid,
+                new_uuid=serializer.validated_data["new_uuid"],
+                user=request.user,
+            )
+        except Project.DoesNotExist:
             return Response(
                 {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
-        if not ProjectPermission.objects.filter(
-            user=request.user, project=integration.project
-        ).exists():
+        except PermissionDenied:
             return Response(
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        if not is_assisted_sales_copilot_enabled(integration.project_id):
+        except CopilotFeatureDisabled:
             return _copilot_feature_forbidden()
-
-        try:
-            integration = UpdateCopilotIntegrationUseCase().execute(
-                integration=integration,
-                new_uuid=serializer.validated_data["new_uuid"],
-                user=request.user,
+        except CopilotIntegrationAlreadyExists:
+            return Response(
+                {
+                    "status_code": status.HTTP_400_BAD_REQUEST,
+                    "error": "Copilot integration already exists for this project",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except CopilotConnectError as exc:
             return Response(
@@ -246,10 +246,7 @@ class CopilotLinkedProjectView(APIView):
                 project=project, sector=sector
             )
         except CopilotIntegration.DoesNotExist:
-            return Response(
-                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({}, status=status.HTTP_200_OK)
 
         return Response(
             CopilotLinkedProjectSerializer(integration).data,

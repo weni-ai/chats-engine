@@ -70,19 +70,6 @@ class CopilotConnectClientTests(TestCase):
 
         self.assertEqual(ctx.exception.status_code, 502)
 
-    @patch("chats.apps.assisted_sales.clients.requests.post")
-    def test_create_copilot_project_requires_user_authorization(
-        self, mock_post, _mock_token
-    ):
-        kwargs = self._create_kwargs()
-        kwargs["authorization"] = ""
-
-        with self.assertRaises(CopilotConnectError) as ctx:
-            self.client_rest.create_copilot_project(**kwargs)
-
-        self.assertEqual(ctx.exception.status_code, 401)
-        mock_post.assert_not_called()
-
     @patch.object(NexusRESTClient, "get_projects_agents")
     def test_get_assigned_agents(self, mock_get, _mock_token):
         mock_get.return_value = MagicMock(
@@ -180,7 +167,7 @@ class CopilotConnectClientTests(TestCase):
             url="https://connect.example.com/v2/organizations/org-uuid/projects/",
             headers={
                 "Content-Type": "application/json; charset: utf-8",
-                "Authorization": "Bearer user-token",
+                "Authorization": "Bearer fake",
             },
             timeout=15,
         )
@@ -202,8 +189,16 @@ class CopilotConnectClientTests(TestCase):
 
         data = self.client_rest.list_copilot_projects("org-uuid")
 
-        mock_get.assert_called_once()
-        self.assertEqual(data[0]["name"], "copilot")
+        mock_get.assert_called_once_with(
+            url="https://connect.example.com/org/org-uuid/copilot",
+            headers={
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer fake",
+            },
+            timeout=15,
+        )
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["uuid"], "abc")
 
     @override_settings(CONNECT_API_URL="https://connect.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")

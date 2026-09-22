@@ -207,11 +207,12 @@ class CopilotConnectClient(InternalAuthentication):
     def list_copilot_projects(
         self, org_uuid: str, name: str = None, authorization: str = None
     ) -> list:
-        request_url, headers = self._copilot_list_request(org_uuid, authorization)
+        del authorization
+        request_url = self._copilot_list_url(org_uuid)
         if not request_url:
             return None
 
-        items = self._fetch_connect_project_pages(request_url, headers)
+        items = self._fetch_connect_project_pages(request_url, self.headers)
         copilots = [item for item in items if self._is_live_desk_copilot(item)]
         if name:
             needle = str(name).strip().lower()
@@ -222,18 +223,14 @@ class CopilotConnectClient(InternalAuthentication):
             ]
         return copilots
 
-    def _copilot_list_request(self, org_uuid: str, authorization: str):
+    def _copilot_list_url(self, org_uuid: str):
         try:
-            url = self._copilot_create_url(org_uuid)
+            return self._copilot_create_url(org_uuid)
         except CopilotConnectError:
             template = settings.CONNECT_COPILOT_LIST_URL
             if not template:
-                return None, None
-            return (
-                template.format(org_uuid=org_uuid, uuid=org_uuid),
-                self.headers,
-            )
-        return url, self._user_headers(authorization)
+                return None
+            return template.format(org_uuid=org_uuid, uuid=org_uuid)
 
     def _fetch_connect_project_pages(self, request_url: str, headers: dict) -> list:
         items = []
@@ -250,7 +247,6 @@ class CopilotConnectClient(InternalAuthentication):
                 raise CopilotConnectError(
                     status_code=HTTP_502_BAD_GATEWAY, error=str(exc)
                 ) from exc
-
             if not response.ok:
                 raise CopilotConnectError(
                     status_code=response.status_code,
