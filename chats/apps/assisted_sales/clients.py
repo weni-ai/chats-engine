@@ -55,7 +55,6 @@ class CopilotConnectClient(InternalAuthentication):
         organization_uuid: str,
         timezone: str,
         date_format: str = None,
-        authorization: str,
     ) -> dict:
         url = self._copilot_create_url(organization_uuid)
 
@@ -71,7 +70,7 @@ class CopilotConnectClient(InternalAuthentication):
         try:
             response = requests.post(
                 url=url,
-                headers=self._user_headers(authorization),
+                headers=self.headers,
                 json=payload,
                 timeout=15,
             )

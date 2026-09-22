@@ -90,7 +90,6 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
             organization_uuid=str(self.project.org),
             timezone="UTC",
             date_format=self.project.date_format,
-            authorization=f"Token {self.token.key}",
         )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
@@ -395,6 +394,14 @@ class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_linked_returns_empty_when_integration_is_missing(self):
+        self.integration.delete()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
 
 
 class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
