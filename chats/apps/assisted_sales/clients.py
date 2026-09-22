@@ -204,7 +204,10 @@ class CopilotConnectClient(InternalAuthentication):
         data = self._parse_json(response)
         return data if isinstance(data, dict) else {}
 
-    def list_copilot_projects(self, org_uuid: str, name: str = None) -> list:
+    def list_copilot_projects(
+        self, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        del authorization
         request_url = self._copilot_list_url(org_uuid)
         if not request_url:
             return None
@@ -244,7 +247,6 @@ class CopilotConnectClient(InternalAuthentication):
                 raise CopilotConnectError(
                     status_code=HTTP_502_BAD_GATEWAY, error=str(exc)
                 ) from exc
-
             if not response.ok:
                 raise CopilotConnectError(
                     status_code=response.status_code,

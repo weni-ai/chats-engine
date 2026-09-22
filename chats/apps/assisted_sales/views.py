@@ -15,6 +15,7 @@ from chats.apps.assisted_sales.exceptions import (
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration
 from chats.apps.assisted_sales.serializers import (
+    CopilotConnectionSerializer,
     CopilotExistingProjectSerializer,
     CopilotIntegrationResponseSerializer,
     CopilotLinkedProjectSerializer,
@@ -25,6 +26,7 @@ from chats.apps.assisted_sales.usecases import (
     CheckCopilotCreatePermissionUseCase,
     CreateCopilotIntegrationUseCase,
     GetLinkedCopilotUseCase,
+    ListCopilotConnectionsUseCase,
     ListCopilotRoomMessagesUseCase,
     ListExistingCopilotsUseCase,
     RemoveCopilotIntegrationUseCase,
@@ -252,6 +254,45 @@ class CopilotLinkedProjectView(APIView):
         )
 
 
+def _query_flag_is_true(raw) -> bool:
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in ("true", "1", "yes")
+
+
+class CopilotListConnectionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_uuid):
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists():
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return _copilot_feature_forbidden()
+
+        integrations = ListCopilotConnectionsUseCase().execute(
+            project=project,
+            is_principal=_query_flag_is_true(request.query_params.get("is_principal")),
+        )
+        return Response(
+            CopilotConnectionSerializer(integrations, many=True).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class CopilotCreatePermissionView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -313,6 +354,7 @@ class CopilotExistingProjectsView(APIView):
             projects = ListExistingCopilotsUseCase().execute(
                 org_uuid=str(org_uuid),
                 name=request.query_params.get("name") or None,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
             )
         except CopilotConnectError as exc:
             return Response(

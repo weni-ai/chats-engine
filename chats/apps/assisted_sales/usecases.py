@@ -260,6 +260,28 @@ class GetLinkedCopilotUseCase:
         return integration
 
 
+class ListCopilotConnectionsUseCase:
+    def execute(self, *, project: Project, is_principal: bool) -> list:
+        if is_principal:
+            if not project.org:
+                queryset = CopilotIntegration.objects.filter(project=project)
+            else:
+                queryset = CopilotIntegration.objects.filter(
+                    project__org=str(project.org)
+                )
+            return list(queryset)
+
+        queryset = CopilotIntegration.objects.filter(
+            project=project, sector__isnull=True
+        )
+        if not queryset.exists():
+            queryset = CopilotIntegration.objects.filter(project=project)
+        integration = queryset.first()
+        if not integration:
+            return []
+        return [integration]
+
+
 CONNECT_MODERATOR_ROLE_LABEL = "moderator"
 
 
@@ -295,8 +317,12 @@ class ListExistingCopilotsUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
 
-    def execute(self, *, org_uuid: str, name: str = None) -> list:
-        connect_projects = self.client.list_copilot_projects(org_uuid, name=name)
+    def execute(
+        self, *, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        connect_projects = self.client.list_copilot_projects(
+            org_uuid, name=name, authorization=authorization
+        )
         if connect_projects is not None:
             return [
                 self._from_connect(item)
