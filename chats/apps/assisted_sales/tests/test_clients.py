@@ -70,19 +70,6 @@ class CopilotConnectClientTests(TestCase):
 
         self.assertEqual(ctx.exception.status_code, 502)
 
-    @patch("chats.apps.assisted_sales.clients.requests.post")
-    def test_create_copilot_project_requires_user_authorization(
-        self, mock_post, _mock_token
-    ):
-        kwargs = self._create_kwargs()
-        kwargs["authorization"] = ""
-
-        with self.assertRaises(CopilotConnectError) as ctx:
-            self.client_rest.create_copilot_project(**kwargs)
-
-        self.assertEqual(ctx.exception.status_code, 401)
-        mock_post.assert_not_called()
-
     @patch.object(NexusRESTClient, "get_projects_agents")
     def test_get_assigned_agents(self, mock_get, _mock_token):
         mock_get.return_value = MagicMock(
@@ -145,20 +132,85 @@ class CopilotConnectClientTests(TestCase):
 
         mock_delete.assert_called_once()
 
-    @override_settings(
-        CONNECT_COPILOT_LIST_URL="https://connect.example.com/org/{org_uuid}/copilot"
-    )
     @patch("chats.apps.assisted_sales.clients.requests.get")
     def test_list_copilot_projects(self, mock_get, _mock_token):
         mock_get.return_value = MagicMock(
             ok=True,
-            json=lambda: [{"uuid": "abc", "name": "copilot", "assigned_agents": 3}],
+            json=lambda: {
+                "next": None,
+                "results": [
+                    {
+                        "uuid": "abc",
+                        "name": "copilot",
+                        "assigned_agents": 3,
+                        "is_live_desk_copilot": True,
+                    },
+                    {
+                        "uuid": "live",
+                        "name": "Live Desk",
+                        "is_live_desk_copilot": False,
+                    },
+                    {
+                        "uuid": "other",
+                        "name": "agente de vendas",
+                        "is_live_desk_copilot": True,
+                    },
+                ],
+            },
         )
 
-        data = self.client_rest.list_copilot_projects("org-uuid", name="copilot")
+        data = self.client_rest.list_copilot_projects(
+            "org-uuid", name="copilot", authorization="Bearer user-token"
+        )
 
-        mock_get.assert_called_once()
-        self.assertEqual(data[0]["name"], "copilot")
+        mock_get.assert_called_once_with(
+            url="https://connect.example.com/v2/organizations/org-uuid/projects/",
+            headers={
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer user-token",
+            },
+            timeout=15,
+        )
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["uuid"], "abc")
+
+    @override_settings(CONNECT_API_URL="")
+    @override_settings(
+        CONNECT_COPILOT_LIST_URL="https://connect.example.com/org/{org_uuid}/copilot"
+    )
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_copilot_projects_falls_back_to_list_url(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(
+            ok=True,
+            json=lambda: [
+                {"uuid": "abc", "name": "copilot", "is_live_desk_copilot": True}
+            ],
+        )
+
+        data = self.client_rest.list_copilot_projects(
+            "org-uuid", authorization="Bearer user-token"
+        )
+
+        mock_get.assert_called_once_with(
+            url="https://connect.example.com/org/org-uuid/copilot",
+            headers={
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer user-token",
+            },
+            timeout=15,
+        )
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["uuid"], "abc")
+
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_copilot_projects_requires_user_authorization(
+        self, mock_get, _mock_token
+    ):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.list_copilot_projects("org-uuid")
+
+        self.assertEqual(ctx.exception.status_code, 401)
+        mock_get.assert_not_called()
 
     @override_settings(CONNECT_API_URL="https://connect.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")

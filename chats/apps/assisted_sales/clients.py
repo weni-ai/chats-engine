@@ -40,7 +40,7 @@ class CopilotConnectClient(InternalAuthentication):
         if not authorization or not str(authorization).strip():
             raise CopilotConnectError(
                 status_code=HTTP_UNAUTHORIZED,
-                error="User authorization is required to create a copilot project",
+                error="User authorization is required",
             )
         return {
             "Content-Type": "application/json; charset: utf-8",
@@ -204,39 +204,83 @@ class CopilotConnectClient(InternalAuthentication):
         data = self._parse_json(response)
         return data if isinstance(data, dict) else {}
 
-    def list_copilot_projects(self, org_uuid: str, name: str = None) -> list:
-        url = settings.CONNECT_COPILOT_LIST_URL
-        if not url:
+    def list_copilot_projects(
+        self, org_uuid: str, name: str = None, authorization: str = None
+    ) -> list:
+        request_url = self._copilot_list_url(org_uuid)
+        if not request_url:
             return None
 
-        request_url = url.format(org_uuid=org_uuid, uuid=org_uuid)
-        params = {"org_uuid": org_uuid}
+        items = self._fetch_connect_project_pages(
+            request_url, self._user_headers(authorization)
+        )
+        copilots = [item for item in items if self._is_live_desk_copilot(item)]
         if name:
-            params["name"] = name
+            needle = str(name).strip().lower()
+            copilots = [
+                item
+                for item in copilots
+                if needle in str(item.get("name") or "").lower()
+            ]
+        return copilots
 
+    def _copilot_list_url(self, org_uuid: str):
         try:
-            response = requests.get(
-                url=request_url,
-                headers=self.headers,
-                params=params,
-                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
-            )
-        except requests.RequestException as exc:
-            logger.exception("Failed to list copilot projects on Connect")
-            raise CopilotConnectError(status_code=502, error=str(exc)) from exc
+            return self._copilot_create_url(org_uuid)
+        except CopilotConnectError:
+            template = settings.CONNECT_COPILOT_LIST_URL
+            if not template:
+                return None
+            return template.format(org_uuid=org_uuid, uuid=org_uuid)
 
-        if not response.ok:
-            raise CopilotConnectError(
-                status_code=response.status_code,
-                error=self._parse_error(response),
-            )
+    def _fetch_connect_project_pages(self, request_url: str, headers: dict) -> list:
+        items = []
+        next_url = request_url
+        while next_url:
+            try:
+                response = requests.get(
+                    url=next_url,
+                    headers=headers,
+                    timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
+                )
+            except requests.RequestException as exc:
+                logger.exception("Failed to list copilot projects on Connect")
+                raise CopilotConnectError(
+                    status_code=HTTP_502_BAD_GATEWAY, error=str(exc)
+                ) from exc
+            if not response.ok:
+                raise CopilotConnectError(
+                    status_code=response.status_code,
+                    error=self._parse_error(response),
+                )
 
-        data = self._parse_json(response)
+            page_items, next_url = self._parse_project_list_page(
+                self._parse_json(response)
+            )
+            items.extend(page_items)
+        return items
+
+    def _parse_project_list_page(self, data):
         if isinstance(data, list):
-            return data
+            return data, None
         if isinstance(data, dict):
-            return data.get("results") or data.get("projects") or data.get("data") or []
-        return []
+            page_items = (
+                data.get("results") or data.get("projects") or data.get("data") or []
+            )
+            if not isinstance(page_items, list):
+                page_items = []
+            return page_items, data.get("next") or None
+        return [], None
+
+    def _is_live_desk_copilot(self, item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        flag = item.get("is_live_desk_copilot")
+        if flag is True:
+            return True
+        if isinstance(flag, str):
+            return flag.strip().lower() in ("true", "1")
+        return False
 
     def list_internal_messages(
         self,

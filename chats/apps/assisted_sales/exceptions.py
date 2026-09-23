@@ -7,3 +7,7 @@ class CopilotConnectError(Exception):
 
 class CopilotIntegrationAlreadyExists(Exception):
     pass
+
+
+class CopilotFeatureDisabled(Exception):
+    pass
