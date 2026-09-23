@@ -469,6 +469,32 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
             {str(self.copilot_uuid), str(other_uuid)},
         )
 
+    def test_list_connections_fills_sector_from_secondary_project_when_principal(self):
+        secondary = Project.objects.create(
+            name="Secundario CSAT 2", timezone="UTC", org=str(self.org_uuid)
+        )
+        sector = Sector.objects.create(
+            name="Secundário CSAT 2",
+            project=self.project,
+            rooms_limit=5,
+            secondary_project={"uuid": str(secondary.uuid)},
+        )
+        copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=secondary,
+            copilot_project_uuid=copilot_uuid,
+            name="Secundário CSAT 2",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+
+        response = self.client.get(self.url, {"is_principal": "true"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_copilot = {str(item["project_uuid"]): item for item in response.data}
+        self.assertEqual(str(by_copilot[str(copilot_uuid)]["sector"]), str(sector.uuid))
+        self.assertIsNone(by_copilot[str(self.copilot_uuid)]["sector"])
+
     def test_list_connections_forbidden_without_permission(self):
         _, other_token = create_user_and_token("other")
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
