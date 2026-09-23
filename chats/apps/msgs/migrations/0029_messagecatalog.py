@@ -6,7 +6,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("msgs", "0029_bulkquickmessagesend_bulkquickmessagesendmessage"),
+        ("msgs", "0028_messagemedia_room_alter_messagemedia_message"),
     ]
 
     operations = [
