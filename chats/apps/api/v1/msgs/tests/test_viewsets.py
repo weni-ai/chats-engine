@@ -213,6 +213,27 @@ class TestMessageViewsetCreate(APITestCase):
         self.assertEqual(self.room.last_message_text, "Hello from agent")
         self.assertEqual(self.room.last_message_user, self.user)
 
+    def test_create_message_ignores_catalog_payload(self):
+        """Catalog messages are WebSocket-only; REST silently ignores them."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "catalog": {
+                "carousel": True,
+                "products": [{"product": "destaques", "product_retailer_ids": ["1"]}],
+            },
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        message = self.room.messages.get()
+        with self.assertRaises(Message.catalog.RelatedObjectDoesNotExist):
+            message.catalog
+
     @patch(
         "chats.apps.ai_features.improve_user_message.tasks"
         ".register_message_improvement_task.delay"

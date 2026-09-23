@@ -27,7 +27,7 @@ from chats.apps.msgs.models import (
     ChatMessageReplyIndex,
 )
 from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.models import MessageCatalog, MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 from chats.apps.rooms.models import RoomNote
 
@@ -494,6 +494,7 @@ class MessageSerializer(BaseMessageSerializer):
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
     bulk_message = serializers.SerializerMethodField(read_only=True)
+    catalog = serializers.SerializerMethodField(read_only=True)
     ai_text_improvement = AITextImprovementSerializer(
         write_only=True, required=False, allow_null=True
     )
@@ -521,6 +522,7 @@ class MessageSerializer(BaseMessageSerializer):
             "ai_text_improvement",
             "bulk_message",
             "external_id",
+            "catalog",
         ]
         read_only_fields = [
             "uuid",
@@ -683,6 +685,21 @@ class MessageSerializer(BaseMessageSerializer):
 
     def get_bulk_message(self, obj):
         return get_message_bulk_message_data(obj)
+
+    def get_catalog(self, obj):
+        """Product catalog/carousel payload, or ``None`` when absent.
+
+        Read-only by design: catalog messages are created only through the
+        agent WebSocket flow, which writes the related ``MessageCatalog`` row
+        directly. The REST create endpoint ignores any ``catalog`` in the body.
+        """
+
+        try:
+            return obj.catalog.data
+        except MessageCatalog.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
 
 
 class MessageWSSerializer(MessageSerializer):

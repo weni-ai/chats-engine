@@ -1042,6 +1042,13 @@ ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY = env.str(
     default="weniChatsAssistedSalesCopilot",
 )
 
+# Product catalog/carousel messages sent by agents via WebSocket and
+# forwarded to the mailroom. Separate from the Copilot flag above.
+MESSAGE_CATALOG_FEATURE_FLAG_KEY = env.str(
+    "MESSAGE_CATALOG_FEATURE_FLAG_KEY",
+    default="weniChatsAssistedSales",
+)
+
 # Metric Goal Alerts (risk alerts)
 METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY = env.str(
     "METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY",

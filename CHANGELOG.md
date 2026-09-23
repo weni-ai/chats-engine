@@ -1,3 +1,7 @@
+# 3.80.0
+# Add
+  - Support for sending product catalog/carousel messages via WebSocket, forwarded to mailroom (behind weniChatsAssistedSales flag)
+
 # 3.79.1
 # Fix
   - Inactivity automatic messages skipped for closed rooms and expired WhatsApp windows
