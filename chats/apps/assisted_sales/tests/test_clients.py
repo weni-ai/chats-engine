@@ -167,7 +167,7 @@ class CopilotConnectClientTests(TestCase):
             url="https://connect.example.com/v2/organizations/org-uuid/projects/",
             headers={
                 "Content-Type": "application/json; charset: utf-8",
-                "Authorization": "Bearer fake",
+                "Authorization": "Bearer user-token",
             },
             timeout=15,
         )
@@ -187,18 +187,30 @@ class CopilotConnectClientTests(TestCase):
             ],
         )
 
-        data = self.client_rest.list_copilot_projects("org-uuid")
+        data = self.client_rest.list_copilot_projects(
+            "org-uuid", authorization="Bearer user-token"
+        )
 
         mock_get.assert_called_once_with(
             url="https://connect.example.com/org/org-uuid/copilot",
             headers={
                 "Content-Type": "application/json; charset: utf-8",
-                "Authorization": "Bearer fake",
+                "Authorization": "Bearer user-token",
             },
             timeout=15,
         )
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["uuid"], "abc")
+
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_list_copilot_projects_requires_user_authorization(
+        self, mock_get, _mock_token
+    ):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.list_copilot_projects("org-uuid")
+
+        self.assertEqual(ctx.exception.status_code, 401)
+        mock_get.assert_not_called()
 
     @override_settings(CONNECT_API_URL="https://connect.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")

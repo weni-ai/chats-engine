@@ -40,7 +40,7 @@ class CopilotConnectClient(InternalAuthentication):
         if not authorization or not str(authorization).strip():
             raise CopilotConnectError(
                 status_code=HTTP_UNAUTHORIZED,
-                error="User authorization is required to create a copilot project",
+                error="User authorization is required",
             )
         return {
             "Content-Type": "application/json; charset: utf-8",
@@ -207,12 +207,13 @@ class CopilotConnectClient(InternalAuthentication):
     def list_copilot_projects(
         self, org_uuid: str, name: str = None, authorization: str = None
     ) -> list:
-        del authorization
         request_url = self._copilot_list_url(org_uuid)
         if not request_url:
             return None
 
-        items = self._fetch_connect_project_pages(request_url, self.headers)
+        items = self._fetch_connect_project_pages(
+            request_url, self._user_headers(authorization)
+        )
         copilots = [item for item in items if self._is_live_desk_copilot(item)]
         if name:
             needle = str(name).strip().lower()
