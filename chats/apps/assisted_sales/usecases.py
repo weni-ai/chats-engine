@@ -269,7 +269,9 @@ class ListCopilotConnectionsUseCase:
                 queryset = CopilotIntegration.objects.filter(
                     project__org=str(project.org)
                 )
-            return list(queryset)
+            integrations = list(queryset)
+            self._attach_sectors_from_secondary_projects(project, integrations)
+            return integrations
 
         queryset = CopilotIntegration.objects.filter(
             project=project, sector__isnull=True
@@ -280,6 +282,30 @@ class ListCopilotConnectionsUseCase:
         if not integration:
             return []
         return [integration]
+
+    def _attach_sectors_from_secondary_projects(self, project, integrations) -> None:
+        pending = [item for item in integrations if not item.sector_id]
+        if not pending:
+            return
+
+        secondary_ids = {str(item.project_id) for item in pending}
+        sector_by_secondary = {}
+        sectors = Sector.objects.filter(project=project).order_by("created_on")
+        for sector in sectors:
+            secondary_project = sector.secondary_project or {}
+            if not isinstance(secondary_project, dict):
+                continue
+            secondary_uuid = str(secondary_project.get("uuid") or "")
+            if (
+                secondary_uuid in secondary_ids
+                and secondary_uuid not in sector_by_secondary
+            ):
+                sector_by_secondary[secondary_uuid] = sector.uuid
+
+        for item in pending:
+            sector_uuid = sector_by_secondary.get(str(item.project_id))
+            if sector_uuid:
+                item.sector_id = sector_uuid
 
 
 CONNECT_MODERATOR_ROLE_LABEL = "moderator"
