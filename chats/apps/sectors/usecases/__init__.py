@@ -6,3 +6,9 @@ from .group_sector_authorization import (
     RemoveSectorFromGroupSectorUseCase,
     UpdateAgentQueueAuthorizationsUseCase,
 )
+from .official_holidays import (
+    ImportOfficialHolidaysUseCase,
+    ListOfficialHolidaysUseCase,
+    OfficialHolidayRequestError,
+    UpdateOfficialHolidaysUseCase,
+)
