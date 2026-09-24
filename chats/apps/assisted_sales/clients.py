@@ -87,6 +87,55 @@ class CopilotConnectClient(InternalAuthentication):
 
         return self._parse_json(response)
 
+    def get_wwc_channel_uuid(self, copilot_project_uuid: str) -> str:
+        base_url = (settings.CONNECT_API_URL or "").rstrip("/")
+        if not base_url:
+            raise CopilotConnectError(
+                status_code=HTTP_502_BAD_GATEWAY,
+                error="Connect API URL is not configured",
+            )
+
+        try:
+            response = requests.get(
+                url=f"{base_url}/v2/projects/channels",
+                headers=self.headers,
+                params={
+                    "project_uuid": str(copilot_project_uuid),
+                    "channel_type": "WWC",
+                },
+                timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            logger.exception(
+                "Failed to fetch WWC channel for copilot %s",
+                copilot_project_uuid,
+            )
+            raise CopilotConnectError(
+                status_code=HTTP_502_BAD_GATEWAY, error=str(exc)
+            ) from exc
+
+        if not response.ok:
+            raise CopilotConnectError(
+                status_code=response.status_code,
+                error=self._parse_error(response),
+            )
+
+        data = self._parse_json(response)
+        channels = data.get("channels") if isinstance(data, dict) else None
+        if not isinstance(channels, list):
+            channels = []
+        for channel in channels:
+            if not isinstance(channel, dict):
+                continue
+            raw = channel.get("uuid")
+            if raw:
+                return str(raw)
+
+        raise CopilotConnectError(
+            status_code=HTTP_502_BAD_GATEWAY,
+            error="WWC channel not found for this copilot",
+        )
+
     def switch_copilot_project(
         self, old_copilot_uuid: str, new_copilot_uuid: str
     ) -> dict:

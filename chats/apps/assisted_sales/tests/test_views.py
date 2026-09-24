@@ -194,12 +194,9 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_update_copilot_integration(self, mock_client_cls):
+        channel_uuid = uuid4()
         mock_client = MagicMock()
-        mock_client.switch_copilot_project.return_value = {
-            "uuid": str(self.new_copilot_uuid),
-            "name": "copilot novo",
-            "channel_uuid": str(uuid4()),
-        }
+        mock_client.get_wwc_channel_uuid.return_value = str(channel_uuid)
         mock_client.get_assigned_agents.return_value = 7
         mock_client_cls.return_value = mock_client
 
@@ -208,18 +205,23 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["name"], "copilot novo")
+        self.assertEqual(response.data["name"], "copilot antigo")
         self.assertEqual(response.data["assigned_agents"], 7)
         self.assertEqual(str(response.data["uuid"]), str(self.integration.uuid))
         self.integration.refresh_from_db()
-        self.assertEqual(self.integration.name, "copilot novo")
+        self.assertEqual(self.integration.name, "copilot antigo")
         self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
         self.assertEqual(self.integration.assigned_agents, 7)
+        self.assertEqual(self.integration.connection["channelUuid"], str(channel_uuid))
+        mock_client.switch_copilot_project.assert_not_called()
+        mock_client.get_wwc_channel_uuid.assert_called_once_with(
+            str(self.new_copilot_uuid)
+        )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_update_fails_when_connect_fails(self, mock_client_cls):
         mock_client = MagicMock()
-        mock_client.switch_copilot_project.side_effect = CopilotConnectError(
+        mock_client.get_wwc_channel_uuid.side_effect = CopilotConnectError(
             status_code=502, error="Connect unavailable"
         )
         mock_client_cls.return_value = mock_client
@@ -266,11 +268,9 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
     def test_update_with_live_desk_uuid_switches_when_integration_exists(
         self, mock_client_cls
     ):
+        channel_uuid = uuid4()
         mock_client = MagicMock()
-        mock_client.switch_copilot_project.return_value = {
-            "uuid": str(self.new_copilot_uuid),
-            "name": "copilot novo",
-        }
+        mock_client.get_wwc_channel_uuid.return_value = str(channel_uuid)
         mock_client.get_assigned_agents.return_value = (
             self.EXPECTED_ASSIGNED_AGENTS_SWITCH
         )
@@ -283,9 +283,13 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_client.switch_copilot_project.assert_called_once()
+        mock_client.switch_copilot_project.assert_not_called()
+        mock_client.get_wwc_channel_uuid.assert_called_once_with(
+            str(self.new_copilot_uuid)
+        )
         self.integration.refresh_from_db()
         self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
+        self.assertEqual(self.integration.connection["channelUuid"], str(channel_uuid))
 
 
 class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):

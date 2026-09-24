@@ -107,6 +107,24 @@ class CopilotConnectClientTests(TestCase):
     def test_get_assigned_agents_returns_zero_when_url_missing(self, _mock_token):
         self.assertEqual(self.client_rest.get_assigned_agents("copilot-uuid"), 0)
 
+    @patch("chats.apps.assisted_sales.clients.requests.get")
+    def test_get_wwc_channel_uuid(self, mock_get, _mock_token):
+        channel_uuid = "989aa94e-a7eb-46c8-8954-13658bdf646f"
+        mock_get.return_value = MagicMock(
+            ok=True,
+            json=lambda: {"channels": [{"uuid": channel_uuid, "channel_type": "WWC"}]},
+        )
+
+        data = self.client_rest.get_wwc_channel_uuid("copilot-uuid")
+
+        mock_get.assert_called_once_with(
+            url="https://connect.example.com/v2/projects/channels",
+            headers=self.client_rest.headers,
+            params={"project_uuid": "copilot-uuid", "channel_type": "WWC"},
+            timeout=15,
+        )
+        self.assertEqual(data, channel_uuid)
+
     @override_settings(
         CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}"
     )
