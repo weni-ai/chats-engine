@@ -93,6 +93,29 @@ def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
     return None
 
 
+def is_message_catalog_feature_enabled(project_uuid: Optional[str]) -> bool:
+    """Return whether catalog/carousel messages are enabled for ``project_uuid``.
+
+    Same safety net as :func:`is_reply_core_fallback_active`: a missing or
+    falsy ``project_uuid`` short-circuits to ``False``, and any failure
+    talking to the flag service is captured and degrades to ``False`` so a
+    flag outage never blocks regular message sending. Never raises.
+    """
+
+    if not project_uuid:
+        return False
+
+    try:
+        return is_feature_active_for_attributes(
+            settings.MESSAGE_CATALOG_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project_uuid)},
+        )
+    except Exception as error:
+        capture_exception(error)
+        logger.error("Error checking message catalog feature flag: %s", error)
+        return False
+
+
 def is_reply_core_fallback_active(project_uuid: Optional[str]) -> bool:
     """Return whether the WAMID core fallback is enabled for ``project_uuid``.
 
