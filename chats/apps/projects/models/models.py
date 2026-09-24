@@ -842,3 +842,72 @@ class AgentStatusLog(BaseModel):
 
     def __str__(self):
         return f"{self.agent.email} - {self.project.name} - {self.log_date}"
+
+
+class UnifiedSacMigrationStatus(models.TextChoices):
+    """Named Unified SAC to match the existing product term."""
+
+    PENDING = "PENDING"
+    SETTING_PRINCIPAL = "SETTING_PRINCIPAL"
+    PRINCIPAL_SET = "PRINCIPAL_SET"
+    CLOSING_ROOMS = "CLOSING_ROOMS"
+    ROOMS_CLOSED = "ROOMS_CLOSED"
+    DELETING_QUEUES = "DELETING_QUEUES"
+    QUEUES_DELETED = "QUEUES_DELETED"
+    DELETING_SECTORS = "DELETING_SECTORS"
+    SECTORS_DELETED = "SECTORS_DELETED"
+    FINISHED = "FINISHED"
+    FAILED = "FAILED"
+
+
+class UnifiedSacMigration(BaseModel):
+    """Tracks a Unified SAC migration for an org.
+
+    Named Unified SAC because the product and existing code already use
+    this term (e.g. end_by="sac_unificado").
+    """
+
+    org = models.CharField(_("org uuid"), max_length=50, db_index=True)
+    principal_project = models.ForeignKey(
+        "projects.Project",
+        verbose_name=_("Principal project"),
+        related_name="unified_sac_migrations",
+        on_delete=models.PROTECT,
+    )
+    created_by = models.ForeignKey(
+        User,
+        verbose_name=_("Created by"),
+        related_name="unified_sac_migrations",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=32,
+        choices=UnifiedSacMigrationStatus.choices,
+        default=UnifiedSacMigrationStatus.PENDING,
+        db_index=True,
+    )
+    started_at = models.DateTimeField(_("Started at"), null=True, blank=True)
+    finished_at = models.DateTimeField(_("Finished at"), null=True, blank=True)
+    error = models.JSONField(_("error"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Unified SAC migration")
+        verbose_name_plural = _("Unified SAC migrations")
+        constraints = [
+            UniqueConstraint(
+                fields=["org"],
+                condition=~Q(
+                    status__in=[
+                        UnifiedSacMigrationStatus.FINISHED,
+                        UnifiedSacMigrationStatus.FAILED,
+                    ]
+                ),
+                name="unique_in_progress_unified_sac_migration_per_org",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.org} - {self.status}"
