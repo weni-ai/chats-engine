@@ -22,7 +22,7 @@ class QueueInternalViewset(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
-        return super().get_queryset()
+        return super().get_queryset().select_related("sector__project")
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
