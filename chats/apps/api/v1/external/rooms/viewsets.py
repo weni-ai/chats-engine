@@ -15,6 +15,8 @@ from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+from weni_commons.auth import SessionTokenAuthentication
+from weni_commons.kong import api_gateway_expose
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -627,7 +629,6 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Room.objects
     serializer_class = RoomListSerializer
     lookup_field = "uuid"
-    authentication_classes = [ProjectAdminAuthentication]
     throttle_classes = [
         ExternalSecondRateThrottle,
         ExternalMinuteRateThrottle,
@@ -652,6 +653,13 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class.default_limit = 10
     pagination_class.max_limit = 100
 
+    @property
+    def authentication_classes(self):
+        classes = [ProjectAdminAuthentication]
+        if SessionTokenAuthentication not in classes:
+            classes.insert(0, SessionTokenAuthentication)
+        return classes
+
     def get_queryset(self):
         return (
             super()
@@ -659,10 +667,20 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .filter(queue__sector__project=self.request.auth.project)
         )
 
+    @api_gateway_expose(
+        alias="v1/rooms",
+        methods=["GET"],
+        service=settings.KONG_SERVICE,
+    )
     def list(self, request, *args, **kwargs):
         """List rooms with limit/offset pagination (default=10, max=100)."""
         return super().list(request, *args, **kwargs)
 
+    @api_gateway_expose(
+        alias="v1/rooms/{uuid}",
+        methods=["GET"],
+        service=settings.KONG_SERVICE,
+    )
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)

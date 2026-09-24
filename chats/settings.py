@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
+    "weni_commons",
     "channels",
     "drf_yasg",
     "django_filters",
@@ -1005,6 +1006,12 @@ ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
     default=2,
 )
 
+
+# Kong API Gateway (weni-commons)
+KONG_ADMIN_URL = env.str("KONG_ADMIN_URL", default="http://localhost:8001")
+KONG_SERVICE = env.str("KONG_SERVICE", default="chats-service")
+KONG_SERVICE_URL = env.str("KONG_SERVICE_URL", default=ENGINE_BASE_URL)
+KONG_URL_PREFIX = env.str("KONG_URL_PREFIX", default="/chats")
 
 # Meta
 META_GRAPH_API_BASE_HOST_URL = env.str(
