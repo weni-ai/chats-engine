@@ -104,3 +104,28 @@ class TestSetMsgExternalIdUseCase(TestCase):
             any("unexpected error setting external_id" in line for line in logs.output),
             f"expected exception log, got: {logs.output}",
         )
+
+    def test_expected_validation_errors_are_logged_without_sentry(self):
+        """
+        Closed-room / 24h ValidationErrors are business rules — log only.
+        """
+        from rest_framework.exceptions import ValidationError
+
+        with mock.patch(
+            "chats.apps.msgs.usecases.set_msg_external_id.Message.objects"
+        ) as mocked_manager, mock.patch(
+            "chats.apps.msgs.usecases.set_msg_external_id.sentry_sdk.capture_exception"
+        ) as mocked_capture, self.assertLogs(
+            "chats.apps.msgs.usecases.set_msg_external_id", level="WARNING"
+        ) as logs:
+            mocked_manager.select_for_update.return_value.get.side_effect = (
+                ValidationError({"detail": "Closed rooms can't receive messages"})
+            )
+
+            self.use_case.execute(self.message.uuid, "any-external-id")
+
+        mocked_capture.assert_not_called()
+        self.assertTrue(
+            any("expected validation failure" in line for line in logs.output),
+            f"expected warning log, got: {logs.output}",
+        )

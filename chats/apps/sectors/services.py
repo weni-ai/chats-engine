@@ -4,12 +4,14 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
 from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType, Message
 from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
+from chats.core.sentry import is_expected_validation_error
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +136,22 @@ class AutomaticMessagesService:
                     "[AUTOMATIC MESSAGES SERVICE] Automatic message sent to room %s",
                     room.pk,
                 )
+        except ValidationError as e:
+            if is_expected_validation_error(e):
+                logger.warning(
+                    "[AUTOMATIC MESSAGES SERVICE] Expected validation failure "
+                    "for room %s: %s",
+                    room.pk,
+                    e,
+                )
+                return False
+            logger.exception(
+                "[AUTOMATIC MESSAGES SERVICE] Unexpected ValidationError "
+                "sending automatic message to room %s",
+                room.pk,
+            )
+            capture_exception(e)
+            return False
         except Exception as e:
             logger.error(
                 "[AUTOMATIC MESSAGES SERVICE] Error sending automatic message to room %s: %s"
