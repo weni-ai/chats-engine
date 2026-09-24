@@ -20,9 +20,7 @@ WAMID_HBGL_US_CONTACT = (
 # Contact-self-reply pair observed in production: a contact message
 # (HBgM/phone envelope) and the ``context.id`` of a later reply by the same
 # contact to that message (HBgT/LID envelope). Both share the same internal
-# id (``ACF1292A9EB1991D17C575DDA2A6B587``) but use the ``0x12, 0x18, 0x20``
-# trailer marker, which is distinct from ``WAMID_HBGT_BUSINESS`` above
-# (same HBgT/LID shape, but ``0x12, 0x18, 0x16`` marker).
+# id (``ACF1292A9EB1991D17C575DDA2A6B587``) with length 32.
 WAMID_HBGM_CONTACT_SELF_REPLY_ORIGINAL = (
     "wamid.HBgMNTU4NDg3NzgyMDg3FQIAEhggQUNGMTI5MkE5RUIxOTkxRDE3QzU3NUREQTJB"
     "NkI1ODcA"
@@ -30,6 +28,22 @@ WAMID_HBGM_CONTACT_SELF_REPLY_ORIGINAL = (
 WAMID_HBGT_CONTACT_SELF_REPLY_CONTEXT = (
     "wamid.HBgTQlIuMTE4MDk1NTMyMDg2MDk4OBUUABIYIEFDRjEyOTJBOUVCMTk5MUQxN0M1"
     "NzVEREEyQTZCNTg3AA=="
+)
+# Jul 2026 incident: contact self-reply where the original message was stored
+# under a phone ``HBgM`` envelope (id length 20) and the reply's ``context.id``
+# arrived with a LID ``HBgU`` envelope. Exact ``external_id`` match misses;
+# the core extracted from both must coincide (id ``3A6CA38A67DC49A8F3B3``).
+WAMID_HBGM_CONTACT_LEN20_ORIGINAL = (
+    "wamid.HBgMNTU4NDg2MDY1NzQyFQIAEhgUM0E2Q0EzOEE2N0RDNDlBOEYzQjMA"
+)
+WAMID_HBGU_CONTACT_LEN20_CONTEXT = (
+    "wamid.HBgUQlIuMzU2Nzk5ODIyNzQ5ODIwMjgVFAASGBQzQTZDQTM4QTY3REM0OUE4RjNCMwA="
+)
+WAMID_HBGU_CONTACT_LEN20_CONTEXT_B = (
+    "wamid.HBgUQlIuMzU2Nzk5ODIyNzQ5ODIwMjgVFAASGBQzQTcyMkQzRUEwN0RBQUIxMzQyMQA="
+)
+WAMID_HBGU_CONTACT_LEN20_CONTEXT_C = (
+    "wamid.HBgUQlIuMzU2Nzk5ODIyNzQ5ODIwMjgVFAASGBQzQTREMzA0MUM2NzhBQjQ2MzlDNgA="
 )
 
 
@@ -87,9 +101,9 @@ class ExtractWamidCoreTests(SimpleTestCase):
 
     def test_resolves_contact_self_reply_envelope(self):
         # Regression test: a contact replying to their own earlier message
-        # used to fail to resolve because the ``0x12, 0x18, 0x20`` trailer
-        # marker wasn't recognized, even though the original (HBgM/phone)
-        # and the reply's context.id (HBgT/LID) reference the same message.
+        # used to fail to resolve because length-32 ids weren't recognized,
+        # even though the original (HBgM/phone) and the reply's context.id
+        # (HBgT/LID) reference the same message.
         original_core = extract_wamid_core(
             WAMID_HBGM_CONTACT_SELF_REPLY_ORIGINAL
         )
@@ -101,10 +115,10 @@ class ExtractWamidCoreTests(SimpleTestCase):
         self.assertEqual(original_core, context_core)
 
     def test_lid_envelope_core_exceeds_old_64_char_column_limit(self):
-        # Production incident regression test: every core produced via the
-        # ``0x12, 0x18, 0x20`` marker (LID-based envelope) is 66 hex chars,
-        # not a rare outlier. ``ChatMessageReplyIndex.external_id_core`` used
-        # to be ``CharField(max_length=64)``, so storing this value raised a
+        # Production incident regression test: every core produced via a
+        # length-32 id (LID-based envelope) is 66 hex chars, not a rare
+        # outlier. ``ChatMessageReplyIndex.external_id_core`` used to be
+        # ``CharField(max_length=64)``, so storing this value raised a
         # ``DataError`` on every incoming message matching this envelope.
         # The field is now an unbounded ``TextField`` (see migration 0021);
         # this test documents *why* and guards against the column ever being
@@ -113,3 +127,37 @@ class ExtractWamidCoreTests(SimpleTestCase):
         self.assertIsNotNone(core)
         self.assertEqual(len(core), 66)
         self.assertGreater(len(core), 64)
+
+    def test_resolves_hbgu_contact_self_reply_length_20(self):
+        # Regression: Jul 2026 — ``HBgU`` reply context with id length 20
+        # (``12 18 14``) against an ``HBgM`` original. The old fixed-marker
+        # list did not include that length, so ``extract_wamid_core``
+        # returned ``None`` and the quote never mounted.
+        original_core = extract_wamid_core(WAMID_HBGM_CONTACT_LEN20_ORIGINAL)
+        context_core = extract_wamid_core(WAMID_HBGU_CONTACT_LEN20_CONTEXT)
+        self.assertIsNotNone(original_core)
+        self.assertIsNotNone(context_core)
+        self.assertEqual(original_core, context_core)
+        # 20 ASCII hex chars + trailing NUL → 42 hex digits.
+        self.assertEqual(len(original_core), 42)
+
+    def test_extracts_core_for_hbgu_envelopes(self):
+        for wamid in (
+            WAMID_HBGU_CONTACT_LEN20_CONTEXT,
+            WAMID_HBGU_CONTACT_LEN20_CONTEXT_B,
+            WAMID_HBGU_CONTACT_LEN20_CONTEXT_C,
+        ):
+            with self.subTest(wamid=wamid):
+                core = extract_wamid_core(wamid)
+                self.assertIsNotNone(core)
+                self.assertEqual(core, core.upper())
+                self.assertEqual(len(core), 42)
+
+    def test_distinct_hbgu_contexts_yield_distinct_cores(self):
+        cores = {
+            extract_wamid_core(WAMID_HBGU_CONTACT_LEN20_CONTEXT),
+            extract_wamid_core(WAMID_HBGU_CONTACT_LEN20_CONTEXT_B),
+            extract_wamid_core(WAMID_HBGU_CONTACT_LEN20_CONTEXT_C),
+        }
+        self.assertEqual(len(cores), 3)
+        self.assertTrue(all(cores))
