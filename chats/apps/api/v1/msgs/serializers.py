@@ -86,6 +86,23 @@ class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
     )
 
 
+def get_message_catalog_data(message: ChatMessage) -> Optional[dict]:
+    """Product catalog/carousel payload for a message, or ``None`` when absent.
+
+    Shared by v1 and v2 message serializers so both list/retrieve endpoints
+    (and the mailroom webhook, via ``MessageWSSerializer``) stay in sync.
+    Read-only: catalog messages are only created through the agent
+    WebSocket flow, which writes the related ``MessageCatalog`` row directly.
+    """
+
+    try:
+        return message.catalog.data
+    except MessageCatalog.DoesNotExist:
+        return None
+    except AttributeError:
+        return None
+
+
 def get_message_bulk_message_data(message: ChatMessage) -> Optional[dict]:
     """
     Build the ``bulk_message`` payload for a message, if it was sent via bulk send.
@@ -662,19 +679,7 @@ class MessageSerializer(BaseMessageSerializer):
         return get_message_bulk_message_data(obj)
 
     def get_catalog(self, obj):
-        """Product catalog/carousel payload, or ``None`` when absent.
-
-        Read-only by design: catalog messages are created only through the
-        agent WebSocket flow, which writes the related ``MessageCatalog`` row
-        directly. The REST create endpoint ignores any ``catalog`` in the body.
-        """
-
-        try:
-            return obj.catalog.data
-        except MessageCatalog.DoesNotExist:
-            return None
-        except AttributeError:
-            return None
+        return get_message_catalog_data(obj)
 
 
 class MessageWSSerializer(MessageSerializer):
