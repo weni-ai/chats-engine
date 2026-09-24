@@ -142,6 +142,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_automatic_message",
             "automatic_message_type",
             "bulk_message",
+            "external_id",
         ]
         read_only_fields = [
             "uuid",
@@ -158,6 +159,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_automatic_message",
             "automatic_message_type",
             "bulk_message",
+            "external_id",
         ]
 
     def get_replied_message(self, obj):
