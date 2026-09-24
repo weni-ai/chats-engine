@@ -1,9 +1,10 @@
 from datetime import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import (
@@ -44,6 +45,7 @@ class RouteQueueRoomsTaskTestCase(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         QueueAuthorization.objects.create(
             queue=self.queue,
