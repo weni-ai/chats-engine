@@ -2,7 +2,10 @@ import logging
 
 from rest_framework import serializers
 
-from chats.apps.api.v1.msgs.serializers import get_message_bulk_message_data
+from chats.apps.api.v1.msgs.serializers import (
+    get_message_bulk_message_data,
+    get_message_catalog_data,
+)
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
@@ -124,6 +127,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
     bulk_message = serializers.SerializerMethodField(read_only=True)
+    catalog = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChatMessage
@@ -143,6 +147,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "automatic_message_type",
             "bulk_message",
             "external_id",
+            "catalog",
         ]
         read_only_fields = [
             "uuid",
@@ -160,6 +165,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "automatic_message_type",
             "bulk_message",
             "external_id",
+            "catalog",
         ]
 
     def get_replied_message(self, obj):
@@ -236,3 +242,6 @@ class MessageSerializerV2(serializers.ModelSerializer):
 
     def get_bulk_message(self, obj):
         return get_message_bulk_message_data(obj)
+
+    def get_catalog(self, obj):
+        return get_message_catalog_data(obj)
