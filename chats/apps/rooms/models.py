@@ -341,6 +341,15 @@ class Room(BaseModel, BaseConfigurableModel):
                     last_message_user__isnull=False,
                 ),
             ),
+            # Prefix btree for Insights/dashboard channel filters
+            # (`urn LIKE 'whatsapp:%'` via `urn__startswith`). Default btree
+            # collations do not support LIKE prefix scans; text_pattern_ops does.
+            models.Index(
+                fields=["urn"],
+                name="rooms_room_urn_prefix_idx",
+                opclasses=["text_pattern_ops"],
+                condition=Q(urn__isnull=False) & ~Q(urn=""),
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
