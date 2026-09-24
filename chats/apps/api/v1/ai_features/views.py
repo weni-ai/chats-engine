@@ -1,5 +1,6 @@
 import logging
 
+from botocore.exceptions import BotoCoreError, ClientError
 from django.utils import translation
 from django.utils.translation import gettext as _
 from rest_framework import status
@@ -60,11 +61,21 @@ class AITextImprovementView(APIView):
                 improvement_type=serializer.validated_data["type"],
                 project=project,
             )
+        except (ClientError, BotoCoreError):
+            return Response(
+                {"detail": "Error generating improved message"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         except ValueError:
+            return Response(
+                {"detail": "Error generating improved message"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception:
             logger.exception("Error generating improved message")
             return Response(
                 {"detail": "Error generating improved message"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         return Response({"text": improved_text}, status=status.HTTP_200_OK)
