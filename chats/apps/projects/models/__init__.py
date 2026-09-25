@@ -8,4 +8,6 @@ from .models import (  # noqa
     Project,
     ProjectPermission,
     TemplateType,
+    UnifiedSacMigration,
+    UnifiedSacMigrationStatus,
 )
