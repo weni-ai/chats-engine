@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -56,3 +57,44 @@ class CopilotIntegration(BaseModel):
 
     def __str__(self):
         return f"{self.name} ({self.copilot_project_uuid})"
+
+
+class CopilotMessageFeedback(BaseModel):
+    """
+    A model to store the user feedback of a Copilot assistant message.
+    """
+
+    room = models.ForeignKey(
+        "rooms.Room",
+        verbose_name=_("Room"),
+        on_delete=models.CASCADE,
+        related_name="copilot_message_feedbacks",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name=_("User"),
+        on_delete=models.CASCADE,
+        related_name="copilot_message_feedbacks",
+    )
+    message_id = models.CharField(_("Message ID"), max_length=255)
+    liked = models.BooleanField(_("Liked?"))
+    text = models.CharField(_("Text"), max_length=150, blank=True, default="")
+    tags = ArrayField(
+        models.CharField(max_length=100),
+        blank=True,
+        default=list,
+        verbose_name=_("Tags"),
+    )
+
+    class Meta:
+        verbose_name = _("Copilot message feedback")
+        verbose_name_plural = _("Copilot message feedbacks")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "message_id", "user"],
+                name="unique_copilot_message_feedback_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.room_id} - {self.message_id} - {self.user}"
