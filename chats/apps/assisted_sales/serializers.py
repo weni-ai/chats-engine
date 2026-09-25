@@ -137,4 +137,5 @@ class CopilotMessageFeedbackSerializer(serializers.ModelSerializer):
                 code="negative_feedback_requires_reason",
             )
 
+        attrs["text"] = text
         return attrs
