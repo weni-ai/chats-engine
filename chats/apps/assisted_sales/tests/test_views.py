@@ -870,6 +870,28 @@ class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["text"], "Suggested items were unrelated")
         self.assertEqual(response.data["tags"], [])
 
+    def test_negative_feedback_strips_text_whitespace(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": "  Needs work  ",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["text"], "Needs work")
+        feedback = CopilotMessageFeedback.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(feedback.text, "Needs work")
+
+    def test_negative_feedback_with_whitespace_only_text_returns_400(self):
+        response = self._post(
+            {"message_id": "msg-1", "liked": False, "text": "   ", "tags": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
     def test_missing_liked_returns_400(self):
         response = self._post({"message_id": "msg-1"})
 
