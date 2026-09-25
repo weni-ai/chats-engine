@@ -903,7 +903,7 @@ class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
 
     def test_feature_flag_disabled_returns_403(self):
         with patch(
-            "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
             return_value=False,
         ):
             response = self._post({"message_id": "msg-1", "liked": True})
