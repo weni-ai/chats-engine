@@ -13,12 +13,13 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotIntegrationAlreadyExists,
 )
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.assisted_sales.serializers import (
     CopilotConnectionSerializer,
     CopilotExistingProjectSerializer,
     CopilotIntegrationResponseSerializer,
     CopilotLinkedProjectSerializer,
+    CopilotMessageFeedbackSerializer,
     CreateCopilotIntegrationSerializer,
     UpdateCopilotIntegrationSerializer,
 )
@@ -443,3 +444,89 @@ class CopilotRoomMessagesView(APIView):
             data["previous"] = _rewrite_pagination_url(request, data.get("previous"))
 
         return Response(data, status=status.HTTP_200_OK)
+
+
+class CopilotMessageFeedbackView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_room(self, request, room_uuid):
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(uuid=room_uuid)
+            .first()
+        )
+        if not room or not room.queue_id:
+            return None, Response(
+                {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        project = room.queue.sector.project
+        if not ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists():
+            return None, Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not is_assisted_sales_copilot_enabled(project.uuid):
+            return None, _copilot_feature_forbidden()
+
+        return room, None
+
+    def get(self, request, room_uuid):
+        room, error_response = self._get_room(request, room_uuid)
+        if error_response:
+            return error_response
+
+        queryset = CopilotMessageFeedback.objects.filter(room=room, user=request.user)
+
+        message_id = request.query_params.get("message_id")
+        if message_id is not None:
+            feedback = queryset.filter(message_id=message_id).first()
+            if not feedback:
+                return Response(
+                    {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(
+                CopilotMessageFeedbackSerializer(feedback).data,
+                status=status.HTTP_200_OK,
+            )
+
+        results = queryset.order_by("created_on")
+        return Response(
+            {"results": CopilotMessageFeedbackSerializer(results, many=True).data},
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request, room_uuid):
+        room, error_response = self._get_room(request, room_uuid)
+        if error_response:
+            return error_response
+
+        serializer = CopilotMessageFeedbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if room.user != request.user:
+            return Response(
+                {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = serializer.validated_data
+        feedback, created = CopilotMessageFeedback.objects.update_or_create(
+            room=room,
+            user=request.user,
+            message_id=data["message_id"],
+            defaults={
+                "liked": data["liked"],
+                "text": data.get("text") or "",
+                "tags": data.get("tags") or [],
+            },
+        )
+        return Response(
+            CopilotMessageFeedbackSerializer(feedback).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
