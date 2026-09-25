@@ -6,6 +6,8 @@ from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
 
+FEEDBACK_TEXT_MAX_LENGTH = 150
+
 
 class CopilotIntegration(BaseModel):
     project = models.ForeignKey(
@@ -78,7 +80,9 @@ class CopilotMessageFeedback(BaseModel):
     )
     message_id = models.CharField(_("Message ID"), max_length=255)
     liked = models.BooleanField(_("Liked?"))
-    text = models.CharField(_("Text"), max_length=150, blank=True, default="")
+    text = models.CharField(
+        _("Text"), max_length=FEEDBACK_TEXT_MAX_LENGTH, blank=True, default=""
+    )
     tags = ArrayField(
         models.CharField(max_length=100),
         blank=True,
