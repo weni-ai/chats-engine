@@ -2,12 +2,14 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.test import override_settings
+from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.assisted_sales.enums import CopilotMessageFeedbackTags
 from chats.apps.assisted_sales.exceptions import CopilotConnectError
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
@@ -712,3 +714,255 @@ class CopilotRoomMessagesViewTests(CopilotFeatureFlagMixin, APITestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.data["error"], "Flows unavailable")
+
+
+class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+        self.room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            urn="ext:57619149186@",
+            user=self.user,
+        )
+        self.url = f"/v1/room/{self.room.uuid}/copilot/feedback/"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _post(self, data, room_uuid=None):
+        url = (
+            self.url if room_uuid is None else f"/v1/room/{room_uuid}/copilot/feedback/"
+        )
+        return self.client.post(url, data, format="json")
+
+    def test_thumb_up_creates_feedback(self):
+        response = self._post(
+            {"message_id": "msg-1", "liked": True, "text": "", "tags": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["message_id"], "msg-1")
+        self.assertTrue(response.data["liked"])
+        self.assertEqual(response.data["text"], "")
+        self.assertEqual(response.data["tags"], [])
+        self.assertEqual(str(response.data["room"]), str(self.room.uuid))
+
+        feedback = CopilotMessageFeedback.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(feedback.user, self.user)
+        self.assertEqual(feedback.room, self.room)
+        self.assertEqual(feedback.message_id, "msg-1")
+
+    def test_resubmit_updates_feedback_without_duplicating(self):
+        first = self._post({"message_id": "msg-1", "liked": True})
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": "Needs work",
+                "tags": [CopilotMessageFeedbackTags.INCORRECT_ANSWER],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], first.data["uuid"])
+        self.assertFalse(response.data["liked"])
+        self.assertEqual(response.data["text"], "Needs work")
+        self.assertEqual(
+            response.data["tags"], [CopilotMessageFeedbackTags.INCORRECT_ANSWER]
+        )
+        self.assertEqual(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1"
+            ).count(),
+            1,
+        )
+
+    def test_same_message_from_another_user_creates_separate_record(self):
+        first = self._post({"message_id": "msg-1", "liked": True})
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        other_user, other_token = create_user_and_token("other")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=other_user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.room.user = other_user
+        self.room.save(update_fields=["user"])
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotEqual(response.data["uuid"], first.data["uuid"])
+        self.assertEqual(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1"
+            ).count(),
+            2,
+        )
+        self.assertTrue(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1", user=other_user
+            ).exists()
+        )
+
+    def test_invalid_tag_returns_400(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "tags": ["INVALID_TAG"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_text_exceeds_max_length_returns_400(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": get_random_string(length=151),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("text", response.data)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_negative_feedback_without_tag_or_text_returns_400(self):
+        response = self._post(
+            {"message_id": "msg-1", "liked": False, "text": "", "tags": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_negative_feedback_with_text_only_is_accepted(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": "Suggested items were unrelated",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["text"], "Suggested items were unrelated")
+        self.assertEqual(response.data["tags"], [])
+
+    def test_missing_liked_returns_400(self):
+        response = self._post({"message_id": "msg-1"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("liked", response.data)
+
+    def test_missing_message_id_returns_400(self):
+        response = self._post({"liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("message_id", response.data)
+
+    def test_room_does_not_exist_returns_404(self):
+        response = self._post({"message_id": "msg-1", "liked": True}, room_uuid=uuid4())
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_is_not_the_room_agent_returns_403(self):
+        other_user, other_token = create_user_and_token("other-agent")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=other_user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_feature_flag_disabled_returns_403(self):
+        with patch(
+            "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+            return_value=False,
+        ):
+            response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_get_feedback_by_message_id(self):
+        created = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+
+        response = self.client.get(self.url, {"message_id": "msg-1"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(str(response.data["uuid"]), str(created.uuid))
+        self.assertEqual(response.data["message_id"], "msg-1")
+        self.assertTrue(response.data["liked"])
+
+    def test_get_feedback_by_message_id_not_found(self):
+        response = self.client.get(self.url, {"message_id": "msg-missing"})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_list_returns_only_current_user_feedbacks(self):
+        other_user, _ = create_user_and_token("other-list")
+        mine_first = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+        mine_second = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-2",
+            liked=False,
+            tags=[CopilotMessageFeedbackTags.SLOW_TO_LOAD],
+        )
+        CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=other_user,
+            message_id="msg-1",
+            liked=False,
+            text="Other user",
+            tags=[CopilotMessageFeedbackTags.INCORRECT_ANSWER],
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            [str(item["uuid"]) for item in results],
+            [str(mine_first.uuid), str(mine_second.uuid)],
+        )
+        self.assertEqual(results[0]["message_id"], "msg-1")
+        self.assertEqual(results[1]["message_id"], "msg-2")
