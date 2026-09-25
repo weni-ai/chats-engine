@@ -1,7 +1,11 @@
 from rest_framework import serializers
 
 from chats.apps.assisted_sales.enums import CopilotMessageFeedbackTags
-from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
+from chats.apps.assisted_sales.models import (
+    FEEDBACK_TEXT_MAX_LENGTH,
+    CopilotIntegration,
+    CopilotMessageFeedback,
+)
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector
 
@@ -96,7 +100,10 @@ class CopilotConnectionSerializer(serializers.ModelSerializer):
 
 class CopilotMessageFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
-        required=False, allow_blank=True, max_length=150, default=""
+        required=False,
+        allow_blank=True,
+        max_length=FEEDBACK_TEXT_MAX_LENGTH,
+        default="",
     )
     tags = serializers.ListField(
         child=serializers.ChoiceField(choices=CopilotMessageFeedbackTags.choices),
