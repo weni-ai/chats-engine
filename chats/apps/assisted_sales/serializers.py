@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.enums import CopilotMessageFeedbackTags
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector
 
@@ -91,3 +92,42 @@ class CopilotConnectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CopilotIntegration
         fields = ["sector", "project_uuid", "conection"]
+
+
+class CopilotMessageFeedbackSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(
+        required=False, allow_blank=True, max_length=150, default=""
+    )
+    tags = serializers.ListField(
+        child=serializers.ChoiceField(choices=CopilotMessageFeedbackTags.choices),
+        required=False,
+        default=list,
+    )
+
+    class Meta:
+        model = CopilotMessageFeedback
+        fields = [
+            "uuid",
+            "room",
+            "message_id",
+            "liked",
+            "text",
+            "tags",
+            "created_on",
+            "modified_on",
+        ]
+        read_only_fields = ["uuid", "room", "created_on", "modified_on"]
+        validators = []
+
+    def validate(self, attrs):
+        liked = attrs.get("liked")
+        text = (attrs.get("text") or "").strip()
+        tags = attrs.get("tags") or []
+
+        if liked is False and not text and not tags:
+            raise serializers.ValidationError(
+                "Negative feedback requires at least one tag or text.",
+                code="negative_feedback_requires_reason",
+            )
+
+        return attrs
