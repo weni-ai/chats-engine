@@ -21,7 +21,7 @@
             "modified_on": "2022-08-24T20:27:42.815Z",
             "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
             "user": "agentqueue@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -32,7 +32,7 @@
             "modified_on": "2022-08-24T20:25:54.375Z",
             "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
             "user": "johndoe@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {
@@ -43,7 +43,7 @@
             "modified_on": "2022-08-24T20:25:36.278Z",
             "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
             "user": "foobar@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {

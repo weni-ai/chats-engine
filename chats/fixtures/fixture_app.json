@@ -2496,7 +2496,7 @@
             "modified_on": "2022-08-24T20:27:42.815Z",
             "project": "32e74fec-0dd7-413d-8062-9659f2e213d2",
             "user": "agentqueue@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -2507,7 +2507,7 @@
             "modified_on": "2022-08-24T20:25:54.375Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "johndoe@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {
@@ -2518,7 +2518,7 @@
             "modified_on": "2022-08-24T20:25:36.278Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "foobar@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {
@@ -2529,7 +2529,7 @@
             "modified_on": "2022-08-24T20:19:28.826Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "amazoninhaweni@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -2540,7 +2540,7 @@
             "modified_on": "2022-08-24T20:28:05.281Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "amywong@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {
@@ -2551,7 +2551,7 @@
             "modified_on": "2022-08-24T20:28:22.966Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "linalawson@chats.weni.ai",
-            "role": 2
+            "role": 5
         }
     },
     {
@@ -2562,7 +2562,7 @@
             "modified_on": "2022-08-24T20:27:23.748Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "brucebanner@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -2573,7 +2573,7 @@
             "modified_on": "2022-08-24T20:27:42.815Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "janeduren@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
