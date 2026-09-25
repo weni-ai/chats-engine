@@ -1,0 +1,20 @@
+---
+description: Revisar e rodar checagem de segredo no commit/push; não pular mesmo pedindo skip de CI
+alwaysApply: true
+---
+
+# Segredos no commit e no CI
+
+Antes de commit ou push, revise o diff: chave AWS, chave privada, `.env`, token, senha, connection string, `credentials.json`, `*.pem`.
+
+## Sempre rodar
+
+Rode os hooks `detect-aws-credentials` e `detect-private-key`, e qualquer job futuro de secret scan no CI, **mesmo se o usuário disser** para não rodar CI, não rodar teste ou pular hooks.
+
+Pular a suíte Django/pytest (`SKIP=tests`) pode, se ele pedir. Pular a checagem de segredo **não**.
+
+Não use `--no-verify` se isso também pular os hooks de segredo. Se o único caminho for pular o hook de teste, use `SKIP=tests` para os hooks de segredo continuarem.
+
+## Se achar segredo
+
+Pare. Avise. Não faça push.

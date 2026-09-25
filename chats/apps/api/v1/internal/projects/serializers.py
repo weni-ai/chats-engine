@@ -61,7 +61,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             if get_user_id_by_email_cached(email_l) is None:
                 raise exceptions.APIException(detail="User not found")
             permission, created = instance.permissions.get_or_create(
-                user_id=email_l, role=1
+                user_id=email_l, role=ProjectPermission.ROLE_MODERATOR
             )
             sector = instance.sectors.create(
                 name="Default Sector",

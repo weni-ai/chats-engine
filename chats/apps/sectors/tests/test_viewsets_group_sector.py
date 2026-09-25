@@ -188,7 +188,9 @@ class GroupSectorAuthorizationTests(APITestCase):
 
         # Create a project permission first
         project_permission = ProjectPermission.objects.get(
-            project=self.project, user=self.manager_user, role=1  # 1 = Manager role
+            project=self.project,
+            user=self.manager_user,
+            role=ProjectPermission.ROLE_MODERATOR,
         )
 
         data = {
@@ -244,7 +246,9 @@ class GroupSectorAuthorizationTests(APITestCase):
         """
         # Create a project permission first
         project_permission = ProjectPermission.objects.get(
-            project=self.project, user=self.manager_user, role=1  # 1 = Manager role
+            project=self.project,
+            user=self.manager_user,
+            role=ProjectPermission.ROLE_MODERATOR,
         )
 
         group_sector_auth = GroupSectorAuthorization.objects.create(
@@ -289,7 +293,9 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         self.group_sector.sectors.add(self.sector_fluxos, self.sector_intel)
 
         self.project_permission = ProjectPermission.objects.get(
-            project=self.project, user=self.manager_user, role=1
+            project=self.project,
+            user=self.manager_user,
+            role=ProjectPermission.ROLE_MODERATOR,
         )
 
         self.engine_queue = Queue.objects.get(sector=self.sector_fluxos)
@@ -375,7 +381,9 @@ class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
         self.group_sector.sectors.add(self.sector_fluxos, self.sector_intel)
 
         self.project_permission = ProjectPermission.objects.get(
-            project=self.project, user=self.manager_user, role=1
+            project=self.project,
+            user=self.manager_user,
+            role=ProjectPermission.ROLE_MODERATOR,
         )
 
         self.engine_queue = Queue.objects.get(sector=self.sector_fluxos)
