@@ -1,23 +1,30 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+from django.core.exceptions import PermissionDenied
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from chats.apps.assisted_sales.exceptions import CopilotConnectError
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.api.utils import create_user_and_token
+from chats.apps.assisted_sales.exceptions import (
+    CopilotConnectError,
+    CopilotFeatureDisabled,
+)
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.assisted_sales.tasks import (
     enqueue_set_room_copilot_channel,
     set_room_copilot_channel,
 )
 from chats.apps.assisted_sales.usecases import (
     CheckCopilotCreatePermissionUseCase,
+    GetCopilotMessageFeedbackUseCase,
     ListCopilotRoomMessagesUseCase,
     SetRoomCopilotChannelUseCase,
+    SubmitCopilotMessageFeedbackUseCase,
     UpdateCopilotWwcChannelUseCase,
     user_can_create_copilot,
 )
 from chats.apps.contacts.models import Contact
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -507,3 +514,160 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
                 project=self.project,
                 room_uuid=self.room.uuid,
             )
+
+
+class CopilotMessageFeedbackUseCaseTests(TestCase):
+    def setUp(self):
+        patcher = patch(
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+            return_value=True,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.user, _ = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+        self.room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            urn="ext:57619149186@",
+            user=self.user,
+        )
+
+    def test_submit_creates_feedback(self):
+        feedback, created = SubmitCopilotMessageFeedbackUseCase().execute(
+            user=self.user,
+            room_uuid=self.room.uuid,
+            message_id="msg-1",
+            liked=True,
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(feedback.user, self.user)
+        self.assertEqual(feedback.room, self.room)
+        self.assertEqual(feedback.message_id, "msg-1")
+        self.assertTrue(feedback.liked)
+
+    def test_submit_updates_existing_feedback(self):
+        SubmitCopilotMessageFeedbackUseCase().execute(
+            user=self.user,
+            room_uuid=self.room.uuid,
+            message_id="msg-1",
+            liked=True,
+        )
+
+        feedback, created = SubmitCopilotMessageFeedbackUseCase().execute(
+            user=self.user,
+            room_uuid=self.room.uuid,
+            message_id="msg-1",
+            liked=False,
+            text="Needs work",
+            tags=["incorrect_answer"],
+        )
+
+        self.assertFalse(created)
+        self.assertFalse(feedback.liked)
+        self.assertEqual(feedback.text, "Needs work")
+        self.assertEqual(feedback.tags, ["incorrect_answer"])
+        self.assertEqual(CopilotMessageFeedback.objects.count(), 1)
+
+    def test_submit_raises_when_user_is_not_the_room_agent(self):
+        other_user, _ = create_user_and_token("other")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=other_user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        with self.assertRaises(PermissionDenied):
+            SubmitCopilotMessageFeedbackUseCase().execute(
+                user=other_user,
+                room_uuid=self.room.uuid,
+                message_id="msg-1",
+                liked=True,
+            )
+
+    def test_submit_raises_when_room_does_not_exist(self):
+        with self.assertRaises(Room.DoesNotExist):
+            SubmitCopilotMessageFeedbackUseCase().execute(
+                user=self.user,
+                room_uuid=uuid4(),
+                message_id="msg-1",
+                liked=True,
+            )
+
+    def test_submit_raises_when_feature_flag_is_disabled(self):
+        with patch(
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+            return_value=False,
+        ):
+            with self.assertRaises(CopilotFeatureDisabled):
+                SubmitCopilotMessageFeedbackUseCase().execute(
+                    user=self.user,
+                    room_uuid=self.room.uuid,
+                    message_id="msg-1",
+                    liked=True,
+                )
+
+    def test_get_returns_feedback_by_message_id(self):
+        created = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+
+        feedback = GetCopilotMessageFeedbackUseCase().execute(
+            user=self.user,
+            room_uuid=self.room.uuid,
+            message_id="msg-1",
+        )
+
+        self.assertEqual(feedback.uuid, created.uuid)
+
+    def test_get_raises_when_feedback_does_not_exist(self):
+        with self.assertRaises(CopilotMessageFeedback.DoesNotExist):
+            GetCopilotMessageFeedbackUseCase().execute(
+                user=self.user,
+                room_uuid=self.room.uuid,
+                message_id="missing",
+            )
+
+    def test_list_returns_only_current_user_feedbacks(self):
+        other_user, _ = create_user_and_token("other-list")
+        mine = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+        CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=other_user,
+            message_id="msg-1",
+            liked=False,
+            text="Other",
+        )
+
+        results = list(
+            GetCopilotMessageFeedbackUseCase().execute(
+                user=self.user,
+                room_uuid=self.room.uuid,
+            )
+        )
+
+        self.assertEqual(results, [mine])

@@ -15,7 +15,7 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotIntegrationAlreadyExists,
 )
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -506,3 +506,64 @@ class UpdateCopilotWwcChannelUseCase:
             integration.connection = connection
             integration.save(update_fields=["connection", "modified_on"])
         return integration
+
+
+def get_room_for_copilot_feedback(user, room_uuid) -> Room:
+    room = (
+        Room.objects.select_related("queue__sector__project")
+        .filter(uuid=room_uuid)
+        .first()
+    )
+    if not room or not room.queue_id:
+        raise Room.DoesNotExist()
+
+    project = room.queue.sector.project
+    if not ProjectPermission.objects.filter(user=user, project=project).exists():
+        raise PermissionDenied()
+
+    if not is_assisted_sales_copilot_enabled(project.uuid):
+        raise CopilotFeatureDisabled()
+
+    return room
+
+
+class GetCopilotMessageFeedbackUseCase:
+    def execute(self, *, user, room_uuid, message_id: str = None):
+        room = get_room_for_copilot_feedback(user, room_uuid)
+        queryset = CopilotMessageFeedback.objects.filter(room=room, user=user)
+
+        if message_id is not None:
+            feedback = queryset.filter(message_id=message_id).first()
+            if not feedback:
+                raise CopilotMessageFeedback.DoesNotExist()
+            return feedback
+
+        return queryset.order_by("created_on")
+
+
+class SubmitCopilotMessageFeedbackUseCase:
+    def execute(
+        self,
+        *,
+        user,
+        room_uuid,
+        message_id: str,
+        liked: bool,
+        text: str = "",
+        tags=None,
+    ):
+        room = get_room_for_copilot_feedback(user, room_uuid)
+
+        if room.user != user:
+            raise PermissionDenied()
+
+        return CopilotMessageFeedback.objects.update_or_create(
+            room=room,
+            user=user,
+            message_id=message_id,
+            defaults={
+                "liked": liked,
+                "text": text or "",
+                "tags": tags or [],
+            },
+        )
