@@ -34,6 +34,16 @@ class CopilotIntegration(BaseModel):
         blank=True,
     )
     connected_on = models.DateTimeField(_("Connected on"), auto_now_add=True)
+    is_connected = models.BooleanField(_("Is connected"), default=True)
+    disconnected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name=_("Disconnected by"),
+        on_delete=models.SET_NULL,
+        related_name="disconnected_copilot_integrations",
+        null=True,
+        blank=True,
+    )
+    disconnected_on = models.DateTimeField(_("Disconnected on"), null=True, blank=True)
     copilot_created_on = models.DateTimeField(
         _("Copilot created on"), null=True, blank=True
     )
