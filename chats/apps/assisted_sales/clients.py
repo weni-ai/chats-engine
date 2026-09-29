@@ -175,7 +175,7 @@ class CopilotConnectClient(InternalAuthentication):
             return custom + official
         return 0
 
-    def get_project_authorization(self, project_uuid: str, user_email: str) -> dict:
+    def get_organization(self, org_uuid: str, authorization: str) -> dict:
         base_url = (settings.CONNECT_API_URL or "").rstrip("/")
         if not base_url:
             raise CopilotConnectError(
@@ -183,16 +183,15 @@ class CopilotConnectClient(InternalAuthentication):
                 error="Connect API URL is not configured",
             )
 
-        url = f"{base_url}/v2/projects/{project_uuid}/authorization"
+        url = f"{base_url}/v1/organization/org/{org_uuid}/"
         try:
             response = requests.get(
                 url=url,
-                headers=self.headers,
-                params={"user": user_email},
+                headers=self._user_headers(authorization),
                 timeout=COPILOT_REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
-            logger.exception("Failed to fetch project authorization on Connect")
+            logger.exception("Failed to fetch organization on Connect")
             raise CopilotConnectError(status_code=502, error=str(exc)) from exc
 
         if not response.ok:

@@ -31,85 +31,139 @@ from chats.apps.sectors.models import Sector
 
 DEFAULT_ROOMS_LIMIT = 5
 
-AVAILABLE_ROLES = {
-    "0": "not set",
-    "1": "viewer",
-    "2": "contributor",
-    "3": "moderator",
-    "4": "support",
-    "5": "Chat user",
-    "6": "marketing",
-}
 
-
-def _authorization(role):
+def _organization(role, email="member@example.com", other_role=None):
+    other_email = "chats@weni.ai"
     return {
-        "user": "member@example.com",
-        "project_authorization": role,
-        "available_roles": AVAILABLE_ROLES,
+        "uuid": "org-uuid",
+        "authorization": {
+            "user__username": email,
+            "user__email": email,
+            "role": role,
+            "is_admin": role == 3,
+        },
+        "authorizations": {
+            "count": 2,
+            "users": [
+                {
+                    "username": other_email,
+                    "first_name": "chats",
+                    "last_name": "module",
+                    "role": other_role if other_role is not None else 3,
+                    "photo_user": None,
+                },
+                {
+                    "username": email,
+                    "first_name": "Member",
+                    "last_name": "",
+                    "role": role,
+                    "photo_user": None,
+                },
+            ],
+        },
     }
 
 
 class UserCanCreateCopilotTests(SimpleTestCase):
-    def test_moderator_can_create(self):
-        self.assertTrue(user_can_create_copilot(_authorization(3)))
+    def test_org_admin_can_create(self):
+        self.assertTrue(user_can_create_copilot(_organization(3), "member@example.com"))
 
     def test_contributor_cannot_create(self):
-        self.assertFalse(user_can_create_copilot(_authorization(2)))
+        self.assertFalse(
+            user_can_create_copilot(_organization(2), "member@example.com")
+        )
 
     def test_viewer_cannot_create(self):
-        self.assertFalse(user_can_create_copilot(_authorization(1)))
+        self.assertFalse(
+            user_can_create_copilot(_organization(1), "member@example.com")
+        )
 
-    def test_support_cannot_create(self):
-        self.assertFalse(user_can_create_copilot(_authorization(4)))
+    def test_financial_cannot_create(self):
+        self.assertFalse(
+            user_can_create_copilot(_organization(4), "member@example.com")
+        )
 
-    def test_missing_roles_cannot_create(self):
-        self.assertFalse(user_can_create_copilot({"project_authorization": 3}))
+    def test_missing_authorization_cannot_create(self):
+        self.assertFalse(user_can_create_copilot({}, "member@example.com"))
 
     def test_invalid_authorization_cannot_create(self):
         self.assertFalse(
             user_can_create_copilot(
-                {"project_authorization": "admin", "available_roles": AVAILABLE_ROLES}
+                {
+                    "authorization": {
+                        "role": "admin",
+                        "user__email": "member@example.com",
+                    }
+                },
+                "member@example.com",
             )
         )
 
+    def test_authorization_for_another_user_does_not_grant_permission(self):
+        data = _organization(2)
+        data["authorization"] = {
+            "user__username": "chats@weni.ai",
+            "user__email": "chats@weni.ai",
+            "role": 3,
+            "is_admin": True,
+        }
+        self.assertFalse(user_can_create_copilot(data, "member@example.com"))
+
+    def test_users_list_grants_permission_when_authorization_is_missing(self):
+        data = _organization(3)
+        data["authorization"] = {}
+        self.assertTrue(user_can_create_copilot(data, "member@example.com"))
+
 
 class CheckCopilotCreatePermissionUseCaseTests(SimpleTestCase):
-    def test_returns_true_when_connect_role_is_moderator(self):
+    def test_returns_true_when_connect_org_role_is_admin(self):
         client = MagicMock()
-        client.get_project_authorization.return_value = _authorization(3)
+        client.get_organization.return_value = _organization(3)
 
         can_create = CheckCopilotCreatePermissionUseCase(client=client).execute(
-            project_uuid="project-uuid",
+            org_uuid="org-uuid",
             user_email="member@example.com",
+            authorization="Bearer user-token",
         )
 
         self.assertTrue(can_create)
-        client.get_project_authorization.assert_called_once_with(
-            "project-uuid", "member@example.com"
-        )
+        client.get_organization.assert_called_once_with("org-uuid", "Bearer user-token")
 
-    def test_returns_false_when_connect_role_is_not_moderator(self):
+    def test_returns_false_when_connect_org_role_is_not_admin(self):
         client = MagicMock()
-        client.get_project_authorization.return_value = _authorization(2)
+        client.get_organization.return_value = _organization(2)
 
         can_create = CheckCopilotCreatePermissionUseCase(client=client).execute(
-            project_uuid="project-uuid",
+            org_uuid="org-uuid",
             user_email="member@example.com",
+            authorization="Bearer user-token",
         )
 
         self.assertFalse(can_create)
 
+    def test_returns_false_when_org_uuid_is_missing(self):
+        client = MagicMock()
+
+        can_create = CheckCopilotCreatePermissionUseCase(client=client).execute(
+            org_uuid="",
+            user_email="member@example.com",
+            authorization="Bearer user-token",
+        )
+
+        self.assertFalse(can_create)
+        client.get_organization.assert_not_called()
+
     def test_raises_when_connect_fails(self):
         client = MagicMock()
-        client.get_project_authorization.side_effect = CopilotConnectError(
+        client.get_organization.side_effect = CopilotConnectError(
             status_code=502, error="Connect unavailable"
         )
 
         with self.assertRaises(CopilotConnectError):
             CheckCopilotCreatePermissionUseCase(client=client).execute(
-                project_uuid="project-uuid",
+                org_uuid="org-uuid",
                 user_email="member@example.com",
+                authorization="Bearer user-token",
             )
 
 

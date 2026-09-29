@@ -321,8 +321,9 @@ class CopilotCreatePermissionView(APIView):
 
         try:
             can_create = CheckCopilotCreatePermissionUseCase().execute(
-                project_uuid=str(project.uuid),
+                org_uuid=str(project.org) if project.org else "",
                 user_email=request.user.email,
+                authorization=request.META.get("HTTP_AUTHORIZATION", ""),
             )
         except CopilotConnectError as exc:
             return Response(
