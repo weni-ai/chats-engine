@@ -226,13 +226,45 @@ class UpdateCopilotIntegrationUseCase:
         return integration
 
 
-class RemoveCopilotIntegrationUseCase:
-    def __init__(self, client: CopilotConnectClient = None):
-        self.client = client or CopilotConnectClient()
+class ReconnectCopilotIntegrationUseCase:
+    def execute(self, *, uuid, user) -> CopilotIntegration:
+        integration = CopilotIntegration.objects.select_related(
+            "project", "connected_by"
+        ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
+        if not ProjectPermission.objects.filter(
+            user=user, project=integration.project
+        ).exists():
+            raise PermissionDenied()
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            raise CopilotFeatureDisabled()
 
-    def execute(self, *, integration: CopilotIntegration) -> None:
-        self.client.remove_copilot_project(str(integration.copilot_project_uuid))
-        integration.delete()
+        integration.is_connected = True
+        integration.disconnected_by = None
+        integration.disconnected_on = None
+        integration.save(
+            update_fields=[
+                "is_connected",
+                "disconnected_by",
+                "disconnected_on",
+                "modified_on",
+            ]
+        )
+        return integration
+
+
+class RemoveCopilotIntegrationUseCase:
+    def execute(self, *, integration: CopilotIntegration, user) -> None:
+        integration.is_connected = False
+        integration.disconnected_by = user
+        integration.disconnected_on = timezone.now()
+        integration.save(
+            update_fields=[
+                "is_connected",
+                "disconnected_by",
+                "disconnected_on",
+                "modified_on",
+            ]
+        )
 
 
 class GetLinkedCopilotUseCase:

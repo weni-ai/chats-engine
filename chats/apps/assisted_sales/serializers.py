@@ -13,7 +13,15 @@ COPILOT_NAME_MAX_LENGTH = 255
 
 
 class UpdateCopilotIntegrationSerializer(serializers.Serializer):
-    new_uuid = serializers.UUIDField()
+    new_uuid = serializers.UUIDField(required=False)
+    is_connected = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if attrs.get("is_connected") is True:
+            return attrs
+        if "new_uuid" not in attrs:
+            raise serializers.ValidationError({"new_uuid": "This field is required."})
+        return attrs
 
 
 class CreateCopilotIntegrationSerializer(serializers.Serializer):
@@ -41,6 +49,9 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
     created_on = serializers.SerializerMethodField()
     connected_on = serializers.DateTimeField(read_only=True)
     connected_by = serializers.SerializerMethodField()
+    is_connected = serializers.BooleanField(read_only=True)
+    disconnected_by = serializers.SerializerMethodField()
+    disconnected_on = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = CopilotIntegration
@@ -51,6 +62,9 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
             "connected_on",
             "uuid",
             "connected_by",
+            "is_connected",
+            "disconnected_by",
+            "disconnected_on",
         ]
 
     def get_created_on(self, obj: CopilotIntegration):
@@ -60,6 +74,11 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
         if not obj.connected_by:
             return ""
         return obj.connected_by.name or obj.connected_by.email
+
+    def get_disconnected_by(self, obj: CopilotIntegration):
+        if not obj.disconnected_by:
+            return ""
+        return obj.disconnected_by.name or obj.disconnected_by.email
 
 
 class CopilotLinkedProjectSerializer(CopilotIntegrationResponseSerializer):
@@ -75,6 +94,9 @@ class CopilotLinkedProjectSerializer(CopilotIntegrationResponseSerializer):
             "uuid",
             "project_uuid",
             "connect_by",
+            "is_connected",
+            "disconnected_by",
+            "disconnected_on",
         ]
 
     def get_connect_by(self, obj: CopilotIntegration):
