@@ -33,6 +33,7 @@ class CreateCopilotIntegrationSerializer(serializers.Serializer):
 
 class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
     uuid = serializers.UUIDField(read_only=True)
+    project_uuid = serializers.UUIDField(source="copilot_project_uuid", read_only=True)
     created_on = serializers.SerializerMethodField()
     connected_on = serializers.DateTimeField(read_only=True)
     connected_by = serializers.SerializerMethodField()
@@ -45,6 +46,7 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
             "created_on",
             "connected_on",
             "uuid",
+            "project_uuid",
             "connected_by",
         ]
 
