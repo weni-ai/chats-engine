@@ -214,29 +214,32 @@ class CopilotConnectClientTests(TestCase):
 
     @override_settings(CONNECT_API_URL="https://connect.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")
-    def test_get_project_authorization(self, mock_get, _mock_token):
+    def test_get_organization(self, mock_get, _mock_token):
         payload = {
-            "user": "member@example.com",
-            "project_authorization": 3,
-            "available_roles": {"3": "moderator"},
+            "uuid": "org-uuid",
+            "authorization": {
+                "user__username": "member@example.com",
+                "user__email": "member@example.com",
+                "role": 3,
+            },
         }
         mock_get.return_value = MagicMock(ok=True, json=lambda: payload)
 
-        data = self.client_rest.get_project_authorization(
-            "project-uuid", "member@example.com"
-        )
+        data = self.client_rest.get_organization("org-uuid", "Bearer user-token")
 
         mock_get.assert_called_once_with(
-            url="https://connect.example.com/v2/projects/project-uuid/authorization",
-            headers=self.client_rest.headers,
-            params={"user": "member@example.com"},
+            url="https://connect.example.com/v1/organization/org/org-uuid/",
+            headers={
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer user-token",
+            },
             timeout=15,
         )
-        self.assertEqual(data["project_authorization"], 3)
+        self.assertEqual(data["authorization"]["role"], 3)
 
     @override_settings(CONNECT_API_URL="https://connect.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")
-    def test_get_project_authorization_raises_on_error(self, mock_get, _mock_token):
+    def test_get_organization_raises_on_error(self, mock_get, _mock_token):
         mock_get.return_value = MagicMock(
             ok=False,
             status_code=404,
@@ -245,21 +248,23 @@ class CopilotConnectClientTests(TestCase):
         )
 
         with self.assertRaises(CopilotConnectError) as ctx:
-            self.client_rest.get_project_authorization(
-                "project-uuid", "member@example.com"
-            )
+            self.client_rest.get_organization("org-uuid", "Bearer user-token")
 
         self.assertEqual(ctx.exception.status_code, 404)
         self.assertEqual(ctx.exception.error, "missing")
 
     @override_settings(CONNECT_API_URL="")
-    def test_get_project_authorization_raises_when_url_missing(self, _mock_token):
+    def test_get_organization_raises_when_url_missing(self, _mock_token):
         with self.assertRaises(CopilotConnectError) as ctx:
-            self.client_rest.get_project_authorization(
-                "project-uuid", "member@example.com"
-            )
+            self.client_rest.get_organization("org-uuid", "Bearer user-token")
 
         self.assertEqual(ctx.exception.status_code, 502)
+
+    def test_get_organization_requires_user_authorization(self, _mock_token):
+        with self.assertRaises(CopilotConnectError) as ctx:
+            self.client_rest.get_organization("org-uuid", "")
+
+        self.assertEqual(ctx.exception.status_code, 401)
 
     @override_settings(FLOWS_API_URL="https://flows.example.com")
     @patch("chats.apps.assisted_sales.clients.requests.get")
