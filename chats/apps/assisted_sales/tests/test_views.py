@@ -80,6 +80,7 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["name"], "projeto copilot teste")
         self.assertEqual(response.data["assigned_agents"], 5)
         self.assertEqual(response.data["connected_by"], "edu")
+        self.assertEqual(response.data["project_uuid"], connect_data["uuid"])
         integration = CopilotIntegration.objects.get(uuid=response.data["uuid"])
         self.assertEqual(integration.assigned_agents, 5)
         self.assertEqual(str(integration.copilot_project_uuid), connect_data["uuid"])
