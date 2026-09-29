@@ -33,6 +33,24 @@ def validate_agent_can_create_message(user, room: Room) -> None:
         )
 
 
+def validate_message_catalog_payload(catalog) -> None:
+    """Loose validation for a catalog/carousel payload.
+
+    Only the envelope is checked: it must be an object with a non-empty
+    ``products`` list. Product fields (retailer ids, prices, etc.) are
+    forwarded to the mailroom as-is.
+    """
+
+    if not isinstance(catalog, dict):
+        raise MessageCreateError("validation_error", _("catalog must be an object"))
+
+    products = catalog.get("products")
+    if not isinstance(products, list) or not products:
+        raise MessageCreateError(
+            "validation_error", _("catalog.products must be a non-empty list")
+        )
+
+
 def first_serializer_error(errors) -> str:
     if isinstance(errors, dict):
         for value in errors.values():

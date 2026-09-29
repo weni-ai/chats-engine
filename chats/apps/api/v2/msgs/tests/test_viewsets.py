@@ -5,7 +5,12 @@ from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import ChatMessageReplyIndex, Message, MessageMedia
+from chats.apps.msgs.models import (
+    ChatMessageReplyIndex,
+    Message,
+    MessageCatalog,
+    MessageMedia,
+)
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote
@@ -150,6 +155,7 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
             "is_automatic_message",
             "automatic_message_type",
             "created_on",
+            "catalog",
         ]
 
         for field in expected_fields:
@@ -161,6 +167,38 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
             self.assertNotIn(
                 field, message_data, f"Field '{field}' should not be in response"
             )
+
+    def test_response_includes_catalog_when_present(self):
+        """Tests that a message with a MessageCatalog exposes it on v2 too."""
+        catalog_data = {
+            "carousel": True,
+            "products": [
+                {"product": "destaques", "product_retailer_ids": ["5371#1"]}
+            ],
+        }
+        MessageCatalog.objects.create(
+            message=self.message_from_agent, data=catalog_data
+        )
+
+        response = self.list({"room": str(self.room.uuid)})
+
+        message_data = next(
+            msg
+            for msg in response.data["results"]
+            if msg["uuid"] == str(self.message_from_agent.uuid)
+        )
+        self.assertEqual(message_data["catalog"], catalog_data)
+
+    def test_response_catalog_is_none_without_catalog(self):
+        """Tests that a message without catalog exposes catalog as None on v2."""
+        response = self.list({"room": str(self.room.uuid)})
+
+        message_data = next(
+            msg
+            for msg in response.data["results"]
+            if msg["uuid"] == str(self.message_from_agent.uuid)
+        )
+        self.assertIsNone(message_data["catalog"])
 
     def test_user_field_has_correct_simplified_structure(self):
         """Tests if 'user' field has correct simplified structure"""

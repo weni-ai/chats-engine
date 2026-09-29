@@ -275,6 +275,99 @@ class TestCreateAgentMessageUseCase(TestCase):
 
         self.assertEqual(ctx.exception.error_code, "duplicate_in_progress")
 
+    CATALOG = {
+        "carousel": True,
+        "action": "Ver produtos",
+        "header": "Novidades",
+        "footer": "Deslize para o lado",
+        "products": [
+            {
+                "product": "destaques",
+                "product_retailer_ids": ["5371#1", "5372#1"],
+                "product_retailer_info": [
+                    {
+                        "retailer_id": "5371#1",
+                        "name": "Blusa UV Coyote",
+                        "price": "189.90",
+                        "currency": "BRL",
+                    }
+                ],
+            }
+        ],
+    }
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=True)
+    @patch(
+        "chats.apps.msgs.usecases.create_agent_message.calculate_first_response_time_task.delay"
+    )
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_execute_creates_catalog_when_flag_enabled(
+        self, mock_notify_room, mock_first_response_task, mock_feature_flag
+    ):
+        message = self.use_case.execute(
+            self.user,
+            self._payload(text="Confira", catalog=self.CATALOG),
+        )
+
+        self.assertEqual(message.catalog.data, self.CATALOG)
+        mock_notify_room.assert_called_once_with("create", True)
+        mock_feature_flag.assert_called_once()
+        flag_args = mock_feature_flag.call_args[0]
+        self.assertEqual(flag_args[1], {"projectUUID": str(self.project.uuid)})
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message, message)
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=True)
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_execute_catalog_only_message_updates_last_message(
+        self, mock_notify_room, mock_feature_flag
+    ):
+        message = self.use_case.execute(
+            self.user,
+            {"room": str(self.room.uuid), "catalog": self.CATALOG},
+        )
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message, message)
+        mock_notify_room.assert_called_once_with("create", True)
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=False)
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    def test_execute_catalog_feature_disabled(self, mock_notify_room, mock_feature_flag):
+        with self.assertRaises(MessageCreateError) as ctx:
+            self.use_case.execute(
+                self.user,
+                self._payload(catalog=self.CATALOG),
+            )
+
+        self.assertEqual(ctx.exception.error_code, "feature_disabled")
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 0)
+        mock_notify_room.assert_not_called()
+
+    def test_execute_catalog_invalid_payload(self):
+        with self.assertRaises(MessageCreateError) as ctx:
+            self.use_case.execute(
+                self.user,
+                self._payload(catalog="not-an-object"),
+            )
+
+        self.assertEqual(ctx.exception.error_code, "validation_error")
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 0)
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=True)
+    def test_execute_catalog_requires_non_empty_products(self, mock_feature_flag):
+        catalog = {"carousel": True, "products": []}
+
+        with self.assertRaises(MessageCreateError) as ctx:
+            self.use_case.execute(
+                self.user,
+                self._payload(catalog=catalog),
+            )
+
+        self.assertEqual(ctx.exception.error_code, "validation_error")
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 0)
+
 
 class TestPostCreateAgentMessageUseCase(TestCase):
     @patch(
