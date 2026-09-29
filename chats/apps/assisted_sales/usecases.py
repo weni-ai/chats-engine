@@ -282,35 +282,53 @@ class ListCopilotConnectionsUseCase:
         return [integration]
 
 
-CONNECT_MODERATOR_ROLE_LABEL = "moderator"
+CONNECT_ORG_ADMIN_ROLE = 3
 
 
-def user_can_create_copilot(authorization_data: dict) -> bool:
-    available_roles = authorization_data.get("available_roles") or {}
-    moderator_role = None
-    for key, label in available_roles.items():
-        if str(label).strip().lower() == CONNECT_MODERATOR_ROLE_LABEL:
-            try:
-                moderator_role = int(key)
-            except (TypeError, ValueError):
-                return False
-            break
-    if moderator_role is None:
-        return False
+def _normalize_email(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def _role_is_org_admin(value) -> bool:
     try:
-        current_role = int(authorization_data.get("project_authorization"))
+        return int(value) == CONNECT_ORG_ADMIN_ROLE
     except (TypeError, ValueError):
         return False
-    return current_role == moderator_role
+
+
+def user_can_create_copilot(organization_data: dict, user_email: str = "") -> bool:
+    email = _normalize_email(user_email)
+    authorization = organization_data.get("authorization") or {}
+    if not isinstance(authorization, dict):
+        authorization = {}
+
+    authorization_email = _normalize_email(
+        authorization.get("user__email") or authorization.get("user__username")
+    )
+    if _role_is_org_admin(authorization.get("role")):
+        if not authorization_email or authorization_email == email:
+            return True
+
+    users = (organization_data.get("authorizations") or {}).get("users") or []
+    if not isinstance(users, list):
+        return False
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        if email and _normalize_email(user.get("username")) == email:
+            return _role_is_org_admin(user.get("role"))
+    return False
 
 
 class CheckCopilotCreatePermissionUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
 
-    def execute(self, *, project_uuid: str, user_email: str) -> bool:
-        data = self.client.get_project_authorization(project_uuid, user_email)
-        return user_can_create_copilot(data)
+    def execute(self, *, org_uuid: str, user_email: str, authorization: str) -> bool:
+        if not org_uuid:
+            return False
+        data = self.client.get_organization(org_uuid, authorization)
+        return user_can_create_copilot(data, user_email)
 
 
 class ListExistingCopilotsUseCase:
