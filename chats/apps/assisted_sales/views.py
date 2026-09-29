@@ -31,7 +31,6 @@ from chats.apps.assisted_sales.usecases import (
     ListCopilotConnectionsUseCase,
     ListCopilotRoomMessagesUseCase,
     ListExistingCopilotsUseCase,
-    ReconnectCopilotIntegrationUseCase,
     RemoveCopilotIntegrationUseCase,
     SubmitCopilotMessageFeedbackUseCase,
     UpdateOrLinkCopilotUseCase,
@@ -129,17 +128,12 @@ class CopilotProjectUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            if serializer.validated_data.get("is_connected") is True:
-                integration = ReconnectCopilotIntegrationUseCase().execute(
-                    uuid=uuid,
-                    user=request.user,
-                )
-            else:
-                integration = UpdateOrLinkCopilotUseCase().execute(
-                    uuid=uuid,
-                    new_uuid=serializer.validated_data["new_uuid"],
-                    user=request.user,
-                )
+            integration = UpdateOrLinkCopilotUseCase().execute(
+                uuid=uuid,
+                user=request.user,
+                is_connected=serializer.validated_data.get("is_connected") is True,
+                new_uuid=serializer.validated_data.get("new_uuid"),
+            )
         except (Project.DoesNotExist, CopilotIntegration.DoesNotExist):
             return Response(
                 {"status_code": status.HTTP_404_NOT_FOUND, "error": "Not found"},

@@ -145,7 +145,12 @@ class LinkExistingCopilotUseCase:
 
 
 class UpdateOrLinkCopilotUseCase:
-    def execute(self, *, uuid, new_uuid, user) -> CopilotIntegration:
+    def execute(
+        self, *, uuid, user, new_uuid=None, is_connected=False
+    ) -> CopilotIntegration:
+        if is_connected:
+            return ReconnectCopilotIntegrationUseCase().execute(uuid=uuid, user=user)
+
         integration = self._integration_by_uuid(uuid)
         if integration is None:
             project = Project.objects.get(uuid=uuid)
