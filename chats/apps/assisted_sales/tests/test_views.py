@@ -84,6 +84,7 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertTrue(response.data["is_connected"])
         self.assertEqual(response.data["disconnected_by"], "")
         self.assertIsNone(response.data["disconnected_on"])
+        self.assertEqual(response.data["project_uuid"], connect_data["uuid"])
         integration = CopilotIntegration.objects.get(uuid=response.data["uuid"])
         self.assertTrue(integration.is_connected)
         self.assertIsNone(integration.disconnected_by)
