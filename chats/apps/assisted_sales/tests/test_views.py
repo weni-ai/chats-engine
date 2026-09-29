@@ -535,7 +535,10 @@ class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
-        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
         ProjectPermission.objects.create(
             project=self.project,
             user=self.user,
@@ -544,45 +547,64 @@ class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.url = f"/v1/project/copilot/can_create/{self.project.uuid}"
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
 
-    def _authorization(self, role):
+    def _organization(self, role):
         return {
-            "user": self.user.email,
-            "project_authorization": role,
-            "available_roles": {
-                "0": "not set",
-                "1": "viewer",
-                "2": "contributor",
-                "3": "moderator",
-                "4": "support",
-                "5": "Chat user",
-                "6": "marketing",
+            "uuid": str(self.org_uuid),
+            "authorization": {
+                "user__username": self.user.email,
+                "user__email": self.user.email,
+                "role": role,
+                "is_admin": role == 3,
+            },
+            "authorizations": {
+                "count": 1,
+                "users": [
+                    {
+                        "username": self.user.email,
+                        "first_name": "Edu",
+                        "last_name": "",
+                        "role": role,
+                        "photo_user": None,
+                    }
+                ],
             },
         }
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
-    def test_returns_true_when_user_is_moderator(self, mock_client_cls):
+    def test_returns_true_when_user_is_org_admin(self, mock_client_cls):
         mock_client = MagicMock()
-        mock_client.get_project_authorization.return_value = self._authorization(3)
+        mock_client.get_organization.return_value = self._organization(3)
         mock_client_cls.return_value = mock_client
 
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {"can_create": True})
-        mock_client.get_project_authorization.assert_called_once_with(
-            str(self.project.uuid), self.user.email
+        mock_client.get_organization.assert_called_once_with(
+            str(self.org_uuid), f"Token {self.token.key}"
         )
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
-    def test_returns_false_when_user_is_not_moderator(self, mock_client_cls):
+    def test_returns_false_when_user_is_not_org_admin(self, mock_client_cls):
         mock_client = MagicMock()
-        mock_client.get_project_authorization.return_value = self._authorization(2)
+        mock_client.get_organization.return_value = self._organization(2)
         mock_client_cls.return_value = mock_client
 
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {"can_create": False})
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_false_when_project_has_no_org(self, mock_client_cls):
+        self.project.org = None
+        self.project.save(update_fields=["org"])
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": False})
+        mock_client_cls.return_value.get_organization.assert_not_called()
 
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_returns_forbidden_without_permission(self, mock_client_cls):
@@ -592,7 +614,7 @@ class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        mock_client_cls.return_value.get_project_authorization.assert_not_called()
+        mock_client_cls.return_value.get_organization.assert_not_called()
 
     def test_returns_not_found_for_unknown_project(self):
         response = self.client.get(f"/v1/project/copilot/can_create/{uuid4()}")
@@ -602,7 +624,7 @@ class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
     @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
     def test_returns_connect_error(self, mock_client_cls):
         mock_client = MagicMock()
-        mock_client.get_project_authorization.side_effect = CopilotConnectError(
+        mock_client.get_organization.side_effect = CopilotConnectError(
             status_code=502, error="Connect unavailable"
         )
         mock_client_cls.return_value = mock_client
