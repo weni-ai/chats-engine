@@ -453,7 +453,7 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
 
         client.list_internal_messages.assert_called_once_with(
             project_uuid=str(self.copilot_uuid),
-            contact_urn=str(self.room.uuid),
+            contact_urn=f"ext:{self.room.uuid}",
             cursor="next-page",
             limit=None,
         )
@@ -480,7 +480,7 @@ class ListCopilotRoomMessagesUseCaseTests(TestCase):
 
         client.list_internal_messages.assert_called_once_with(
             project_uuid=str(sector_copilot),
-            contact_urn=str(self.room.uuid),
+            contact_urn=f"ext:{self.room.uuid}",
             cursor=None,
             limit=None,
         )

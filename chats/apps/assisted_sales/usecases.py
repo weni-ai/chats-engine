@@ -413,7 +413,7 @@ class ListCopilotRoomMessagesUseCase:
         integration = get_copilot_integration_for_room(project, room)
         return self.client.list_internal_messages(
             project_uuid=str(integration.copilot_project_uuid),
-            contact_urn=str(room.uuid),
+            contact_urn=f"ext:{room.uuid}",
             cursor=cursor,
             limit=limit,
         )
