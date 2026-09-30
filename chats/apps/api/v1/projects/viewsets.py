@@ -15,11 +15,9 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.authentication.classes import JWTAuthentication
-from chats.apps.api.authentication.permissions import (
-    IsAuthenticatedOrHasInternalJWT,
-)
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -54,9 +52,15 @@ from chats.apps.projects.models import (
     CustomStatusType,
     Project,
     ProjectPermission,
+    UnifiedSacMigration,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.start_unified_sac_migration import (
+    StartUnifiedSacMigrationError,
+    StartUnifiedSacMigrationUseCase,
+    UnifiedSacMigrationInProgressError,
+)
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
@@ -566,6 +570,57 @@ class ProjectViewset(
         return Response(
             {
                 "detail": "Project set as principal and other projects in the same org set as secondary."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="start-unified-sac-migration",
+    )
+    def start_unified_sac_migration(self, request, *args, **kwargs):
+        """Start the Unified SAC migration for this project's organization."""
+        project = self.get_object()
+        try:
+            migration = StartUnifiedSacMigrationUseCase().execute(
+                project, user=request.user, request=request
+            )
+        except UnifiedSacMigrationInProgressError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
+        except StartUnifiedSacMigrationError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"uuid": str(migration.uuid), "status": migration.status},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="unified-sac-migration",
+    )
+    def unified_sac_migration_status(self, request, *args, **kwargs):
+        """Return the latest Unified SAC migration status for this project's org."""
+        project = self.get_object()
+        migration = (
+            UnifiedSacMigration.objects.filter(org=project.org)
+            .order_by("-created_on")
+            .first()
+        )
+        if migration is None:
+            return Response(
+                {"detail": "No Unified SAC migration for this organization."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {
+                "uuid": str(migration.uuid),
+                "status": migration.status,
+                "error": migration.error,
+                "started_at": migration.started_at,
+                "finished_at": migration.finished_at,
             },
             status=status.HTTP_200_OK,
         )
