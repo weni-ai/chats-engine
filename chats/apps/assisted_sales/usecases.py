@@ -234,7 +234,7 @@ class UpdateCopilotIntegrationUseCase:
 class ReconnectCopilotIntegrationUseCase:
     def execute(self, *, uuid, user) -> CopilotIntegration:
         integration = CopilotIntegration.objects.select_related(
-            "project", "connected_by"
+            "project", "connected_by", "disconnected_by"
         ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
         if not ProjectPermission.objects.filter(
             user=user, project=integration.project
