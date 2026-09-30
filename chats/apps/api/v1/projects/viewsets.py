@@ -55,6 +55,11 @@ from chats.apps.projects.models import (
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.start_unified_sac_migration import (
+    StartUnifiedSacMigrationError,
+    StartUnifiedSacMigrationUseCase,
+    UnifiedSacMigrationInProgressError,
+)
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.usecases.filter_flows_by_queue import filter_flows_by_user_queues
 from chats.apps.queues.utils import (
@@ -572,6 +577,28 @@ class ProjectViewset(
             {
                 "detail": "Project set as principal and other projects in the same org set as secondary."
             },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="start-unified-sac-migration",
+    )
+    def start_unified_sac_migration(self, request, *args, **kwargs):
+        """Start the Unified SAC migration for this project's organization."""
+        project = self.get_object()
+        try:
+            migration = StartUnifiedSacMigrationUseCase().execute(
+                project, user=request.user
+            )
+        except UnifiedSacMigrationInProgressError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
+        except StartUnifiedSacMigrationError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"uuid": str(migration.uuid), "status": migration.status},
             status=status.HTTP_200_OK,
         )
 
