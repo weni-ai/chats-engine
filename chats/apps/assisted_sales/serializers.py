@@ -51,8 +51,8 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
     connected_on = serializers.DateTimeField(read_only=True)
     connected_by = serializers.SerializerMethodField()
     is_connected = serializers.BooleanField(read_only=True)
-    disconnected_by = serializers.SerializerMethodField()
-    disconnected_on = serializers.DateTimeField(read_only=True)
+    disconnect_by = serializers.SerializerMethodField()
+    disconnect_on = serializers.DateTimeField(source="disconnected_on", read_only=True)
 
     class Meta:
         model = CopilotIntegration
@@ -65,8 +65,8 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
             "project_uuid",
             "connected_by",
             "is_connected",
-            "disconnected_by",
-            "disconnected_on",
+            "disconnect_by",
+            "disconnect_on",
         ]
 
     def get_created_on(self, obj: CopilotIntegration):
@@ -77,7 +77,7 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
             return ""
         return obj.connected_by.name or obj.connected_by.email
 
-    def get_disconnected_by(self, obj: CopilotIntegration):
+    def get_disconnect_by(self, obj: CopilotIntegration):
         if not obj.disconnected_by:
             return ""
         return obj.disconnected_by.name or obj.disconnected_by.email
@@ -97,8 +97,8 @@ class CopilotLinkedProjectSerializer(CopilotIntegrationResponseSerializer):
             "project_uuid",
             "connect_by",
             "is_connected",
-            "disconnected_by",
-            "disconnected_on",
+            "disconnect_by",
+            "disconnect_on",
         ]
 
     def get_connect_by(self, obj: CopilotIntegration):
