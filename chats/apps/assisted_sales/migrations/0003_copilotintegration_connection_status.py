@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("assisted_sales", "0001_initial"),
+        ("assisted_sales", "0002_copilotmessagefeedback"),
     ]
 
     operations = [
