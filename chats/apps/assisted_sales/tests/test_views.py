@@ -514,6 +514,15 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(str(by_copilot[str(copilot_uuid)]["sector"]), str(sector.uuid))
         self.assertIsNone(by_copilot[str(self.copilot_uuid)]["sector"])
 
+    def test_list_connections_hides_disconnected_integration(self):
+        self.integration.is_connected = False
+        self.integration.save(update_fields=["is_connected"])
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
     def test_list_connections_forbidden_without_permission(self):
         _, other_token = create_user_and_token("other")
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
