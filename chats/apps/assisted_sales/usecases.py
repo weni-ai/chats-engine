@@ -303,18 +303,22 @@ class ListCopilotConnectionsUseCase:
     def execute(self, *, project: Project, is_principal: bool) -> list:
         if is_principal:
             if not project.org:
-                queryset = CopilotIntegration.objects.filter(project=project)
+                queryset = CopilotIntegration.objects.filter(
+                    project=project, is_connected=True
+                )
             else:
                 queryset = CopilotIntegration.objects.filter(
-                    project__org=str(project.org)
+                    project__org=str(project.org), is_connected=True
                 )
             return list(queryset)
 
         queryset = CopilotIntegration.objects.filter(
-            project=project, sector__isnull=True
+            project=project, sector__isnull=True, is_connected=True
         )
         if not queryset.exists():
-            queryset = CopilotIntegration.objects.filter(project=project)
+            queryset = CopilotIntegration.objects.filter(
+                project=project, is_connected=True
+            )
         integration = queryset.first()
         if not integration:
             return []
