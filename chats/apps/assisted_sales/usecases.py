@@ -15,7 +15,7 @@ from chats.apps.assisted_sales.exceptions import (
     CopilotIntegrationAlreadyExists,
 )
 from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -243,33 +243,35 @@ class ReconnectCopilotIntegrationUseCase:
         if not is_assisted_sales_copilot_enabled(integration.project_id):
             raise CopilotFeatureDisabled()
 
-        integration.is_connected = True
-        integration.disconnected_by = None
-        integration.disconnected_on = None
-        integration.save(
-            update_fields=[
-                "is_connected",
-                "disconnected_by",
-                "disconnected_on",
-                "modified_on",
-            ]
-        )
+        with transaction.atomic():
+            integration.is_connected = True
+            integration.disconnected_by = None
+            integration.disconnected_on = None
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
         return integration
 
 
 class RemoveCopilotIntegrationUseCase:
     def execute(self, *, integration: CopilotIntegration, user) -> None:
-        integration.is_connected = False
-        integration.disconnected_by = user
-        integration.disconnected_on = timezone.now()
-        integration.save(
-            update_fields=[
-                "is_connected",
-                "disconnected_by",
-                "disconnected_on",
-                "modified_on",
-            ]
-        )
+        with transaction.atomic():
+            integration.is_connected = False
+            integration.disconnected_by = user
+            integration.disconnected_on = timezone.now()
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
 
 
 class GetLinkedCopilotUseCase:
@@ -310,7 +312,9 @@ class ListCopilotConnectionsUseCase:
                 queryset = CopilotIntegration.objects.filter(
                     project__org=str(project.org), is_connected=True
                 )
-            return list(queryset)
+            integrations = list(queryset)
+            self._attach_sectors_from_secondary_projects(project, integrations)
+            return integrations
 
         queryset = CopilotIntegration.objects.filter(
             project=project, sector__isnull=True, is_connected=True
@@ -324,36 +328,82 @@ class ListCopilotConnectionsUseCase:
             return []
         return [integration]
 
+    def _attach_sectors_from_secondary_projects(self, project, integrations) -> None:
+        pending = [item for item in integrations if not item.sector_id]
+        if not pending:
+            return
 
-CONNECT_MODERATOR_ROLE_LABEL = "moderator"
+        secondary_ids = {str(item.project_id) for item in pending}
+        sector_by_secondary = {}
+        sectors = (
+            Sector.objects.filter(project=project)
+            .order_by("created_on")
+            .values("uuid", "secondary_project")
+        )
+        for sector in sectors:
+            secondary_project = sector["secondary_project"] or {}
+            if not isinstance(secondary_project, dict):
+                continue
+            secondary_uuid = str(secondary_project.get("uuid") or "")
+            if (
+                secondary_uuid in secondary_ids
+                and secondary_uuid not in sector_by_secondary
+            ):
+                sector_by_secondary[secondary_uuid] = sector["uuid"]
+
+        for item in pending:
+            sector_uuid = sector_by_secondary.get(str(item.project_id))
+            if sector_uuid:
+                item.sector_id = sector_uuid
 
 
-def user_can_create_copilot(authorization_data: dict) -> bool:
-    available_roles = authorization_data.get("available_roles") or {}
-    moderator_role = None
-    for key, label in available_roles.items():
-        if str(label).strip().lower() == CONNECT_MODERATOR_ROLE_LABEL:
-            try:
-                moderator_role = int(key)
-            except (TypeError, ValueError):
-                return False
-            break
-    if moderator_role is None:
-        return False
+CONNECT_ORG_ADMIN_ROLE = 3
+
+
+def _normalize_email(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def _role_is_org_admin(value) -> bool:
     try:
-        current_role = int(authorization_data.get("project_authorization"))
+        return int(value) == CONNECT_ORG_ADMIN_ROLE
     except (TypeError, ValueError):
         return False
-    return current_role == moderator_role
+
+
+def user_can_create_copilot(organization_data: dict, user_email: str = "") -> bool:
+    email = _normalize_email(user_email)
+    authorization = organization_data.get("authorization") or {}
+    if not isinstance(authorization, dict):
+        authorization = {}
+
+    authorization_email = _normalize_email(
+        authorization.get("user__email") or authorization.get("user__username")
+    )
+    if _role_is_org_admin(authorization.get("role")):
+        if not authorization_email or authorization_email == email:
+            return True
+
+    users = (organization_data.get("authorizations") or {}).get("users") or []
+    if not isinstance(users, list):
+        return False
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        if email and _normalize_email(user.get("username")) == email:
+            return _role_is_org_admin(user.get("role"))
+    return False
 
 
 class CheckCopilotCreatePermissionUseCase:
     def __init__(self, client: CopilotConnectClient = None):
         self.client = client or CopilotConnectClient()
 
-    def execute(self, *, project_uuid: str, user_email: str) -> bool:
-        data = self.client.get_project_authorization(project_uuid, user_email)
-        return user_can_create_copilot(data)
+    def execute(self, *, org_uuid: str, user_email: str, authorization: str) -> bool:
+        if not org_uuid:
+            return False
+        data = self.client.get_organization(org_uuid, authorization)
+        return user_can_create_copilot(data, user_email)
 
 
 class ListExistingCopilotsUseCase:
@@ -456,7 +506,7 @@ class ListCopilotRoomMessagesUseCase:
         integration = get_copilot_integration_for_room(project, room)
         return self.client.list_internal_messages(
             project_uuid=str(integration.copilot_project_uuid),
-            contact_urn=str(room.uuid),
+            contact_urn=f"ext:{room.uuid}",
             cursor=cursor,
             limit=limit,
         )
@@ -549,3 +599,64 @@ class UpdateCopilotWwcChannelUseCase:
             integration.connection = connection
             integration.save(update_fields=["connection", "modified_on"])
         return integration
+
+
+def get_room_for_copilot_feedback(user, room_uuid) -> Room:
+    room = (
+        Room.objects.select_related("queue__sector__project")
+        .filter(uuid=room_uuid)
+        .first()
+    )
+    if not room or not room.queue_id:
+        raise Room.DoesNotExist()
+
+    project = room.queue.sector.project
+    if not ProjectPermission.objects.filter(user=user, project=project).exists():
+        raise PermissionDenied()
+
+    if not is_assisted_sales_copilot_enabled(project.uuid):
+        raise CopilotFeatureDisabled()
+
+    return room
+
+
+class GetCopilotMessageFeedbackUseCase:
+    def execute(self, *, user, room_uuid, message_id: str = None):
+        room = get_room_for_copilot_feedback(user, room_uuid)
+        queryset = CopilotMessageFeedback.objects.filter(room=room, user=user)
+
+        if message_id is not None:
+            feedback = queryset.filter(message_id=message_id).first()
+            if not feedback:
+                raise CopilotMessageFeedback.DoesNotExist()
+            return feedback
+
+        return queryset.order_by("created_on")
+
+
+class SubmitCopilotMessageFeedbackUseCase:
+    def execute(
+        self,
+        *,
+        user,
+        room_uuid,
+        message_id: str,
+        liked: bool,
+        text: str = "",
+        tags=None,
+    ):
+        room = get_room_for_copilot_feedback(user, room_uuid)
+
+        if room.user != user:
+            raise PermissionDenied()
+
+        return CopilotMessageFeedback.objects.update_or_create(
+            room=room,
+            user=user,
+            message_id=message_id,
+            defaults={
+                "liked": liked,
+                "text": text or "",
+                "tags": tags or [],
+            },
+        )

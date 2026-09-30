@@ -10,6 +10,7 @@ from chats.apps.msgs.models import (
     AutomaticMessage,
     AutomaticMessageType,
     Message,
+    MessageCatalog,
     MessageMedia,
 )
 from chats.apps.projects.models import Project
@@ -121,6 +122,37 @@ class TestMessageModel(TestCase):
 
         self.assertEqual(msg.metadata["context"]["from"], "")
         self.assertEqual(msg.metadata["context"]["id"], "")
+
+    def test_serialized_data_includes_catalog(self):
+        catalog_data = {
+            "carousel": True,
+            "action": "Ver produtos",
+            "header": "Novidades",
+            "footer": "Deslize para o lado",
+            "products": [
+                {
+                    "product": "destaques",
+                    "product_retailer_ids": ["5371#1", "5372#1"],
+                    "product_retailer_info": [
+                        {"retailer_id": "5371#1", "name": "Blusa UV Coyote"}
+                    ],
+                }
+            ],
+        }
+        msg = Message.objects.create(room=self.room, text="Confira")
+        MessageCatalog.objects.create(message=msg, data=catalog_data)
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertEqual(serialized_data["catalog"], catalog_data)
+
+    def test_serialized_data_catalog_is_none_without_catalog(self):
+        msg = Message.objects.create(room=self.room, text="Regular message")
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertIn("catalog", serialized_data)
+        self.assertIsNone(serialized_data["catalog"])
 
     def test_message_with_null_metadata_values(self):
         """
@@ -393,6 +425,41 @@ class TestMessageNotifyRoom(TestCase):
         # O erro não será logado porque raise_for_status está comentado
         # Então verificamos que a notificação base foi chamada
         mock_base_notification.assert_called_once()
+
+    @patch("chats.apps.rooms.models.Room.base_notification")
+    @patch("chats.apps.msgs.models.get_request_session_with_retries")
+    def test_notify_room_callback_includes_catalog(
+        self, mock_get_session, mock_base_notification
+    ):
+        """The mailroom webhook payload carries the catalog payload as-is."""
+        catalog_data = {
+            "carousel": True,
+            "action": "Ver produtos",
+            "header": "Novidades",
+            "footer": "Deslize para o lado",
+            "products": [
+                {
+                    "product": "destaques",
+                    "product_retailer_ids": ["5371#1"],
+                    "product_retailer_info": [
+                        {"retailer_id": "5371#1", "name": "Blusa UV Coyote"}
+                    ],
+                }
+            ],
+        }
+        MessageCatalog.objects.create(message=self.message, data=catalog_data)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_session = Mock()
+        mock_session.post.return_value = mock_response
+        mock_get_session.return_value = mock_session
+
+        self.message.notify_room(action="create", callback=True)
+
+        post_data = json.loads(mock_session.post.call_args[1]["data"])
+        self.assertEqual(post_data["type"], "msg.create")
+        self.assertEqual(post_data["content"]["catalog"], catalog_data)
 
     @patch("chats.apps.rooms.models.Room.base_notification")
     def test_notify_room_without_callback(self, mock_base_notification):

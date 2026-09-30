@@ -27,7 +27,7 @@ from chats.apps.msgs.models import (
     ChatMessageReplyIndex,
 )
 from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.models import MessageCatalog, MessageMedia
 from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 from chats.apps.rooms.models import RoomNote
 
@@ -84,6 +84,23 @@ class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
         allow_empty=True,
         default=list,
     )
+
+
+def get_message_catalog_data(message: ChatMessage) -> Optional[dict]:
+    """Product catalog/carousel payload for a message, or ``None`` when absent.
+
+    Shared by v1 and v2 message serializers so both list/retrieve endpoints
+    (and the mailroom webhook, via ``MessageWSSerializer``) stay in sync.
+    Read-only: catalog messages are only created through the agent
+    WebSocket flow, which writes the related ``MessageCatalog`` row directly.
+    """
+
+    try:
+        return message.catalog.data
+    except MessageCatalog.DoesNotExist:
+        return None
+    except AttributeError:
+        return None
 
 
 def get_message_bulk_message_data(message: ChatMessage) -> Optional[dict]:
@@ -469,6 +486,7 @@ class MessageSerializer(BaseMessageSerializer):
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
     bulk_message = serializers.SerializerMethodField(read_only=True)
+    catalog = serializers.SerializerMethodField(read_only=True)
     ai_text_improvement = AITextImprovementSerializer(
         write_only=True, required=False, allow_null=True
     )
@@ -494,6 +512,7 @@ class MessageSerializer(BaseMessageSerializer):
             "automatic_message_type",
             "ai_text_improvement",
             "bulk_message",
+            "catalog",
         ]
         read_only_fields = [
             "uuid",
@@ -658,6 +677,9 @@ class MessageSerializer(BaseMessageSerializer):
 
     def get_bulk_message(self, obj):
         return get_message_bulk_message_data(obj)
+
+    def get_catalog(self, obj):
+        return get_message_catalog_data(obj)
 
 
 class MessageWSSerializer(MessageSerializer):

@@ -14,11 +14,13 @@ from chats.apps.api.v1.msgs.serializers import MessageSerializer, MessageWSSeria
 from chats.apps.dashboard.tasks import calculate_first_response_time_task
 from chats.apps.msgs.exceptions import MessageCreateError
 from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.models import MessageCatalog, MessageMedia
+from chats.apps.msgs.utils import is_message_catalog_feature_enabled
 from chats.apps.msgs.validators.agent_message_create import (
     first_serializer_error,
     map_save_validation_error,
     validate_agent_can_create_message,
+    validate_message_catalog_payload,
 )
 from chats.apps.rooms.models import Room
 
@@ -166,6 +168,21 @@ class CreateAgentMessageUseCase:
 
         validate_agent_can_create_message(user, room)
 
+        # ``catalog`` is handled outside the serializer on purpose: it is
+        # stored in its own table and the REST create endpoint must not be
+        # able to set it, so it never enters ``serializer_data``.
+        catalog = data.get("catalog")
+        if catalog is not None:
+            # Validate the payload before the feature flag so a malformed
+            # catalog gets a validation error instead of a feature error.
+            validate_message_catalog_payload(catalog)
+            project_uuid = room.queue.sector.project_id if room.queue_id else None
+            if not is_message_catalog_feature_enabled(project_uuid):
+                raise MessageCreateError(
+                    "feature_disabled",
+                    _("Catalog messages are not enabled for this project"),
+                )
+
         serializer_data = {
             key: data[key]
             for key in ("room", "text", "metadata", "ai_text_improvement", "media")
@@ -184,6 +201,12 @@ class CreateAgentMessageUseCase:
         try:
             with transaction.atomic():
                 message = serializer.save(user=user)
+                if catalog is not None:
+                    # Assigning back avoids an extra query when the serializer
+                    # reads the catalog during notify_room right below.
+                    message.catalog = MessageCatalog.objects.create(
+                        message=message, data=catalog
+                    )
                 PostCreateAgentMessageUseCase().execute(message)
         except drf_exceptions.ValidationError as error:
             raise map_save_validation_error(error) from error
@@ -200,7 +223,12 @@ class PostCreateAgentMessageUseCase:
     def execute(self, message: ChatMessage, *, is_media_instance: bool = False) -> None:
         message.notify_room("create", True)
 
-        has_content = message.text or is_media_instance or message.medias.exists()
+        has_content = (
+            message.text
+            or is_media_instance
+            or message.medias.exists()
+            or getattr(message, "catalog", None) is not None
+        )
         if has_content:
             message.room.update_last_message(
                 message=message,

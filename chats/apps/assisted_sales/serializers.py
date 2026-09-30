@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
-from chats.apps.assisted_sales.models import CopilotIntegration
+from chats.apps.assisted_sales.enums import CopilotMessageFeedbackTags
+from chats.apps.assisted_sales.models import (
+    FEEDBACK_TEXT_MAX_LENGTH,
+    CopilotIntegration,
+    CopilotMessageFeedback,
+)
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector
 
@@ -41,6 +46,7 @@ class CreateCopilotIntegrationSerializer(serializers.Serializer):
 
 class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
     uuid = serializers.UUIDField(read_only=True)
+    project_uuid = serializers.UUIDField(source="copilot_project_uuid", read_only=True)
     created_on = serializers.SerializerMethodField()
     connected_on = serializers.DateTimeField(read_only=True)
     connected_by = serializers.SerializerMethodField()
@@ -56,6 +62,7 @@ class CopilotIntegrationResponseSerializer(serializers.ModelSerializer):
             "created_on",
             "connected_on",
             "uuid",
+            "project_uuid",
             "connected_by",
             "is_connected",
             "disconnected_by",
@@ -113,3 +120,45 @@ class CopilotConnectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CopilotIntegration
         fields = ["sector", "project_uuid", "conection"]
+
+
+class CopilotMessageFeedbackSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=FEEDBACK_TEXT_MAX_LENGTH,
+        default="",
+    )
+    tags = serializers.ListField(
+        child=serializers.ChoiceField(choices=CopilotMessageFeedbackTags.choices),
+        required=False,
+        default=list,
+    )
+
+    class Meta:
+        model = CopilotMessageFeedback
+        fields = [
+            "uuid",
+            "room",
+            "message_id",
+            "liked",
+            "text",
+            "tags",
+            "created_on",
+            "modified_on",
+        ]
+        read_only_fields = ["uuid", "room", "created_on", "modified_on"]
+        validators = []
+
+    def validate(self, attrs):
+        liked = attrs.get("liked")
+        text = (attrs.get("text") or "").strip()
+        tags = attrs.get("tags") or []
+
+        if liked is False and not text and not tags:
+            raise serializers.ValidationError(
+                "Negative feedback requires at least one tag or text.",
+                code="negative_feedback_requires_reason",
+            )
+
+        return attrs

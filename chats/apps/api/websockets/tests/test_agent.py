@@ -134,6 +134,76 @@ class AgentMessageCreateWebSocketTestCase(AgentConsumerTestCase):
 
         await communicator.disconnect()
 
+    CATALOG = {
+        "carousel": True,
+        "action": "Ver produtos",
+        "header": "Novidades",
+        "footer": "Deslize para o lado",
+        "products": [
+            {
+                "product": "destaques",
+                "product_retailer_ids": ["5371#1"],
+                "product_retailer_info": [
+                    {"retailer_id": "5371#1", "name": "Blusa UV Coyote"}
+                ],
+            }
+        ],
+    }
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=True)
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    async def test_message_create_with_catalog(
+        self, mock_notify_room, mock_feature_flag
+    ):
+        communicator = await self._connect()
+        request_id = "tmp-test-catalog"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Confira",
+                    "catalog": self.CATALOG,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.success")
+        self.assertEqual(response["content"]["request_id"], request_id)
+        self.assertEqual(response["content"]["catalog"], self.CATALOG)
+        mock_notify_room.assert_called_once_with("create", True)
+
+        await communicator.disconnect()
+
+    @patch("chats.apps.msgs.utils.is_feature_active_for_attributes", return_value=False)
+    async def test_message_create_catalog_feature_disabled(self, mock_feature_flag):
+        communicator = await self._connect()
+        request_id = "tmp-test-catalog-disabled"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Confira",
+                    "catalog": self.CATALOG,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.error")
+        self.assertEqual(response["content"]["request_id"], request_id)
+        self.assertEqual(response["content"]["error_code"], "feature_disabled")
+
+        await communicator.disconnect()
+
     async def test_message_create_permission_denied(self):
         other_user, _ = create_user_and_token(nickname="other-agent")
         self.room.user = other_user
