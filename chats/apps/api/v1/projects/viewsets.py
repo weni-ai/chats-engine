@@ -54,6 +54,7 @@ from chats.apps.projects.models import (
     CustomStatusType,
     Project,
     ProjectPermission,
+    UnifiedSacMigration,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
@@ -594,6 +595,35 @@ class ProjectViewset(
 
         return Response(
             {"uuid": str(migration.uuid), "status": migration.status},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="unified-sac-migration",
+    )
+    def unified_sac_migration_status(self, request, *args, **kwargs):
+        """Return the latest Unified SAC migration status for this project's org."""
+        project = self.get_object()
+        migration = (
+            UnifiedSacMigration.objects.filter(org=project.org)
+            .order_by("-created_on")
+            .first()
+        )
+        if migration is None:
+            return Response(
+                {"detail": "No Unified SAC migration for this organization."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {
+                "uuid": str(migration.uuid),
+                "status": migration.status,
+                "error": migration.error,
+                "started_at": migration.started_at,
+                "finished_at": migration.finished_at,
+            },
             status=status.HTTP_200_OK,
         )
 
