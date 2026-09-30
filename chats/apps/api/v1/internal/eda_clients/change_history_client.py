@@ -14,6 +14,8 @@ def _entity_for(instance: models.Model):
         return Entity.QUEUE
     if label == "queues.queueauthorization":
         return Entity.USER
+    if label == "projects.unifiedsacmigration":
+        return Entity.UNIFIED_SAC_MIGRATION
     raise ValueError("Unsupported model for change history: %s" % label)
 
 
@@ -39,11 +41,20 @@ def _object_name(instance: models.Model) -> str:
 def _value_diff(before, after):
     if before is None or after is None:
         return None, None
+    if hasattr(before, "status") and before.status != after.status:
+        return str(before.status), str(after.status)
     if hasattr(before, "name") and before.name != after.name:
         return str(before.name), str(after.name)
     if hasattr(before, "role") and before.role != after.role:
         return str(before.role), str(after.role)
     return None, None
+
+
+def _project_uuid(instance: models.Model) -> str:
+    project = getattr(instance, "project", None)
+    if project is None:
+        project = instance.principal_project
+    return str(project.uuid)
 
 
 def _user_ip(request):
@@ -74,7 +85,7 @@ def publish_change_history(before=None, after=None, user=None, request=None):
     action = _action_for(before, after, reference)
     entity = _entity_for(reference)
     old_value, new_value = _value_diff(before, after)
-    project_uuid = str(reference.project.uuid)
+    project_uuid = _project_uuid(reference)
     user_email = getattr(user, "email", None) or ""
     object_id = str(reference.pk)
     object_name = _object_name(reference)

@@ -15,11 +15,9 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.authentication.classes import JWTAuthentication
-from chats.apps.api.authentication.permissions import (
-    IsAuthenticatedOrHasInternalJWT,
-)
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -586,7 +584,7 @@ class ProjectViewset(
         project = self.get_object()
         try:
             migration = StartUnifiedSacMigrationUseCase().execute(
-                project, user=request.user
+                project, user=request.user, request=request
             )
         except UnifiedSacMigrationInProgressError as error:
             return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)

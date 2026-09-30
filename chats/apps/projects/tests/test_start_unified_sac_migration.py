@@ -63,6 +63,33 @@ class StartUnifiedSacMigrationUseCaseTests(APITestCase):
         self.assertEqual(migration.status, UnifiedSacMigrationStatus.FAILED)
         self.assertEqual(migration.error, {"detail": "flows failed"})
 
+    @patch(
+        "chats.apps.projects.usecases.start_unified_sac_migration.publish_change_history"
+    )
+    @patch(
+        "chats.apps.projects.usecases.start_unified_sac_migration.ClearOrgSectorsUseCase.execute"
+    )
+    @patch(
+        "chats.apps.projects.usecases.start_unified_sac_migration.CloseOrgRoomsUseCase.execute"
+    )
+    def test_execute_publishes_create_and_status_changes(
+        self, close_rooms, clear_sectors, publish
+    ):
+        migration = StartUnifiedSacMigrationUseCase().execute(
+            self.project, user=self.user
+        )
+        actions = [call.kwargs for call in publish.call_args_list]
+        self.assertIsNone(actions[0]["before"])
+        self.assertEqual(actions[0]["after"].status, UnifiedSacMigrationStatus.PENDING)
+        self.assertEqual(
+            actions[-1]["after"].status, UnifiedSacMigrationStatus.FINISHED
+        )
+        self.assertEqual(
+            actions[-1]["before"].status, UnifiedSacMigrationStatus.SECTORS_DELETED
+        )
+        self.assertEqual(publish.call_count, 8)
+        self.assertEqual(migration.status, UnifiedSacMigrationStatus.FINISHED)
+
     def test_execute_rejects_project_without_org(self):
         project = Project.objects.create(name="No org")
         with self.assertRaises(Exception):
