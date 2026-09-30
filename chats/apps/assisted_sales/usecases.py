@@ -112,6 +112,7 @@ class CreateCopilotIntegrationUseCase:
             connection=connection,
             connected_by=user,
             copilot_created_on=parse_created_on(connect_data),
+            is_connected=True,
         )
 
 
@@ -139,6 +140,7 @@ class LinkExistingCopilotUseCase:
             assigned_agents=assigned_agents,
             connection=build_webchat_connection({}),
             connected_by=user,
+            is_connected=True,
         )
 
 
