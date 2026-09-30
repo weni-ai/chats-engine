@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.test import override_settings
+from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -80,6 +81,9 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["name"], "projeto copilot teste")
         self.assertEqual(response.data["assigned_agents"], 5)
         self.assertEqual(response.data["connected_by"], "edu")
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnected_by"], "")
+        self.assertIsNone(response.data["disconnected_on"])
         self.assertEqual(response.data["project_uuid"], connect_data["uuid"])
         integration = CopilotIntegration.objects.get(uuid=response.data["uuid"])
         self.assertTrue(integration.is_connected)
@@ -293,6 +297,26 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.integration.refresh_from_db()
         self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
 
+    def test_put_reconnects_integration(self):
+        self.integration.is_connected = False
+        self.integration.disconnected_by = self.user
+        self.integration.disconnected_on = timezone.now()
+        self.integration.save(
+            update_fields=["is_connected", "disconnected_by", "disconnected_on"]
+        )
+
+        response = self.client.put(self.url, {"is_connected": True}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnected_by"], "")
+        self.assertIsNone(response.data["disconnected_on"])
+        self.integration.refresh_from_db()
+        self.assertTrue(self.integration.is_connected)
+        self.assertIsNone(self.integration.disconnected_by)
+        self.assertIsNone(self.integration.disconnected_on)
+        self.assertEqual(self.integration.copilot_project_uuid, self.old_copilot_uuid)
+
 
 class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
     def setUp(self):
@@ -323,25 +347,11 @@ class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {"status": 200})
-        self.assertFalse(
-            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
-        )
-        mock_client.remove_copilot_project.assert_called_once()
-
-    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
-    def test_remove_fails_when_connect_fails(self, mock_client_cls):
-        mock_client = MagicMock()
-        mock_client.remove_copilot_project.side_effect = CopilotConnectError(
-            status_code=502, error="Connect unavailable"
-        )
-        mock_client_cls.return_value = mock_client
-
-        response = self.client.delete(self.url)
-
-        self.assertEqual(response.status_code, 502)
-        self.assertTrue(
-            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
-        )
+        self.integration.refresh_from_db()
+        self.assertFalse(self.integration.is_connected)
+        self.assertEqual(self.integration.disconnected_by, self.user)
+        self.assertIsNotNone(self.integration.disconnected_on)
+        mock_client.remove_copilot_project.assert_not_called()
 
     def test_remove_forbidden_without_permission(self):
         _, other_token = create_user_and_token("other")
@@ -390,6 +400,9 @@ class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["name"], "Projeto copilot teste")
         self.assertEqual(response.data["assigned_agents"], 5)
         self.assertEqual(response.data["connect_by"], "edu")
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnected_by"], "")
+        self.assertIsNone(response.data["disconnected_on"])
         self.assertEqual(str(response.data["uuid"]), str(self.integration.uuid))
         self.assertEqual(str(response.data["project_uuid"]), str(self.copilot_uuid))
         self.integration.refresh_from_db()
@@ -474,6 +487,15 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
             {str(item["project_uuid"]) for item in response.data},
             {str(self.copilot_uuid), str(other_uuid)},
         )
+
+    def test_list_connections_hides_disconnected_integration(self):
+        self.integration.is_connected = False
+        self.integration.save(update_fields=["is_connected"])
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
 
     def test_list_connections_fills_sector_from_secondary_project_when_principal(self):
         secondary = Project.objects.create(

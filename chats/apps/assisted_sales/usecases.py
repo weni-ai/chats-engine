@@ -145,7 +145,12 @@ class LinkExistingCopilotUseCase:
 
 
 class UpdateOrLinkCopilotUseCase:
-    def execute(self, *, uuid, new_uuid, user) -> CopilotIntegration:
+    def execute(
+        self, *, uuid, user, new_uuid=None, is_connected=False
+    ) -> CopilotIntegration:
+        if is_connected:
+            return ReconnectCopilotIntegrationUseCase().execute(uuid=uuid, user=user)
+
         integration = self._integration_by_uuid(uuid)
         if integration is None:
             project = Project.objects.get(uuid=uuid)
@@ -226,13 +231,47 @@ class UpdateCopilotIntegrationUseCase:
         return integration
 
 
-class RemoveCopilotIntegrationUseCase:
-    def __init__(self, client: CopilotConnectClient = None):
-        self.client = client or CopilotConnectClient()
+class ReconnectCopilotIntegrationUseCase:
+    def execute(self, *, uuid, user) -> CopilotIntegration:
+        integration = CopilotIntegration.objects.select_related(
+            "project", "connected_by", "disconnected_by"
+        ).get(Q(uuid=uuid) | Q(copilot_project_uuid=uuid))
+        if not ProjectPermission.objects.filter(
+            user=user, project=integration.project
+        ).exists():
+            raise PermissionDenied()
+        if not is_assisted_sales_copilot_enabled(integration.project_id):
+            raise CopilotFeatureDisabled()
 
-    def execute(self, *, integration: CopilotIntegration) -> None:
-        self.client.remove_copilot_project(str(integration.copilot_project_uuid))
-        integration.delete()
+        with transaction.atomic():
+            integration.is_connected = True
+            integration.disconnected_by = None
+            integration.disconnected_on = None
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
+        return integration
+
+
+class RemoveCopilotIntegrationUseCase:
+    def execute(self, *, integration: CopilotIntegration, user) -> None:
+        with transaction.atomic():
+            integration.is_connected = False
+            integration.disconnected_by = user
+            integration.disconnected_on = timezone.now()
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
 
 
 class GetLinkedCopilotUseCase:
@@ -266,20 +305,24 @@ class ListCopilotConnectionsUseCase:
     def execute(self, *, project: Project, is_principal: bool) -> list:
         if is_principal:
             if not project.org:
-                queryset = CopilotIntegration.objects.filter(project=project)
+                queryset = CopilotIntegration.objects.filter(
+                    project=project, is_connected=True
+                )
             else:
                 queryset = CopilotIntegration.objects.filter(
-                    project__org=str(project.org)
+                    project__org=str(project.org), is_connected=True
                 )
             integrations = list(queryset)
             self._attach_sectors_from_secondary_projects(project, integrations)
             return integrations
 
         queryset = CopilotIntegration.objects.filter(
-            project=project, sector__isnull=True
+            project=project, sector__isnull=True, is_connected=True
         )
         if not queryset.exists():
-            queryset = CopilotIntegration.objects.filter(project=project)
+            queryset = CopilotIntegration.objects.filter(
+                project=project, is_connected=True
+            )
         integration = queryset.first()
         if not integration:
             return []
