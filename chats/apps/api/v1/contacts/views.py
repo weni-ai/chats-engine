@@ -44,6 +44,7 @@ class OutOffWhatsappResponseWindowContactsView(GenericAPIView):
                 sectors=parse_csv(request.query_params.get("sectors")),
                 queues=parse_csv(request.query_params.get("queues")),
                 search=request.query_params.get("search"),
+                user_email=request.query_params.get("user"),
             )
         except InvalidOutOffWindowFilter as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
