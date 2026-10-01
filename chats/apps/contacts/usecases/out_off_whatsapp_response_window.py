@@ -31,7 +31,9 @@ def _parse_uuids(values, field_name):
     return parsed
 
 
-def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=None):
+def out_off_whatsapp_response_window(
+    project, sectors=None, queues=None, search=None, user_email=None
+):
     """Rooms outside the WhatsApp 24h window, and the contacts that own them."""
     cutoff = timezone.now() - timedelta(days=WHATSAPP_RESPONSE_WINDOW_DAYS)
     recent_contact_message = Message.objects.filter(
@@ -52,6 +54,10 @@ def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=
         rooms = rooms.filter(queue__sector__uuid__in=sector_ids)
     if queue_ids:
         rooms = rooms.filter(queue__uuid__in=queue_ids)
+
+    user_email = (user_email or "").strip()
+    if user_email:
+        rooms = rooms.filter(user__email=user_email)
 
     search = (search or "").strip()
     if search:
