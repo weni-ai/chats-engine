@@ -464,6 +464,9 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["sector"], None)
         self.assertEqual(str(response.data[0]["project_uuid"]), str(self.copilot_uuid))
+        self.assertEqual(
+            str(response.data[0]["original_project_uuid"]), str(self.project.uuid)
+        )
         self.assertEqual(response.data[0]["conection"], self.connection)
 
     def test_list_connections_returns_org_integrations_when_principal(self):
@@ -521,7 +524,15 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         by_copilot = {str(item["project_uuid"]): item for item in response.data}
         self.assertEqual(str(by_copilot[str(copilot_uuid)]["sector"]), str(sector.uuid))
+        self.assertEqual(
+            str(by_copilot[str(copilot_uuid)]["original_project_uuid"]),
+            str(secondary.uuid),
+        )
         self.assertIsNone(by_copilot[str(self.copilot_uuid)]["sector"])
+        self.assertEqual(
+            str(by_copilot[str(self.copilot_uuid)]["original_project_uuid"]),
+            str(self.project.uuid),
+        )
 
     def test_list_connections_forbidden_without_permission(self):
         _, other_token = create_user_and_token("other")
