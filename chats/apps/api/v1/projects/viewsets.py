@@ -39,6 +39,7 @@ from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
+    OutOffWhatsappStartFlowSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
@@ -46,6 +47,11 @@ from chats.apps.api.v1.projects.serializers import (
     UpdateProjectSerializer,
 )
 from chats.apps.contacts.models import Contact
+from chats.apps.contacts.usecases.out_off_whatsapp_response_window import (
+    InvalidOutOffWindowFilter,
+    out_off_whatsapp_response_window,
+    parse_csv,
+)
 from chats.apps.projects.models import (
     CustomStatus,
     CustomStatusType,
@@ -54,6 +60,7 @@ from chats.apps.projects.models import (
 )
 from chats.apps.projects.usecases.exceptions import (
     ActiveFlowStartError,
+    NoContactsToStartFlowError,
     StartFlowPermissionError,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
@@ -358,6 +365,51 @@ class ProjectViewset(
         except StartFlowPermissionError as exc:
             return Response({"Detail": str(exc)}, status.HTTP_401_UNAUTHORIZED)
         except ActiveFlowStartError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
+        return Response(flow_start, status.HTTP_200_OK)
+
+    @swagger_auto_schema(auto_schema=None)
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="out_off_whatsapp_response_window/start_flow",
+        url_name="out_off_whatsapp_response_window_start_flow",
+        serializer_class=OutOffWhatsappStartFlowSerializer,
+    )
+    @transaction.atomic
+    def start_out_off_whatsapp_response_window_flow(self, request, *args, **kwargs):
+        """Start a flow for contacts outside the WhatsApp 24h window."""
+        project = self.get_object()
+        serializer = OutOffWhatsappStartFlowSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            contacts, _ = out_off_whatsapp_response_window(
+                project,
+                sectors=parse_csv(request.query_params.get("sectors")),
+                queues=parse_csv(request.query_params.get("queues")),
+                search=request.query_params.get("search"),
+                user_email=request.query_params.get("user"),
+            )
+        except InvalidOutOffWindowFilter as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        ignored = set(serializer.validated_data.get("ignored_contacts") or [])
+        external_ids = [
+            external_id
+            for external_id in contacts.values_list("external_id", flat=True)
+            if external_id not in ignored
+        ]
+        try:
+            flow_start = StartFlowUseCase().execute_for_contacts(
+                project,
+                request.user,
+                serializer.validated_data["flow"],
+                external_ids,
+            )
+        except StartFlowPermissionError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_401_UNAUTHORIZED)
+        except NoContactsToStartFlowError as exc:
             return Response({"Detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
         return Response(flow_start, status.HTTP_200_OK)
 
