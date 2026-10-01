@@ -53,6 +53,10 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
+from chats.apps.projects.usecases.clear_org_sectors import (
+    ClearOrgSectorsError,
+    ClearOrgSectorsUseCase,
+)
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
@@ -567,6 +571,13 @@ class ProjectViewset(
 
         org_projects = Project.objects.filter(org=project.org).exclude(pk=project.pk)
         org_projects.update(config={"its_principal": False})
+
+        try:
+            ClearOrgSectorsUseCase().execute(
+                project, user_email=getattr(request.user, "email", "") or ""
+            )
+        except ClearOrgSectorsError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {
