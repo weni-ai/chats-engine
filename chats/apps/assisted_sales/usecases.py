@@ -243,33 +243,35 @@ class ReconnectCopilotIntegrationUseCase:
         if not is_assisted_sales_copilot_enabled(integration.project_id):
             raise CopilotFeatureDisabled()
 
-        integration.is_connected = True
-        integration.disconnected_by = None
-        integration.disconnected_on = None
-        integration.save(
-            update_fields=[
-                "is_connected",
-                "disconnected_by",
-                "disconnected_on",
-                "modified_on",
-            ]
-        )
+        with transaction.atomic():
+            integration.is_connected = True
+            integration.disconnected_by = None
+            integration.disconnected_on = None
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
         return integration
 
 
 class RemoveCopilotIntegrationUseCase:
     def execute(self, *, integration: CopilotIntegration, user) -> None:
-        integration.is_connected = False
-        integration.disconnected_by = user
-        integration.disconnected_on = timezone.now()
-        integration.save(
-            update_fields=[
-                "is_connected",
-                "disconnected_by",
-                "disconnected_on",
-                "modified_on",
-            ]
-        )
+        with transaction.atomic():
+            integration.is_connected = False
+            integration.disconnected_by = user
+            integration.disconnected_on = timezone.now()
+            integration.save(
+                update_fields=[
+                    "is_connected",
+                    "disconnected_by",
+                    "disconnected_on",
+                    "modified_on",
+                ]
+            )
 
 
 class GetLinkedCopilotUseCase:
