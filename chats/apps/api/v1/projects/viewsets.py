@@ -47,22 +47,24 @@ from chats.apps.api.v1.projects.serializers import (
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
-    ContactGroupFlowReference,
     CustomStatus,
     CustomStatusType,
     Project,
     ProjectPermission,
 )
+from chats.apps.projects.usecases.exceptions import (
+    ActiveFlowStartError,
+    StartFlowPermissionError,
+)
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.start_flow import StartFlowUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.usecases.filter_flows_by_queue import filter_flows_by_user_queues
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
-from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 
 logger = logging.getLogger(__name__)
@@ -336,24 +338,6 @@ class ProjectViewset(
             status=status.HTTP_200_OK,
         )
 
-    def _create_flow_start_instances(self, data, flow_start):
-        groups = data.get("groups", [])
-        contacts = data.get("contacts", [])
-        instances = []
-        for group in groups:
-            reference = ContactGroupFlowReference(
-                receiver_type="group", external_id=group, flow_start=flow_start
-            )
-            instances.append(reference)
-
-        for contact in contacts:
-            reference = ContactGroupFlowReference(
-                receiver_type="contact", external_id=contact, flow_start=flow_start
-            )
-            instances.append(reference)
-
-        flow_start.references.bulk_create(instances)
-
     @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
@@ -367,61 +351,14 @@ class ProjectViewset(
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        flow = data.get("flow", None)
-
         try:
-            perm = project.permissions.get(user=request.user)
-        except ObjectDoesNotExist:
-            return Response(
-                {"Detail": "the user does not have permission in this project"},
-                status.HTTP_401_UNAUTHORIZED,
+            flow_start = StartFlowUseCase().execute(
+                project, request.user, serializer.validated_data
             )
-        contact_id = data.get("contacts")[0]
-        flow_start_data = {
-            "permission": perm,
-            "flow": flow,
-            "contact_data": {
-                "name": data.pop("contact_name"),
-                "external_id": contact_id,
-            },
-        }
-        room_id = data.get("room", None)
-
-        try:
-            room = Room.objects.get(
-                pk=room_id, is_active=True, contact__external_id=contact_id
-            )
-            if room.flowstarts.filter(is_deleted=False).exists():
-                return Response(
-                    {"Detail": "There already is an active flow start for this room"},
-                    status.HTTP_400_BAD_REQUEST,
-                )
-
-            if not room.is_24h_valid:
-                flow_start_data["room"] = room
-                room.request_callback(room.serialized_ws_data)
-                room.is_waiting = True
-                room.save()
-        except (ObjectDoesNotExist, ValidationError):
-            pass
-
-        chats_flow_start = project.flowstarts.create(**flow_start_data)
-        self._create_flow_start_instances(data, chats_flow_start)
-
-        status_code, flow_start = FlowRESTClient().start_flow(project, data)
-        chats_flow_start.external_id = flow_start.get("uuid")
-        chats_flow_start.name = flow_start.get("flow").get("name")
-        chats_flow_start.save()
-        feedback = {"name": chats_flow_start.name}
-        if chats_flow_start.room:
-            create_room_feedback_message(
-                room,
-                feedback,
-                method=RoomFeedbackMethods.FLOW_START,
-                requested_by=request.user,
-            )
-            room.notify_room("update")
+        except StartFlowPermissionError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_401_UNAUTHORIZED)
+        except ActiveFlowStartError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
         return Response(flow_start, status.HTTP_200_OK)
 
     @swagger_auto_schema(auto_schema=None)
