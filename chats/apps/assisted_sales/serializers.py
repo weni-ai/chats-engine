@@ -115,11 +115,12 @@ class CopilotExistingProjectSerializer(serializers.Serializer):
 class CopilotConnectionSerializer(serializers.ModelSerializer):
     sector = serializers.UUIDField(source="sector_id", allow_null=True, read_only=True)
     project_uuid = serializers.UUIDField(source="copilot_project_uuid", read_only=True)
+    original_project_uuid = serializers.UUIDField(source="project_id", read_only=True)
     conection = serializers.JSONField(source="connection", read_only=True)
 
     class Meta:
         model = CopilotIntegration
-        fields = ["sector", "project_uuid", "conection"]
+        fields = ["sector", "project_uuid", "original_project_uuid", "conection"]
 
 
 class CopilotMessageFeedbackSerializer(serializers.ModelSerializer):
