@@ -19,6 +19,25 @@ class PhoneUrnQTests(TestCase):
         # reliable signal at that length.
         self.assertIsNone(phone_urn_q("442012345678"))
 
+    def test_strips_br_country_code_from_full_international_number(self):
+        project = Project.objects.create(name="Phone Project")
+        sector = Sector.objects.create(
+            name="Sector",
+            project=project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        queue = Queue.objects.create(name="Queue", sector=sector)
+        room = Room.objects.create(
+            contact=Contact.objects.create(name="BR"),
+            queue=queue,
+            urn="whatsapp:5584992126050",
+        )
+
+        matches = Room.objects.filter(phone_urn_q("5584992126050"))
+        self.assertIn(room, matches)
+
     def test_does_not_produce_false_positive_for_us_urn(self):
         # A US-style URN (``whatsapp:1xxxxxxxxxx``) must never be returned
         # by ``phone_urn_q`` since the BR-shaped lookup is anchored at
