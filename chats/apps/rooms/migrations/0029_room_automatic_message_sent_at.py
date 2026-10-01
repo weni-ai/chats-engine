@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -7,12 +7,4 @@ class Migration(migrations.Migration):
         ("rooms", "0028_alter_roomnote_message"),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name="room",
-            name="automatic_message_sent_at",
-            field=models.DateTimeField(
-                blank=True, null=True, verbose_name="Automatic message sent at"
-            ),
-        ),
-    ]
+    operations = []
