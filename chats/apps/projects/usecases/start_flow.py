@@ -7,6 +7,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models import ContactGroupFlowReference
 from chats.apps.projects.usecases.exceptions import (
     ActiveFlowStartError,
+    NoContactsToStartFlowError,
     StartFlowPermissionError,
 )
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -71,6 +72,32 @@ class StartFlowUseCase:
                     requested_by=user,
                 )
                 chats_flow_start.room.notify_room("update")
+        return flow_start
+
+    def execute_for_contacts(self, project, user, flow, contact_external_ids):
+        try:
+            perm = project.permissions.get(user=user)
+        except ObjectDoesNotExist:
+            raise StartFlowPermissionError(
+                "the user does not have permission in this project"
+            )
+
+        external_ids = list(dict.fromkeys(contact_external_ids))
+        if not external_ids:
+            raise NoContactsToStartFlowError("No contacts to start the flow.")
+
+        chats_flow_start = project.flowstarts.create(
+            permission=perm,
+            flow=flow,
+            contact_data={"external_ids": external_ids},
+        )
+        self._create_flow_start_instances({"contacts": external_ids}, chats_flow_start)
+        _status_code, flow_start = FlowRESTClient().start_flow(
+            project, {"flow": flow, "contacts": external_ids}
+        )
+        chats_flow_start.external_id = flow_start.get("uuid")
+        chats_flow_start.name = flow_start.get("flow").get("name")
+        chats_flow_start.save()
         return flow_start
 
     def _create_flow_start_instances(self, data, flow_start):
