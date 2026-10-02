@@ -81,13 +81,11 @@ def build_out_off_window_contact_payload(contacts, rooms):
         .values_list("contact_id", "urn")
     )
     for contact_id, urn in urn_rows:
-        if not urn or urn in seen.get(contact_id, set()):
+        if not urn or urn in seen[contact_id]:
             continue
-        seen.setdefault(contact_id, set()).add(urn)
+        seen[contact_id].add(urn)
         scheme, _, path = urn.partition(":")
-        urns_by_contact.setdefault(contact_id, []).append(
-            {"scheme": scheme, "path": path}
-        )
+        urns_by_contact[contact_id].append({"scheme": scheme, "path": path})
 
     return [
         {
