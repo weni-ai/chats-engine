@@ -1,10 +1,12 @@
 from unittest.mock import patch
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from chats.apps.rooms.models import Room
+from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
 
 
 class RoomsFlowStartReengagementTests(APITestCase):
@@ -19,7 +21,9 @@ class RoomsFlowStartReengagementTests(APITestCase):
             is_active=True, user__isnull=False
         ).first()
 
-        external_token = self.project.permissions.create(user=None, role=1)
+        external_token = self.project.permissions.create(
+            user=None, role=ProjectPermission.ROLE_MODERATOR
+        )
 
         self.flow_start = self.project.flowstarts.create(
             flow="a75d0853-e4e8-48bd-bdb5-f8685a0d5026",

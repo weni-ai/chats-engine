@@ -20,9 +20,6 @@ class ProjectPermissionCreationUseCase:
     def __init__(self, config: dict) -> None:
         self.config = config
 
-    def role_mapping(self):
-        return 1 if self.config.get("role") == 3 else 2
-
     def get_project(self):
         return Project.objects.get(uuid=self.config.get("project"))
 
@@ -40,7 +37,7 @@ class ProjectPermissionCreationUseCase:
 
     def create_permission(self, project_permission_dto: ProjectPermissionDTO):
         user, _ = self.get_or_create_user_by_email(project_permission_dto.user)
-        role_value = self.role_mapping()
+        role_value = self.config.get("role")
         project = self.get_project()
 
         project_permission, created = ProjectPermission.all_objects.get_or_create(

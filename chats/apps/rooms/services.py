@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from sentry_sdk import capture_message
 
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.cache import CacheClient
 
@@ -50,7 +50,9 @@ def can_retrieve(room, user, project) -> bool:
     is_sector_manager = models.Q(queue__sector__authorizations__permission__user=user)
     is_project_admin = models.Q(
         models.Q(queue__sector__project__permissions__user=user)
-        & models.Q(queue__sector__project__permissions__role=1)
+        & models.Q(
+            queue__sector__project__permissions__role__in=ProjectPermission.ADMIN_ROLES
+        )
     )
     is_user_assigned_to_room = models.Q(user=user)
     check_admin_manager_agent_role_filter = models.Q(

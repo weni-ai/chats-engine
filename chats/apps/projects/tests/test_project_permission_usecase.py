@@ -41,16 +41,17 @@ class TestProjectPermissionCreationUseCase(TestCase):
             users.append(user)
         return users
 
-    # --- role_mapping ---
-
-    def test_role_mapping_returns_admin_for_role_3(self):
-        use_case = ProjectPermissionCreationUseCase(config={"role": 3})
-        self.assertEqual(use_case.role_mapping(), 1)
-
-    def test_role_mapping_returns_attendant_for_other_roles(self):
-        for role in [0, 1, 2, 4, 5]:
-            use_case = ProjectPermissionCreationUseCase(config={"role": role})
-            self.assertEqual(use_case.role_mapping(), 2, f"Expected 2 for role={role}")
+    def test_create_permission_stores_connect_role(self):
+        for role in (0, 1, 2, 3, 4, 5, 6):
+            email = f"role{role}@example.com"
+            use_case = ProjectPermissionCreationUseCase(
+                config={"project": str(self.project.uuid), "role": role}
+            )
+            use_case.create_permission(self._make_dto(user=email, role=role))
+            permission = ProjectPermission.all_objects.get(
+                project=self.project, user__email=email
+            )
+            self.assertEqual(permission.role, role)
 
     # --- get_project ---
 
@@ -111,7 +112,7 @@ class TestProjectPermissionCreationUseCase(TestCase):
         permission = ProjectPermission.all_objects.get(
             project=self.project, user=self.user
         )
-        self.assertEqual(permission.role, ProjectPermission.ROLE_ADMIN)
+        self.assertEqual(permission.role, ProjectPermission.ROLE_MODERATOR)
 
     def test_create_permission_reactivates_soft_deleted_permission(self):
         """When a soft-deleted permission exists for the same user+project,
@@ -151,7 +152,7 @@ class TestProjectPermissionCreationUseCase(TestCase):
             project=self.project, user=self.user
         )
         self.assertEqual(perms.count(), 1)
-        self.assertEqual(perms.first().role, ProjectPermission.ROLE_ATTENDANT)
+        self.assertEqual(perms.first().role, ProjectPermission.ROLE_CONTRIBUTOR)
 
     def test_create_permission_is_not_soft_deleted(self):
         dto = self._make_dto()

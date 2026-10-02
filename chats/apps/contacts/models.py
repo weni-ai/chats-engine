@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chats.apps.projects.models import ProjectPermission
 from chats.core.models import BaseModel
 
 Q = models.Q
@@ -23,9 +24,7 @@ class Contact(BaseModel):
     email = models.EmailField(
         _("email"), unique=False, help_text=_("Contact email"), blank=True, null=True
     )
-    document = models.CharField(
-        _("document"), max_length=50, blank=True, null=True
-    )
+    document = models.CharField(_("document"), max_length=50, blank=True, null=True)
     status = models.CharField(_("status"), max_length=30, blank=True)
     phone = models.CharField(_("phone"), max_length=30, blank=True)
 
@@ -142,7 +141,9 @@ class Contact(BaseModel):
         is_sector_manager = Q(queue__sector__authorizations__permission__user=user)
         is_project_admin = Q(
             Q(queue__sector__project__permissions__user=user)
-            & Q(queue__sector__project__permissions__role=1)
+            & Q(
+                queue__sector__project__permissions__role__in=ProjectPermission.ADMIN_ROLES
+            )
         )
         is_user_assigned_to_room = Q(user=user)
         check_admin_manager_agent_role_filter = Q(

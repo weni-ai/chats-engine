@@ -212,9 +212,15 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def external_token(self):
         try:
-            return self.permissions(manager="auth").get_or_create(user=None, role=1)[0]
+            return self.permissions(manager="auth").get_or_create(
+                user=None, role=ProjectPermission.ROLE_MODERATOR
+            )[0]
         except MultipleObjectsReturned:
-            return self.permissions(manager="auth").filter(user=None, role=1).first()
+            return (
+                self.permissions(manager="auth")
+                .filter(user=None, role=ProjectPermission.ROLE_MODERATOR)
+                .first()
+            )
 
     def add_contact_to_history_blocklist(self, contact_external_id: str):
         config = self.config or {}
@@ -266,7 +272,7 @@ class Project(BaseConfigurableModel, BaseModel):
 
     @property
     def admin_permissions(self):
-        return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
+        return self.permissions.filter(role__in=ProjectPermission.ADMIN_ROLES)
 
     @property
     def random_admin(self):
@@ -276,7 +282,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def admins(self):
         return User.objects.filter(
             project_permissions__project=self,
-            project_permissions__role=1,
+            project_permissions__role__in=ProjectPermission.ADMIN_ROLES,
             project_permissions__is_deleted=False,
         )
 
@@ -284,7 +290,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def online_admins(self):
         return User.objects.filter(
             project_permissions__project=self,
-            project_permissions__role=1,
+            project_permissions__role__in=ProjectPermission.ADMIN_ROLES,
             project_permissions__status="ONLINE",
             project_permissions__is_deleted=False,
         )
@@ -296,10 +302,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
         sectors = self.sectors.all()
-        if (
-            user_permission is not None
-            and user_permission.role == ProjectPermission.ROLE_ADMIN
-        ):  # Admin role
+        if user_permission is not None and user_permission.is_admin:  # Admin role
             return sectors
         sector_auth_filter = Q(authorizations__permission=user_permission)
         queue_auth_filter = Q(queues__authorizations__permission=user_permission)
@@ -322,7 +325,7 @@ class Project(BaseConfigurableModel, BaseModel):
 
     def is_admin(self, user):
         return self.permissions.filter(
-            user=user, role=ProjectPermission.ROLE_ADMIN
+            user=user, role__in=ProjectPermission.ADMIN_ROLES
         ).exists()
 
     @property
@@ -342,14 +345,39 @@ class Project(BaseConfigurableModel, BaseModel):
 
 
 class ProjectPermission(BaseSoftDeleteModel, BaseModel):
+    # Same integers as Connect ProjectRole.
     ROLE_NOT_SETTED = 0
-    ROLE_ADMIN = 1
-    ROLE_ATTENDANT = 2
+    ROLE_VIEWER = 1
+    ROLE_CONTRIBUTOR = 2
+    ROLE_MODERATOR = 3
+    ROLE_SUPPORT = 4
+    ROLE_CHAT_USER = 5
+    ROLE_MARKETING = 6
+
+    # Desk admin is whoever can write the project in Connect.
+    ROLE_ADMIN = ROLE_MODERATOR
+    # Desk attendant is the Connect chat user.
+    ROLE_ATTENDANT = ROLE_CHAT_USER
+
+    ADMIN_ROLES = (ROLE_MODERATOR, ROLE_SUPPORT, ROLE_MARKETING)
+    CONTRIBUTE_ROLES = (ROLE_CONTRIBUTOR, ROLE_MODERATOR, ROLE_SUPPORT, ROLE_MARKETING)
+    READ_ROLES = (
+        ROLE_VIEWER,
+        ROLE_CONTRIBUTOR,
+        ROLE_MODERATOR,
+        ROLE_SUPPORT,
+        ROLE_CHAT_USER,
+        ROLE_MARKETING,
+    )
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_ADMIN, _("admin")),
-        (ROLE_ATTENDANT, _("Representative")),
+        (ROLE_VIEWER, _("viewer")),
+        (ROLE_CONTRIBUTOR, _("contributor")),
+        (ROLE_MODERATOR, _("moderator")),
+        (ROLE_SUPPORT, _("support")),
+        (ROLE_CHAT_USER, _("chat user")),
+        (ROLE_MARKETING, _("marketing")),
     ]
 
     STATUS_ONLINE = "ONLINE"
@@ -425,7 +453,7 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
 
     def get_sectors(self, custom_filters: dict = {}):
         sectors = self.project.sectors.all()
-        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+        if self.is_admin:
             return sectors
         sector_auth_filter = Q(authorizations__permission=self)
         queue_auth_filter = Q(queues__authorizations__permission=self)
@@ -444,7 +472,7 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
 
     def manager_sectors(self, custom_filters: dict = {}):
         sectors = self.project.sectors.all()
-        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+        if self.is_admin:
             return sectors
         sector_auth_filter = Q(authorizations__permission=self)
         return sectors.filter(sector_auth_filter).distinct()
@@ -454,8 +482,24 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
         return self.role == self.ROLE_USER
 
     @property
+    def can_read(self):
+        return self.role in self.READ_ROLES
+
+    @property
+    def can_contribute(self):
+        return self.role in self.CONTRIBUTE_ROLES
+
+    @property
+    def can_write(self):
+        return self.role in self.ADMIN_ROLES
+
+    @property
     def is_admin(self):
-        return self.role == self.ROLE_ADMIN
+        return self.can_write
+
+    @property
+    def is_chat_user(self):
+        return self.role == self.ROLE_CHAT_USER
 
     def is_manager(
         self, sector: str = None, queue: str = None, any_sector: bool = False
@@ -535,7 +579,7 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
 
     @property
     def rooms_limit(self):
-        if self.role == self.ROLE_ATTENDANT:
+        if self.is_chat_user:
             limits = (
                 self.queue_authorizations.all()
                 .distinct("queue__sector")

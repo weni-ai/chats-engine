@@ -29,7 +29,9 @@ class GroupSectorAuthorizationUseCaseTests(APITestCase):
 
         # Create project permission
         self.project_permission = ProjectPermission.objects.get(
-            project=self.project, user=self.manager_user, role=1  # 1 = Manager role
+            project=self.project,
+            user=self.manager_user,
+            role=ProjectPermission.ROLE_MODERATOR,
         )
 
         # Create queues

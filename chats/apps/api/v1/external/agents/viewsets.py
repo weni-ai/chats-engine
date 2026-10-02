@@ -3,7 +3,8 @@ from datetime import date
 from django.db.models import OuterRef, Subquery
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status as http_status, viewsets
+from rest_framework import status as http_status
+from rest_framework import viewsets
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -94,8 +95,8 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
             ProjectPermission.objects.filter(
                 project__uuid=project_uuid,
                 role__in=[
-                    ProjectPermission.ROLE_ADMIN,
-                    ProjectPermission.ROLE_ATTENDANT,
+                    *ProjectPermission.ADMIN_ROLES,
+                    ProjectPermission.ROLE_CHAT_USER,
                 ],
             )
             .select_related("user")
@@ -128,7 +129,9 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
         agent_emails = list(queryset.values_list("user__email", flat=True))
 
         status_log_map, online_time_map = build_agent_log_maps(
-            request.auth.project, start_date, end_date,
+            request.auth.project,
+            start_date,
+            end_date,
             agent_emails=agent_emails,
         )
 

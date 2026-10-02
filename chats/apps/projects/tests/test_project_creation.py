@@ -84,7 +84,7 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(project.config, {})
 
         permission = ProjectPermission.objects.get(project=project, user=self.user)
-        self.assertEqual(permission.role, 1)
+        self.assertEqual(permission.role, ProjectPermission.ROLE_MODERATOR)
 
         self.sector_setup_handler.setup_sectors_in_project.assert_not_called()
 
@@ -230,7 +230,7 @@ class TestProjectCreationUsecase(TestCase):
         This test verifies that:
         1. The creator permission is created correctly
         2. Additional permissions are created based on the authorizations in the DTO
-        3. Role 3 is converted to admin role (1)
+        3. Connect roles from the DTO are stored as-is
         """
         users = self._create_test_users(2)
         user2_email = users[0].email
@@ -252,13 +252,13 @@ class TestProjectCreationUsecase(TestCase):
         creator_permission = ProjectPermission.objects.get(
             project=project, user=self.user
         )
-        self.assertEqual(creator_permission.role, 1)
+        self.assertEqual(creator_permission.role, ProjectPermission.ROLE_MODERATOR)
 
         user2_permission = ProjectPermission.objects.get(project=project, user=users[0])
-        self.assertEqual(user2_permission.role, 2)
+        self.assertEqual(user2_permission.role, ProjectPermission.ROLE_CONTRIBUTOR)
 
         user3_permission = ProjectPermission.objects.get(project=project, user=users[1])
-        self.assertEqual(user3_permission.role, 1)
+        self.assertEqual(user3_permission.role, ProjectPermission.ROLE_MODERATOR)
 
     def test_config_its_principal_method(self):
         """
@@ -331,7 +331,7 @@ class TestProjectCreationUsecase(TestCase):
         the use case should find it via all_objects instead of raising IntegrityError.
         """
         project, soft_perm = self._setup_project_with_soft_deleted_permission(
-            user=self.user, role=1
+            user=self.user, role=ProjectPermission.ROLE_MODERATOR
         )
         project_dto = self._create_base_project_dto(uuid=str(project.uuid))
 
@@ -347,7 +347,7 @@ class TestProjectCreationUsecase(TestCase):
             self.use_case.create_project(project_dto)
 
         creator_perms = ProjectPermission.all_objects.filter(
-            user=self.user, project=project, role=1
+            user=self.user, project=project, role=ProjectPermission.ROLE_MODERATOR
         )
         self.assertEqual(creator_perms.count(), 1)
         self.assertEqual(creator_perms.first().uuid, soft_perm.uuid)

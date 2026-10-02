@@ -328,7 +328,7 @@ class HasDashboardAccess(permissions.BasePermission):
         try:
             project_permission = obj.permissions.get(user=request.user)
             if (
-                project_permission.role == 1
+                project_permission.is_admin
                 or project_permission.sector_authorizations.exists()
             ):
                 return True
