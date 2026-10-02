@@ -24,6 +24,7 @@ MOCK_FLOW_START_RESPONSE = {
     "uuid": "ext-flow-start-uuid",
     "flow": {"name": "Test Flow", "uuid": "flow-uuid-001"},
 }
+DEFAULT_ROOM_AGE_DAYS = 2
 
 
 @patch("chats.apps.projects.usecases.start_flow.FlowRESTClient")
@@ -60,7 +61,9 @@ class OutOffWhatsappStartFlowTests(APITestCase):
     def _contact(self, name, external_id):
         return Contact.objects.create(name=name, external_id=external_id)
 
-    def _room(self, contact, urn, queue=None, days_old=2, user=None):
+    def _room(
+        self, contact, urn, queue=None, days_old=DEFAULT_ROOM_AGE_DAYS, user=None
+    ):
         room = Room.objects.create(
             queue=queue or self.queue,
             contact=contact,
