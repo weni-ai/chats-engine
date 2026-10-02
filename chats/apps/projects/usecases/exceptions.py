@@ -38,5 +38,9 @@ class StartFlowPermissionError(Exception):
     pass
 
 
+class ActiveFlowStartError(Exception):
+    pass
+
+
 class NoContactsToStartFlowError(Exception):
     pass
