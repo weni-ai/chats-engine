@@ -8,6 +8,8 @@ from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
+WHATSAPP_RESPONSE_WINDOW_DAYS = 1
+
 
 class InvalidOutOffWindowFilter(Exception):
     pass
@@ -31,7 +33,7 @@ def _parse_uuids(values, field_name):
 
 def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=None):
     """Rooms outside the WhatsApp 24h window, and the contacts that own them."""
-    cutoff = timezone.now() - timedelta(days=1)
+    cutoff = timezone.now() - timedelta(days=WHATSAPP_RESPONSE_WINDOW_DAYS)
     recent_contact_message = Message.objects.filter(
         room_id=OuterRef("pk"),
         contact_id=OuterRef("contact_id"),
@@ -62,6 +64,7 @@ def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=
     contacts = (
         Contact.objects.filter(pk__in=rooms.values("contact_id"))
         .exclude(Q(external_id__isnull=True) | Q(external_id=""))
+        .only("pk", "external_id", "name")
         .order_by("name", "uuid")
         .distinct()
     )
