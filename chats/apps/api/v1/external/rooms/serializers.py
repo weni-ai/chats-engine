@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -421,7 +422,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact, created = self.update_or_create_contact(validated_data)
 
-        room = get_active_room_flow_start(contact, flow_uuid, project)
+        flow_start_project = self._get_flow_start_project(sector, project)
+
+        room = get_active_room_flow_start(contact, flow_uuid, flow_start_project)
 
         if room is not None:
             update_fields = []
@@ -453,7 +456,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         user = validated_data.get("user")
 
-        last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
+        last_flow_start = get_last_flow_start(
+            contact, groups, flow_start_project, flow_uuid
+        )
 
         validated_data["user"] = ResolveRoomUserUseCase(queue, project).execute(
             contact, user, created, last_flow_start
@@ -498,6 +503,25 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if history_data:
             self.process_message_history(room, history_data)
         return room
+
+    def _get_flow_start_project(self, sector, project):
+        """
+        Flow starts for a sector tied to another project live on that project.
+        The room itself stays on ``project``.
+        """
+        secondary_project = sector.secondary_project
+        if isinstance(secondary_project, dict):
+            secondary_project_uuid = secondary_project.get("uuid")
+        else:
+            secondary_project_uuid = secondary_project
+
+        if not secondary_project_uuid:
+            return project
+
+        try:
+            return Project.objects.get(uuid=secondary_project_uuid)
+        except (Project.DoesNotExist, DjangoValidationError, ValueError, TypeError):
+            return project
 
     def validate_unique_active_project(self, contact, project):
         queryset = Room.objects.filter(
