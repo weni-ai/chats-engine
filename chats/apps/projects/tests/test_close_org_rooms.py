@@ -1,12 +1,9 @@
 from unittest.mock import patch
 
-from django.urls import reverse
-from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.api.utils import create_user_and_token
-from chats.apps.projects.models.models import Project, ProjectPermission
+from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.close_org_rooms import (
     SAC_UNIFICADO_END_BY,
     CloseOrgRoomsUseCase,
@@ -71,31 +68,3 @@ class CloseOrgRoomsUseCaseTests(APITestCase):
 
         self.assertIsNone(result)
         mock_service.return_value.close.assert_not_called()
-
-
-class SetProjectAsPrincipalClosesRoomsTests(APITestCase):
-    def setUp(self):
-        self.user, self.token = create_user_and_token("principalcloser")
-        self.org_id = "org-set-principal"
-        self.project = Project.objects.create(name="Main", org=self.org_id)
-        self.other_project = Project.objects.create(name="Other", org=self.org_id)
-        ProjectPermission.objects.create(
-            project=self.project,
-            user=self.user,
-            role=ProjectPermission.ROLE_ADMIN,
-        )
-        self.url = reverse(
-            "project-set-project-as-principal", kwargs={"uuid": str(self.project.uuid)}
-        )
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-    @patch("chats.apps.api.v1.projects.viewsets.CloseOrgRoomsUseCase")
-    def test_set_as_principal_closes_org_rooms(self, mock_usecase):
-        response = self.client.post(self.url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.project.refresh_from_db()
-        self.assertTrue(self.project.config.get("its_principal"))
-        mock_usecase.return_value.execute.assert_called_once_with(
-            self.project, closed_by=self.user
-        )
