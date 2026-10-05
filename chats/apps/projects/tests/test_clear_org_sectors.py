@@ -13,6 +13,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 10
+
 
 class ClearOrgSectorsUseCaseTests(APITestCase):
     def setUp(self):
@@ -39,7 +41,7 @@ class ClearOrgSectorsUseCaseTests(APITestCase):
         return Sector.objects.create(
             name=name,
             project=project,
-            rooms_limit=10,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
