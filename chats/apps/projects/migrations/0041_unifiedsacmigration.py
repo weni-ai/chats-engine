@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("projects", "0037_project_is_live_desk_copilot"),
+        ("projects", "0040_project_is_live_desk_copilot"),
     ]
 
     operations = [
