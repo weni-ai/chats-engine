@@ -52,9 +52,11 @@ from chats.apps.projects.models import (
     CustomStatusType,
     Project,
     ProjectPermission,
-    UnifiedSacMigration,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
+from chats.apps.projects.usecases.get_latest_unified_sac_migration import (
+    GetLatestUnifiedSacMigrationUseCase,
+)
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.start_unified_sac_migration import (
     StartUnifiedSacMigrationError,
@@ -611,11 +613,7 @@ class ProjectViewset(
     def unified_sac_migration_status(self, request, *args, **kwargs):
         """Return the latest Unified SAC migration status for this project's org."""
         project = self.get_object()
-        migration = (
-            UnifiedSacMigration.objects.filter(org=project.org)
-            .order_by("-created_on")
-            .first()
-        )
+        migration = GetLatestUnifiedSacMigrationUseCase().execute(org=project.org)
         if migration is None:
             return Response(
                 {"detail": "No Unified SAC migration for this organization."},
