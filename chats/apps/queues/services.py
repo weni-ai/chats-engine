@@ -10,9 +10,7 @@ from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.queues.models import LAST_SEEN_THRESHOLD_SECONDS
-from chats.apps.queues.usecases.can_agent_receive_room import (
-    CanAgentReceiveRoomUseCase,
-)
+from chats.apps.queues.usecases.can_agent_receive_room import CanAgentReceiveRoomUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +98,10 @@ class QueueRouterService:
                 "status": ProjectPermission.STATUS_ONLINE,
             }
 
-            # If ping timeout feature is enabled, also verify last_seen
-            if self.queue._is_ping_timeout_feature_enabled():
-                last_seen_threshold = timezone.now() - timedelta(
-                    seconds=LAST_SEEN_THRESHOLD_SECONDS
-                )
-                is_still_online_filter["last_seen__gte"] = last_seen_threshold
+            last_seen_threshold = timezone.now() - timedelta(
+                seconds=LAST_SEEN_THRESHOLD_SECONDS
+            )
+            is_still_online_filter["last_seen__gte"] = last_seen_threshold
 
             is_still_online = ProjectPermission.objects.filter(
                 **is_still_online_filter

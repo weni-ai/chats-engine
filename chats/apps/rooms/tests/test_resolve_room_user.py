@@ -2,6 +2,7 @@ from datetime import time
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -17,9 +18,7 @@ from chats.apps.rooms.models import Room
 from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.sectors.models import Sector
 
-GROWTHBOOK_PATCH = (
-    "chats.apps.queues.models.is_feature_active_for_attributes"
-)
+GROWTHBOOK_PATCH = "chats.apps.queues.models.is_feature_active_for_attributes"
 
 
 class ResolveRoomUserFlowStartTests(TestCase):
@@ -43,6 +42,7 @@ class ResolveRoomUserFlowStartTests(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
 
         self.flow_start = FlowStart.objects.create(
@@ -138,6 +138,7 @@ class ResolveRoomUserLinkedUserTests(TestCase):
             user=self.linked_agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         LinkContact.objects.create(
             user=self.linked_agent,
@@ -203,6 +204,7 @@ class ResolveRoomUserExplicitUserTests(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
 
         result = self.usecase.execute(
@@ -264,6 +266,7 @@ class ResolveRoomUserQueuePriorityTests(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         QueueAuthorization.objects.create(
             queue=self.queue,
@@ -362,9 +365,7 @@ class ResolveRoomUserQueuePriorityTests(TestCase):
         mock_routing.assert_not_called()
 
     @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
-    def test_queue_priority_non_empty_queue_returns_none(
-        self, mock_routing, _mock_gb
-    ):
+    def test_queue_priority_non_empty_queue_returns_none(self, mock_routing, _mock_gb):
         Room.objects.create(
             queue=self.queue,
             contact=Contact.objects.create(external_id="waiting-contact"),
@@ -407,6 +408,7 @@ class ResolveRoomUserGeneralRoutingTests(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         QueueAuthorization.objects.create(
             queue=self.queue,

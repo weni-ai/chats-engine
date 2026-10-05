@@ -906,7 +906,9 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in the queue"))
+            raise serializers.ValidationError(
+                _("No available rooms found in the queue")
+            )
         attrs["rooms"] = rooms
         return super().validate(attrs)
 

@@ -10,7 +10,6 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.prometheus.metrics import (
     ws_active_connections,
@@ -19,13 +18,13 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.msgs.exceptions import MessageCreateError
 from chats.apps.msgs.usecases.create_agent_message import (
     CreateAgentMessageUseCase,
     SerializeMessageForWsUseCase,
-)
-from chats.apps.history.filters.rooms_filter import (
-    get_history_rooms_queryset_by_contact,
 )
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
@@ -101,13 +100,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 self.last_ping = timezone.now()
                 self._last_seen_updated_at = None  # Force first update
 
-                # Start background task to monitor ping timeout if feature is enabled
-                if await self.is_ping_timeout_feature_enabled():
-                    # Update last_seen immediately on connect
-                    await self.maybe_update_last_seen()
-                    self.ping_timeout_task = asyncio.create_task(
-                        self.ping_timeout_checker()
-                    )
+                await self.maybe_update_last_seen()
+                self.ping_timeout_task = asyncio.create_task(
+                    self.ping_timeout_checker()
+                )
 
     async def disconnect(self, *args, **kwargs):
         # Cancel the ping timeout checker task
@@ -221,8 +217,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await command(payload.get("content", {}))
         elif command_name == "ping":
             self.last_ping = timezone.now()
-            if await self.is_ping_timeout_feature_enabled():
-                await self.maybe_update_last_seen()
+            await self.maybe_update_last_seen()
             await self.send_json({"type": "pong"})
 
     # METHODS
@@ -536,15 +531,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 InServiceStatusService.room_closed(self.user, permission.project)
         except ProjectPermission.DoesNotExist:
             pass
-
-    @database_sync_to_async
-    def is_ping_timeout_feature_enabled(self) -> bool:
-        if not self.permission:
-            return False
-        return is_feature_active_for_attributes(
-            settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-            {"projectUUID": str(self.permission.project.uuid)},
-        )
 
     async def ping_timeout_checker(self):
         """

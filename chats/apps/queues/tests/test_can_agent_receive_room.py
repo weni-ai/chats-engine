@@ -2,6 +2,7 @@ from datetime import time
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import (
@@ -49,6 +50,7 @@ class CanAgentReceiveRoomUseCaseTestCase(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         QueueAuthorization.objects.create(
             queue=self.queue,
@@ -198,6 +200,7 @@ class CanAgentReceiveRoomUseCaseCustomLimitTestCase(TestCase):
             user=self.agent,
             role=ProjectPermission.ROLE_ATTENDANT,
             status="ONLINE",
+            last_seen=timezone.now(),
         )
         QueueAuthorization.objects.create(
             queue=self.queue,
