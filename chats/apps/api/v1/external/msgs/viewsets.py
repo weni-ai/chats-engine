@@ -86,20 +86,15 @@ class MessageFlowViewset(
             return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
-    @api_gateway_expose(
-        alias="v1/room-messages",
-        methods=["GET"],
-        service=settings.KONG_SERVICE,
-    )
+    @api_gateway_expose(alias="room-messages")
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List messages filtered by room or other criteria."""
         return super().list(request, *args, **kwargs)
 
     @api_gateway_expose(
-        alias="v1/room-messages",
+        alias="room-messages",
         methods=["POST"],
-        service=settings.KONG_SERVICE,
     )
     @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):

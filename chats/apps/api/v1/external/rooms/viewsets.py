@@ -655,10 +655,7 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     @property
     def authentication_classes(self):
-        classes = [ProjectAdminAuthentication]
-        if SessionTokenAuthentication not in classes:
-            classes.insert(0, SessionTokenAuthentication)
-        return classes
+        return [SessionTokenAuthentication, ProjectAdminAuthentication]
 
     def get_queryset(self):
         return (
@@ -667,20 +664,12 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .filter(queue__sector__project=self.request.auth.project)
         )
 
-    @api_gateway_expose(
-        alias="v1/rooms",
-        methods=["GET"],
-        service=settings.KONG_SERVICE,
-    )
+    @api_gateway_expose(alias="rooms")
     def list(self, request, *args, **kwargs):
         """List rooms with limit/offset pagination (default=10, max=100)."""
         return super().list(request, *args, **kwargs)
 
-    @api_gateway_expose(
-        alias="v1/rooms/{uuid}",
-        methods=["GET"],
-        service=settings.KONG_SERVICE,
-    )
+    @api_gateway_expose(alias="rooms/{uuid}")
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)
