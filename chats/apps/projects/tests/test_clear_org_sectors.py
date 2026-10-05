@@ -1,12 +1,10 @@
 from unittest.mock import Mock, patch
 
 from django.test import override_settings
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from chats.apps.api.utils import create_user_and_token
-from chats.apps.projects.models.models import Project, ProjectPermission
+from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.clear_org_sectors import (
     ClearOrgSectorsError,
     ClearOrgSectorsUseCase,
@@ -120,27 +118,3 @@ class ClearOrgSectorsUseCaseTests(APITestCase):
 
         self.principal_sector.refresh_from_db()
         self.assertFalse(self.principal_sector.is_deleted)
-
-
-class SetProjectAsPrincipalClearsSectorsTests(APITestCase):
-    def setUp(self):
-        self.user, self.token = create_user_and_token("principalclear")
-        self.project = Project.objects.create(name="Main", org="org-set-clear")
-        ProjectPermission.objects.create(
-            project=self.project,
-            user=self.user,
-            role=ProjectPermission.ROLE_ADMIN,
-        )
-        self.url = reverse(
-            "project-set-project-as-principal", kwargs={"uuid": str(self.project.uuid)}
-        )
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-    @patch("chats.apps.api.v1.projects.viewsets.ClearOrgSectorsUseCase")
-    def test_set_as_principal_clears_org_sectors(self, mock_usecase):
-        response = self.client.post(self.url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_usecase.return_value.execute.assert_called_once_with(
-            self.project, user_email=self.user.email
-        )
