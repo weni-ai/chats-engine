@@ -81,6 +81,25 @@ class ProjectAnyPermission(permissions.BasePermission):
             return obj.get_permission(request.user)
 
 
+class UnifiedSacInternalOrProjectPermission(permissions.BasePermission):
+    """Allow the internal client on Unified SAC actions, otherwise project membership."""
+
+    internal_actions = {
+        "set_project_as_principal",
+        "start_unified_sac_migration",
+        "unified_sac_migration_status",
+    }
+
+    def has_object_permission(self, request, view, obj) -> bool:
+        if getattr(
+            view, "action", None
+        ) in self.internal_actions and request.user.has_perm(
+            "accounts.can_communicate_internally"
+        ):
+            return True
+        return ProjectAnyPermission().has_object_permission(request, view, obj)
+
+
 class HasObjectProjectPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         project = getattr(obj, "project", None)

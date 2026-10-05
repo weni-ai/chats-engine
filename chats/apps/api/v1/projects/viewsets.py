@@ -27,6 +27,7 @@ from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsSectorManager,
     ProjectAnyPermission,
+    UnifiedSacInternalOrProjectPermission,
 )
 from chats.apps.api.v1.projects.filters import (
     CustomStatusTypeFilterSet,
@@ -88,22 +89,9 @@ class ProjectViewset(
     serializer_class = ProjectSerializer
     permission_classes = [
         IsAuthenticated,
-        ProjectAnyPermission,
+        UnifiedSacInternalOrProjectPermission,
     ]
     lookup_field = "uuid"
-    unified_sac_internal_actions = {
-        "set_project_as_principal",
-        "start_unified_sac_migration",
-        "unified_sac_migration_status",
-    }
-
-    def get_permissions(self):
-        if (
-            self.action in self.unified_sac_internal_actions
-            and self.request.user.has_perm("accounts.can_communicate_internally")
-        ):
-            return [IsAuthenticated()]
-        return [permission() for permission in self.permission_classes]
 
     def get_queryset(self):
         # Allow all projects for internal communication users
