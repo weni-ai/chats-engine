@@ -7,6 +7,8 @@ from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import (
     SectorInactivityTimeoutSerializer,
+    SectorReadOnlyListSerializer,
+    SectorReadOnlyRetrieveSerializer,
     SectorSerializer,
     SectorUpdateSerializer,
     validate_custom_csat_flow_uuid,
@@ -305,9 +307,7 @@ class TestSectorSerializerInactivityTimeout(TestCase):
         serializer.save()
 
         self.sector.refresh_from_db()
-        self.assertEqual(
-            self.sector.inactivity_timeout, payload["inactivity_timeout"]
-        )
+        self.assertEqual(self.sector.inactivity_timeout, payload["inactivity_timeout"])
 
     def test_update_with_invalid_payload_raises(self):
         payload = {
@@ -435,3 +435,99 @@ class TestValidateCustomCsatFlowUuid(TestCase):
             settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
             {"projectUUID": str(self.project.uuid)},
         )
+
+
+class TestSectorSecondaryProjectPreservation(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project", timezone="America/Sao_Paulo"
+        )
+        self.secondary_uuid = str(uuid.uuid4())
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+            secondary_project={"uuid": self.secondary_uuid},
+            config={
+                "existing_field": "keep-me",
+                "secondary_project": {"uuid": self.secondary_uuid},
+            },
+        )
+
+    def _update(self, payload):
+        serializer = SectorUpdateSerializer(
+            instance=self.sector, data=payload, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        self.sector.refresh_from_db()
+
+    def test_null_inside_config_keeps_stored_uuid(self):
+        self._update(
+            {"config": {"secondary_project": None, "existing_field": "updated"}}
+        )
+
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+        self.assertEqual(
+            self.sector.config["secondary_project"], {"uuid": self.secondary_uuid}
+        )
+        self.assertEqual(self.sector.config["existing_field"], "updated")
+
+    def test_null_top_level_keeps_stored_uuid(self):
+        self._update({"name": "Renamed", "secondary_project": None})
+
+        self.assertEqual(self.sector.name, "Renamed")
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+
+    def test_empty_values_do_not_replace_stored_uuid(self):
+        self._update({"config": {"secondary_project": ""}})
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+
+        self._update({"config": {"secondary_project": {}}})
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+
+        self._update({"config": {"secondary_project": {"uuid": "  "}}})
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+
+    def test_string_uuid_inside_config_is_stored(self):
+        new_uuid = str(uuid.uuid4())
+        self._update({"config": {"secondary_project": new_uuid}})
+
+        self.assertEqual(self.sector.secondary_project, {"uuid": new_uuid})
+        self.assertEqual(self.sector.config["secondary_project"], {"uuid": new_uuid})
+
+    def test_dict_uuid_replaces_stored_value(self):
+        new_uuid = str(uuid.uuid4())
+        self._update({"secondary_project": {"uuid": new_uuid}})
+
+        self.assertEqual(self.sector.secondary_project, {"uuid": new_uuid})
+
+    def test_unrelated_update_keeps_stored_uuid(self):
+        self._update({"rooms_limit": 9})
+
+        self.assertEqual(self.sector.rooms_limit, 9)
+        self.assertEqual(self.sector.secondary_project, {"uuid": self.secondary_uuid})
+
+    def test_create_stores_uuid_sent_inside_config(self):
+        new_uuid = str(uuid.uuid4())
+        serializer = SectorSerializer(
+            data={
+                "name": "Created Sector",
+                "project": str(self.project.uuid),
+                "rooms_limit": 3,
+                "config": {"secondary_project": new_uuid},
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sector = serializer.save()
+
+        self.assertEqual(sector.secondary_project, {"uuid": new_uuid})
+
+    def test_retrieve_and_list_include_secondary_project(self):
+        retrieve = SectorReadOnlyRetrieveSerializer(self.sector).data
+        listed = SectorReadOnlyListSerializer(self.sector).data
+
+        self.assertEqual(retrieve["secondary_project"], {"uuid": self.secondary_uuid})
+        self.assertEqual(listed["secondary_project"], {"uuid": self.secondary_uuid})

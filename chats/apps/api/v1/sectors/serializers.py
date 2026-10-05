@@ -31,6 +31,47 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
     return data
 
 
+def _secondary_project_payload(value):
+    """
+    Return {"uuid": "..."} when value carries a secondary project UUID.
+    Empty values return None so an update does not clear a stored UUID.
+    """
+    if isinstance(value, str):
+        value = value.strip()
+        return {"uuid": value} if value else None
+    if isinstance(value, dict):
+        uuid_value = value.get("uuid")
+        if isinstance(uuid_value, str):
+            uuid_value = uuid_value.strip()
+        if uuid_value:
+            return {"uuid": str(uuid_value)}
+    return None
+
+
+def _keep_secondary_project(attrs: dict) -> None:
+    """
+    Copy a real secondary project UUID onto the column.
+    Null, blank and empty objects are dropped so a sector edit does not
+    overwrite the UUID already stored.
+    """
+    config = attrs.get("config")
+    if isinstance(config, dict) and "secondary_project" in config:
+        normalized = _secondary_project_payload(config.get("secondary_project"))
+        if normalized is None:
+            config.pop("secondary_project", None)
+        else:
+            config["secondary_project"] = normalized
+    elif "secondary_project" in attrs:
+        normalized = _secondary_project_payload(attrs.get("secondary_project"))
+    else:
+        return
+
+    if normalized is None:
+        attrs.pop("secondary_project", None)
+    else:
+        attrs["secondary_project"] = normalized
+
+
 def validate_custom_csat_flow_uuid(project: Project, value, current_value=None):
     """
     Validate if the custom CSAT flow feature is enabled for the sector.
@@ -245,13 +286,7 @@ class SectorSerializer(AuditableModelSerializer):
                 ),
             )
 
-        config = data.get("config", {})
-        if "secondary_project" in config:
-            secondary_project_value = config.get("secondary_project")
-            if isinstance(secondary_project_value, str):
-                data["secondary_project"] = {"uuid": secondary_project_value}
-            else:
-                data["secondary_project"] = secondary_project_value
+        _keep_secondary_project(data)
 
         return data
 
@@ -265,13 +300,21 @@ class SectorSerializer(AuditableModelSerializer):
                 # For now, tags are created after the sector is created
                 # This may change in the future
                 raise serializers.ValidationError(
-                    [_("The department must have at least one tag before tags can be required")],
+                    [
+                        _(
+                            "The department must have at least one tag before tags can be required"
+                        )
+                    ],
                     code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
             if not self.instance.tags.exists():
                 raise serializers.ValidationError(
-                    [_("The department must have at least one tag before tags can be required")],
+                    [
+                        _(
+                            "The department must have at least one tag before tags can be required"
+                        )
+                    ],
                     code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
@@ -384,13 +427,7 @@ class SectorUpdateSerializer(AuditableModelSerializer):
                 current_value=self.instance.custom_csat_flow_uuid,
             )
 
-        config = attrs.get("config", {})
-        if "secondary_project" in config:
-            secondary_project_value = config.get("secondary_project")
-            if isinstance(secondary_project_value, str):
-                attrs["secondary_project"] = {"uuid": secondary_project_value}
-            else:
-                attrs["secondary_project"] = secondary_project_value
+        _keep_secondary_project(attrs)
 
         return attrs
 
@@ -400,7 +437,11 @@ class SectorUpdateSerializer(AuditableModelSerializer):
         """
         if value is True and not self.instance.tags.exists():
             raise serializers.ValidationError(
-                [_("The department must have at least one tag before tags can be required")],
+                [
+                    _(
+                        "The department must have at least one tag before tags can be required"
+                    )
+                ],
                 code="sector_must_have_at_least_one_tag_to_require_tags",
             )
 
@@ -442,6 +483,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
         ]
 
     def get_agents(self, sector: Sector):
@@ -485,6 +527,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
             "custom_csat_flow_uuid",
         ]
 
@@ -662,7 +705,11 @@ class SectorHolidaySerializer(AuditableModelSerializer):
         if day_type == SectorHoliday.CLOSED:
             if start_time is not None or end_time is not None:
                 raise serializers.ValidationError(
-                    {"detail": _("Non-working days shouldn't have a start_time or end_time")}
+                    {
+                        "detail": _(
+                            "Non-working days shouldn't have a start_time or end_time"
+                        )
+                    }
                 )
 
         elif day_type == SectorHoliday.CUSTOM_HOURS:
