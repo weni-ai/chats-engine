@@ -96,13 +96,7 @@ class WorkingHoursValidator:
                 return None
             return json.loads(cached_result)
 
-        from chats.apps.sectors.models import SectorHoliday
-
-        holiday = (
-            SectorHoliday.objects.filter(sector__uuid=sector_uuid, is_deleted=False)
-            .filter(Q(date=date) | Q(date__lte=date, date_end__gte=date))
-            .first()
-        )
+        holiday = self._find_sector_holiday(sector_uuid, date)
 
         if holiday:
             holiday_data = {
@@ -120,6 +114,42 @@ class WorkingHoursValidator:
         else:
             cache_client.set(cache_key, "null", ex=300)
             return None
+
+    def _find_sector_holiday(self, sector_uuid, date):
+        """
+        One-off holidays match the full date or range.
+        Annual holidays (repeat=True) match month and day only; a one-off wins.
+        """
+        from chats.apps.sectors.models import SectorHoliday
+
+        holidays = SectorHoliday.objects.filter(
+            sector__uuid=sector_uuid, is_deleted=False
+        )
+        one_off = (
+            holidays.filter(repeat=False)
+            .filter(Q(date=date) | Q(date__lte=date, date_end__gte=date))
+            .first()
+        )
+        if one_off is not None:
+            return one_off
+
+        for holiday in holidays.filter(repeat=True):
+            if self._repeating_holiday_matches(holiday, date):
+                return holiday
+        return None
+
+    @staticmethod
+    def _repeating_holiday_matches(holiday, current_date):
+        start_md = (holiday.date.month, holiday.date.day)
+        current_md = (current_date.month, current_date.day)
+        end = holiday.date_end
+        if end is None or end == holiday.date:
+            return current_md == start_md
+
+        end_md = (end.month, end.day)
+        if end_md < start_md:
+            return current_md >= start_md or current_md <= end_md
+        return start_md <= current_md <= end_md
 
     def _check_static_holidays_fast(
         self, working_hours_config, current_date, current_time, created_on

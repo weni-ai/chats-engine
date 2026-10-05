@@ -79,9 +79,7 @@ class SectorAuthorizationSoftDeleteTestCase(TestCase):
             project=self.project,
             rooms_limit=5,
         )
-        self.manager = User.objects.create_user(
-            email="manager@test.com", password="pw"
-        )
+        self.manager = User.objects.create_user(email="manager@test.com", password="pw")
         self.manager_2 = User.objects.create_user(
             email="manager2@test.com", password="pw"
         )
@@ -104,22 +102,16 @@ class SectorAuthorizationSoftDeleteTestCase(TestCase):
 
     def test_authorizations_reverse_relation_excludes_soft_deleted(self):
         self.assertTrue(
-            self.sector.authorizations.filter(
-                permission__user=self.manager
-            ).exists()
+            self.sector.authorizations.filter(permission__user=self.manager).exists()
         )
 
         self.sector_auth.delete()
 
         self.assertFalse(
-            self.sector.authorizations.filter(
-                permission__user=self.manager
-            ).exists()
+            self.sector.authorizations.filter(permission__user=self.manager).exists()
         )
         self.assertTrue(
-            self.sector.authorizations.filter(
-                permission__user=self.manager_2
-            ).exists()
+            self.sector.authorizations.filter(permission__user=self.manager_2).exists()
         )
 
     def test_authorizations_manager_excludes_soft_deleted(self):
@@ -187,9 +179,7 @@ class SectorAuthorizationSoftDeleteTestCase(TestCase):
         )
 
         self.assertFalse(recreated.is_deleted)
-        self.assertTrue(
-            SectorAuthorization.objects.filter(pk=recreated.pk).exists()
-        )
+        self.assertTrue(SectorAuthorization.objects.filter(pk=recreated.pk).exists())
         self.assertTrue(
             SectorAuthorization.all_objects.filter(pk=self.sector_auth.pk).exists()
         )
@@ -589,6 +579,136 @@ class WorkingHoursValidatorHolidayTests(TestCase):
 
         self.assertIn(
             "Contact can't be done outside working hours",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_repeat_holiday_closed_blocks_same_month_day_in_another_year(
+        self, MockCacheClient
+    ):
+        """Annual closed holiday blocks the same month/day in a later year."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2024, 8, 8),
+            day_type=SectorHoliday.CLOSED,
+            repeat=True,
+            description="Annual closed day",
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(
+                self.sector, datetime(2025, 8, 8, 9, 0, 0)
+            )
+
+        self.assertIn(
+            "Contact can't be done because today is a holiday",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_non_repeat_holiday_does_not_block_same_month_day_next_year(
+        self, MockCacheClient
+    ):
+        """A one-off holiday does not block the same month/day in the next year."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2024, 8, 8),
+            day_type=SectorHoliday.CLOSED,
+            repeat=False,
+            description="One-off closed day",
+        )
+
+        self.validator.validate_working_hours(
+            self.sector, datetime(2025, 8, 8, 9, 0, 0)
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_repeat_holiday_custom_hours_window_in_another_year(self, MockCacheClient):
+        """Annual custom hours apply in a year other than the stored date."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2024, 8, 8),
+            day_type=SectorHoliday.CUSTOM_HOURS,
+            start_time=time(8, 0),
+            end_time=time(12, 0),
+            repeat=True,
+            description="Annual half day",
+        )
+
+        self.validator.validate_working_hours(
+            self.sector, datetime(2025, 8, 8, 9, 0, 0)
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(
+                self.sector, datetime(2025, 8, 8, 14, 0, 0)
+            )
+
+        self.assertIn(
+            "Contact can't be done outside working hours",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_repeat_holiday_month_day_interval(self, MockCacheClient):
+        """Annual date range blocks inside the month/day span and allows outside it."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2024, 8, 4),
+            date_end=date(2024, 8, 6),
+            day_type=SectorHoliday.CLOSED,
+            repeat=True,
+            description="Annual range",
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(
+                self.sector, datetime(2025, 8, 5, 9, 0, 0)
+            )
+
+        self.assertIn(
+            "Contact can't be done because today is a holiday",
+            str(cm.exception),
+        )
+
+        self.validator.validate_working_hours(
+            self.sector, datetime(2025, 8, 7, 9, 0, 0)
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_one_off_holiday_prevails_over_annual_on_same_month_day(
+        self, MockCacheClient
+    ):
+        """When a one-off and an annual holiday match, the one-off is used."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2024, 8, 8),
+            day_type=SectorHoliday.CUSTOM_HOURS,
+            start_time=time(8, 0),
+            end_time=time(17, 0),
+            repeat=True,
+            description="Annual custom hours",
+        )
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=date(2025, 8, 8),
+            day_type=SectorHoliday.CLOSED,
+            repeat=False,
+            description="One-off closed day",
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(
+                self.sector, datetime(2025, 8, 8, 9, 0, 0)
+            )
+
+        self.assertIn(
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
 
