@@ -31,7 +31,7 @@ class HumanSupportNexusSettingsView(APIView):
         try:
             data, status_code = service.get_settings(project_uuid)
         except Exception:
-            logger.exception("Failed to reach NEXUS API for project %s", project_uuid)
+            logger.info("Failed to reach NEXUS API for project %s", project_uuid)
             return Response(
                 {"error": "Failed to reach NEXUS API"},
                 status=status.HTTP_502_BAD_GATEWAY,
@@ -51,7 +51,7 @@ class HumanSupportNexusSettingsView(APIView):
                 project_uuid, serializer.validated_data
             )
         except Exception:
-            logger.exception("Failed to reach NEXUS API for project %s", project_uuid)
+            logger.info("Failed to reach NEXUS API for project %s", project_uuid)
             return Response(
                 {"error": "Failed to reach NEXUS API"},
                 status=status.HTTP_502_BAD_GATEWAY,

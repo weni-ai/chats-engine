@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.urls import reverse
 from django.utils import translation
@@ -243,7 +244,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_returns_400_when_use_case_raises_value_error(self, mock_use_case_cls):
+    def test_returns_500_when_use_case_raises_value_error(self, mock_use_case_cls):
         mock_use_case_cls.return_value.execute.side_effect = ValueError("prompt error")
 
         response = self._post(
@@ -253,7 +254,45 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
                 "project_uuid": str(self.project.uuid),
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(
+            response.data["detail"], "Error generating improved message"
+        )
+
+    def test_returns_502_when_bedrock_raises_client_error(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.side_effect = ClientError(
+            {
+                "Error": {
+                    "Code": "ServiceUnavailableException",
+                    "Message": "Bedrock unavailable",
+                }
+            },
+            "InvokeModel",
+        )
+
+        response = self._post(
+            {
+                "text": "hello wrold",
+                "type": "GRAMMAR_AND_SPELLING",
+                "project_uuid": str(self.project.uuid),
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(
+            response.data["detail"], "Error generating improved message"
+        )
+
+    def test_returns_500_when_use_case_raises_unexpected_error(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.side_effect = RuntimeError("boom")
+
+        response = self._post(
+            {
+                "text": "hello wrold",
+                "type": "GRAMMAR_AND_SPELLING",
+                "project_uuid": str(self.project.uuid),
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertEqual(
             response.data["detail"], "Error generating improved message"
         )
