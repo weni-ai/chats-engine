@@ -51,6 +51,9 @@ class StartUnifiedSacMigrationUseCase:
             self._fail(migration, error)
             raise StartUnifiedSacMigrationError(str(error)) from error
         except Exception as error:
+            logger.exception(
+                "Unexpected error during Unified SAC migration %s", migration.uuid
+            )
             self._fail(migration, error)
             raise
         return migration
