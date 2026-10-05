@@ -13,6 +13,7 @@ from chats.apps.projects.models import (
 )
 from chats.apps.projects.usecases.clear_org_sectors import ClearOrgSectorsError
 from chats.apps.projects.usecases.start_unified_sac_migration import (
+    StartUnifiedSacMigrationError,
     StartUnifiedSacMigrationUseCase,
 )
 
@@ -56,7 +57,7 @@ class StartUnifiedSacMigrationUseCaseTests(APITestCase):
     def test_execute_marks_failed_when_sectors_cannot_be_deleted(
         self, close_rooms, clear_sectors
     ):
-        with self.assertRaises(Exception):
+        with self.assertRaises(StartUnifiedSacMigrationError):
             StartUnifiedSacMigrationUseCase().execute(self.project, user=self.user)
 
         migration = UnifiedSacMigration.objects.get(org=self.org_id)
@@ -65,7 +66,7 @@ class StartUnifiedSacMigrationUseCaseTests(APITestCase):
 
     def test_execute_rejects_project_without_org(self):
         project = Project.objects.create(name="No org")
-        with self.assertRaises(Exception):
+        with self.assertRaises(StartUnifiedSacMigrationError):
             StartUnifiedSacMigrationUseCase().execute(project, user=self.user)
         self.assertFalse(UnifiedSacMigration.objects.exists())
 
