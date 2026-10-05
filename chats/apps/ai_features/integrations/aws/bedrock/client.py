@@ -72,6 +72,21 @@ class BedrockClient(BaseAIPlatformClient):
 
             return self.get_text_from_response(response_body)
 
-        except (ClientError, Exception) as e:
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code in {
+                "ServiceUnavailableException",
+                "InternalServerException",
+                "ThrottlingException",
+                "ModelTimeoutException",
+                "ModelNotReadyException",
+            }:
+                logger.warning(
+                    "Transient Bedrock error invoking '%s': %s", self.model_id, e
+                )
+            else:
+                logger.error("ERROR: Can't invoke '%s'. Reason: %s", self.model_id, e)
+            raise
+        except Exception as e:
             logger.error("ERROR: Can't invoke '%s'. Reason: %s", self.model_id, e)
-            raise e
+            raise

@@ -31,6 +31,7 @@ from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.models import Room
 from chats.core.cache import CacheClient
+from chats.core.sentry import is_closed_websocket_error
 
 logger = logging.getLogger(__name__)
 
@@ -186,11 +187,44 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
         return response
 
+    async def safe_send_json(self, content):
+        """Send JSON, ignoring races where the client already disconnected."""
+        try:
+            await self.send_json(content)
+        except Exception as exc:
+            if is_closed_websocket_error(exc):
+                logger.warning(
+                    "Skipping WS send on closed connection",
+                    extra={
+                        "user": getattr(getattr(self, "user", None), "email", None),
+                        "connection_id": str(getattr(self, "connection_id", "")),
+                        "error": str(exc),
+                    },
+                )
+                return
+            raise
+
     async def receive_json(self, payload):
         """
         Called when we get a text frame. Channels will JSON-decode the payload
         for us and pass it as the first argument.
         """
+        try:
+            await self._handle_receive_json(payload)
+        except Exception as exc:
+            if is_closed_websocket_error(exc):
+                logger.warning(
+                    "Ignoring closed WebSocket during receive_json",
+                    extra={
+                        "user": getattr(getattr(self, "user", None), "email", None),
+                        "connection_id": str(getattr(self, "connection_id", "")),
+                        "error": str(exc),
+                    },
+                )
+                return
+            raise
+
+    async def _handle_receive_json(self, payload):
         ws_messages_received_total.labels(consumer=self.CONSUMER_TYPE).inc()
 
         # Messages will have a "command" key we can switch on
@@ -205,7 +239,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     action,
                     getattr(self.user, "email", "unknown"),
                 )
-                await self.send_json(
+                await self.safe_send_json(
                     {
                         "type": "notify",
                         "action": "method.error",
@@ -223,7 +257,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             self.last_ping = timezone.now()
             if await self.is_ping_timeout_feature_enabled():
                 await self.maybe_update_last_seen()
-            await self.send_json({"type": "pong"})
+            await self.safe_send_json({"type": "pong"})
 
     # METHODS
 
@@ -284,7 +318,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             )
             return
 
-        await self.send_json(
+        await self.safe_send_json(
             {
                 "type": "notify",
                 "action": "msg.create.success",
@@ -302,7 +336,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         if request_id is not None:
             content["request_id"] = request_id
 
-        await self.send_json(
+        await self.safe_send_json(
             {
                 "type": "notify",
                 "action": "msg.create.error",
@@ -389,7 +423,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 connection_id=event["content"].get("connection_id"), response=True
             )
         elif event.get("action") == "rooms.inactivity":
-            await self.send_json(event)
+            await self.safe_send_json(event)
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
 
@@ -400,7 +434,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 room_uuid = content.get("uuid")
 
                 if not room_uuid:
-                    return self.send_json(event)
+                    await self.safe_send_json(event)
+                    return
 
                 has_history = await self.get_has_history_by_room_uuid(room_uuid)
                 content["has_history"] = has_history
@@ -413,11 +448,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 )
             except Exception as e:
                 logger.error(f"Error getting history rooms queryset by contact: {e}")
-                return self.send_json(event)
+                await self.safe_send_json(event)
+                return
 
-            await self.send_json(event)
+            await self.safe_send_json(event)
         else:
-            await self.send_json(event)
+            await self.safe_send_json(event)
 
     # SYNC HELPER FUNCTIONS
 
