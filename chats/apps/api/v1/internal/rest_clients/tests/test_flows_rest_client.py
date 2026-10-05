@@ -198,3 +198,29 @@ class FlowExistsTests(TestCase):
         mock_retry.return_value = _build_response(500)
 
         self.assertTrue(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
+
+
+@override_settings(FLOWS_API_URL="https://flows.test")
+class GetFlowTests(TestCase):
+    def setUp(self):
+        self.project = _build_project()
+        self.flow_uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_matching_flow(self, mock_retry):
+        flow = {"uuid": self.flow_uuid, "name": "Flow A"}
+        mock_retry.return_value = _build_response(200, {"results": [flow]})
+
+        self.assertEqual(FlowRESTClient().get_flow(self.project, self.flow_uuid), flow)
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_none_when_missing(self, mock_retry):
+        mock_retry.return_value = _build_response(200, {"results": []})
+
+        self.assertIsNone(FlowRESTClient().get_flow(self.project, self.flow_uuid))
+
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_none_on_error_status(self, mock_retry):
+        mock_retry.return_value = _build_response(500)
+
+        self.assertIsNone(FlowRESTClient().get_flow(self.project, self.flow_uuid))

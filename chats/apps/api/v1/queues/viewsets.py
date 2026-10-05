@@ -87,7 +87,7 @@ class QueueViewset(ModelViewSet):
         if self.action != "list":
             self.filterset_class = None
 
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related("sector__project")
         if self.request.query_params.get("is_deleted", None) is not None:
             qs = qs.filter(is_deleted=self.request.query_params.get("is_deleted", None))
         else:
@@ -421,17 +421,21 @@ class QueueViewset(ModelViewSet):
             is_deleted=False,
         )
 
-        agents = agents.annotate(
-            _pause_name=Subquery(pause_subquery, output_field=CharField()),
-            _is_online=Exists(online_subquery),
-        ).annotate(
-            _order=Case(
-                When(_pause_name__isnull=False, then=Value(1)),
-                When(_is_online=True, then=Value(0)),
-                default=Value(2),
-                output_field=IntegerField(),
+        agents = (
+            agents.annotate(
+                _pause_name=Subquery(pause_subquery, output_field=CharField()),
+                _is_online=Exists(online_subquery),
             )
-        ).order_by("_order", "first_name", "last_name")
+            .annotate(
+                _order=Case(
+                    When(_pause_name__isnull=False, then=Value(1)),
+                    When(_is_online=True, then=Value(0)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("_order", "first_name", "last_name")
+        )
 
         serializer = QueueAgentsSerializer(
             agents, many=True, context={"project": project}

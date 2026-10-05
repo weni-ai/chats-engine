@@ -290,6 +290,42 @@ class FlowRESTClient(
             ]
         return flows
 
+    def _request_flow_by_uuid(self, project, flow_uuid: str):
+        return retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/flows.json?uuid={flow_uuid}",
+        )
+
+    def get_flow(self, project, flow_uuid: str) -> Optional[dict]:
+        """
+        Return a single flow from Flows, or None when it cannot be resolved.
+        """
+        try:
+            response = self._request_flow_by_uuid(project, flow_uuid)
+        except Exception:
+            LOGGER.exception("Failed to fetch flow %s from Flows", flow_uuid)
+            return None
+
+        if response.status_code != status.HTTP_200_OK:
+            return None
+        try:
+            data = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from get_flow: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            return None
+
+        results = data.get("results") or []
+        return next(
+            (flow for flow in results if str(flow.get("uuid", "")) == str(flow_uuid)),
+            None,
+        )
+
     def flow_exists(self, project, flow_uuid: str) -> bool:
         """
         Check whether a flow UUID still exists in Flows.
@@ -297,12 +333,14 @@ class FlowRESTClient(
         Returns True on transient/unexpected errors so callers do not prune
         valid links when Flows is temporarily unavailable.
         """
-        response = retry_request_and_refresh_flows_auth_token(
-            project=project,
-            request_method=requests.get,
-            headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/flows.json?uuid={flow_uuid}",
-        )
+        try:
+            response = self._request_flow_by_uuid(project, flow_uuid)
+        except Exception:
+            LOGGER.exception(
+                "Failed to check flow %s existence; skipping prune", flow_uuid
+            )
+            return True
+
         if response.status_code == status.HTTP_404_NOT_FOUND:
             return False
         if response.status_code != status.HTTP_200_OK:

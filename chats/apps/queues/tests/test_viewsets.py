@@ -401,7 +401,14 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertFalse(self.queue.bond_flows_queue)
 
     @with_project_permission()
-    def test_create_queue_with_selected_flows(self):
+    @patch(
+        "chats.apps.api.v1.queues.serializers.get_flow_name_map",
+        return_value={
+            "11111111-1111-1111-1111-111111111111": "Flow A",
+            "22222222-2222-2222-2222-222222222222": "Flow B",
+        },
+    )
+    def test_create_queue_with_selected_flows(self, _mock_names):
         flow_uuids = [
             "11111111-1111-1111-1111-111111111111",
             "22222222-2222-2222-2222-222222222222",
@@ -416,7 +423,13 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data.get("selected_flows"), flow_uuids)
+        self.assertEqual(
+            response.data.get("selected_flows"),
+            [
+                {"uuid": flow_uuids[0], "name": "Flow A"},
+                {"uuid": flow_uuids[1], "name": "Flow B"},
+            ],
+        )
 
         queue = Queue.objects.get(uuid=response.data.get("uuid"))
         self.assertEqual(queue.selected_flows, flow_uuids)
@@ -454,7 +467,14 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(queue.selected_flows, [])
 
     @with_project_permission()
-    def test_update_queue_replaces_selected_flows(self):
+    @patch(
+        "chats.apps.api.v1.queues.serializers.get_flow_name_map",
+        return_value={
+            "11111111-1111-1111-1111-111111111111": "Flow A",
+            "22222222-2222-2222-2222-222222222222": "Flow B",
+        },
+    )
+    def test_update_queue_replaces_selected_flows(self, _mock_names):
         self.queue.bond_flows_queue = True
         self.queue.selected_flows = [
             "11111111-1111-1111-1111-111111111111",
@@ -478,7 +498,13 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data.get("selected_flows"), updated_flows)
+        self.assertEqual(
+            response.data.get("selected_flows"),
+            [
+                {"uuid": updated_flows[0], "name": "Flow A"},
+                {"uuid": updated_flows[1], "name": "Flow B"},
+            ],
+        )
 
         self.queue.refresh_from_db()
         self.assertEqual(self.queue.selected_flows, updated_flows)
@@ -502,6 +528,48 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.queue.refresh_from_db()
         self.assertFalse(self.queue.bond_flows_queue)
         self.assertEqual(self.queue.selected_flows, [])
+
+    @with_project_permission()
+    @patch(
+        "chats.apps.api.v1.queues.serializers.get_flow_name_map",
+        return_value={"11111111-1111-1111-1111-111111111111": "Flow A"},
+    )
+    def test_retrieve_queue_returns_selected_flow_names(self, mock_names):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = ["11111111-1111-1111-1111-111111111111"]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        response = self.retrieve_queue(self.queue.pk)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data.get("selected_flows"),
+            [{"uuid": "11111111-1111-1111-1111-111111111111", "name": "Flow A"}],
+        )
+        mock_names.assert_called_once()
+
+    @with_project_permission()
+    @patch(
+        "chats.apps.api.v1.queues.serializers.get_flow_name_map",
+        return_value={"11111111-1111-1111-1111-111111111111": "Flow A"},
+    )
+    def test_list_queues_returns_selected_flow_names(self, mock_names):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = ["11111111-1111-1111-1111-111111111111"]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        response = self.list_queues()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data.get("results")[0].get("selected_flows"),
+            [{"uuid": "11111111-1111-1111-1111-111111111111", "name": "Flow A"}],
+        )
+        mock_names.assert_called_once()
 
 
 class QueueTransferAgentsTests(APITestCase):
