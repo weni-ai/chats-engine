@@ -469,6 +469,8 @@ class ProjectViewset(
                 flow=serializer.validated_data["flow"],
                 ignored_contacts=serializer.validated_data.get("ignored_contacts"),
                 filters=filters,
+                send_to_all=serializer.validated_data.get("send_to_all", True),
+                included_contacts=serializer.validated_data.get("included_contacts"),
             )
         except InvalidOutOffWindowFilter as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
