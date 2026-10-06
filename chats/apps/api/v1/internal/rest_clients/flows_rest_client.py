@@ -225,6 +225,25 @@ class FlowsSectorMixin:
         response = requests.post(url=url, headers=self.headers, json=body, timeout=120)
         return response
 
+    def update_ticketer(self, ticketer_uuid: str, name: str):
+        response = requests.patch(
+            url=f"{self.base_url}/api/v2/internals/ticketers/{ticketer_uuid}/",
+            headers=self.headers,
+            json={"name": name},
+            timeout=120,
+        )
+        if response.status_code not in [
+            status.HTTP_200_OK,
+            status.HTTP_201_CREATED,
+            status.HTTP_204_NO_CONTENT,
+        ]:
+            LOGGER.debug(
+                "[%s] Failed to update the ticketer. response: %s",
+                response.status_code,
+                response.content,
+            )
+        return response
+
     def destroy_sector(
         self,
         sector_uuid: str,

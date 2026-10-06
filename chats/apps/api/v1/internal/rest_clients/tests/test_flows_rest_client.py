@@ -198,3 +198,20 @@ class FlowExistsTests(TestCase):
         mock_retry.return_value = _build_response(500)
 
         self.assertTrue(FlowRESTClient().flow_exists(self.project, self.flow_uuid))
+
+
+@override_settings(FLOWS_API_URL="https://flows.test")
+class UpdateTicketerTests(TestCase):
+    @patch.object(FlowRESTClient, "headers", {"Authorization": "Bearer token"})
+    @patch(f"{CLIENT_PATH}.requests.patch")
+    def test_patches_ticketer_name(self, mock_patch):
+        mock_patch.return_value = _build_response(200, {"name": "Novo setor"})
+
+        response = FlowRESTClient().update_ticketer("ticketer-uuid", "Novo setor")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_patch.call_args.kwargs["url"],
+            "https://flows.test/api/v2/internals/ticketers/ticketer-uuid/",
+        )
+        self.assertEqual(mock_patch.call_args.kwargs["json"], {"name": "Novo setor"})

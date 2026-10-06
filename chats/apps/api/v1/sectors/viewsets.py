@@ -4,8 +4,8 @@ from datetime import datetime
 from django.conf import settings
 from django.db import IntegrityError
 from django.utils import timezone
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status, viewsets
 from rest_framework.decorators import action
@@ -20,7 +20,6 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
-from chats.apps.queues.models import Queue
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
     SectorAuthorizationFilter,
@@ -30,6 +29,7 @@ from chats.apps.api.v1.sectors.filters import (
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import (
     Sector,
@@ -37,6 +37,7 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
+from chats.apps.sectors.usecases.sync_sector_name import SyncSectorNameToFlows
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
 from chats.core.audit import apply_audit_fields
 
@@ -182,7 +183,10 @@ class SectorViewset(viewsets.ModelViewSet):
         return result
 
     def perform_update(self, serializer):
-        serializer.save(modified_by=self.request.user)
+        previous_name = serializer.instance.name
+        instance = serializer.save(modified_by=self.request.user)
+        if settings.USE_WENI_FLOWS and instance.name != previous_name:
+            SyncSectorNameToFlows().execute(instance)
 
     def _transfer_active_rooms(self, instance, target_queue):
         rooms = Room.objects.filter(
@@ -233,9 +237,7 @@ class SectorViewset(viewsets.ModelViewSet):
         instance = self.get_object()
 
         transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
-        end_all_chats = (
-            request.query_params.get("end_all_chats", "").lower() == "true"
-        )
+        end_all_chats = request.query_params.get("end_all_chats", "").lower() == "true"
 
         if transfer_to_queue_uuid and end_all_chats:
             return Response(
@@ -286,9 +288,7 @@ class SectorViewset(viewsets.ModelViewSet):
             "user_email": self.request.query_params.get("user_email"),
         }
 
-        apply_audit_fields(
-            instance, self.request, instance.project, on_delete=True
-        )
+        apply_audit_fields(instance, self.request, instance.project, on_delete=True)
 
         if not settings.USE_WENI_FLOWS:
             instance.delete()
@@ -599,9 +599,7 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.is_deleted = True
-        apply_audit_fields(
-            instance, request, instance.sector.project, on_delete=True
-        )
+        apply_audit_fields(instance, request, instance.sector.project, on_delete=True)
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
