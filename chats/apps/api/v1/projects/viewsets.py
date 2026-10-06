@@ -9,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -45,6 +46,9 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     SectorDiscussionSerializer,
     UpdateProjectSerializer,
+)
+from chats.apps.contacts.feature_flags import (
+    is_out_off_whatsapp_response_window_enabled,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.contacts.usecases.out_off_whatsapp_response_window import (
@@ -381,6 +385,9 @@ class ProjectViewset(
     def start_out_off_whatsapp_response_window_flow(self, request, *args, **kwargs):
         """Start a flow for contacts outside the WhatsApp 24h window."""
         project = self.get_object()
+        if not is_out_off_whatsapp_response_window_enabled(project.uuid):
+            raise PermissionDenied("Feature not available for this project.")
+
         serializer = OutOffWhatsappStartFlowSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
