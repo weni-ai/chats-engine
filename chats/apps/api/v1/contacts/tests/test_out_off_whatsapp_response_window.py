@@ -200,6 +200,37 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["uuid"], "ext-bruno")
 
+    def test_filters_rooms_attended_by_user_email(self):
+        other_user, _ = create_user_and_token("otheragent")
+        attended = self._contact("Attended", "ext-attended")
+        other = self._contact("Other agent", "ext-other-agent")
+        self._room(attended, "whatsapp:5500000000001", user=self.user)
+        self._room(other, "whatsapp:5500000000002", user=other_user)
+
+        response = self._get(user=self.user.email)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [item["uuid"] for item in response.data["results"]],
+            ["ext-attended"],
+        )
+
+    def test_without_user_param_lists_every_agent(self):
+        other_user, _ = create_user_and_token("otheragent")
+        self._room(
+            self._contact("Attended", "ext-attended"),
+            "whatsapp:5500000000001",
+            user=self.user,
+        )
+        self._room(
+            self._contact("Other agent", "ext-other-agent"),
+            "whatsapp:5500000000002",
+            user=other_user,
+        )
+
+        response = self._get()
+        self.assertEqual(response.data["count"], 2)
+
     def test_excludes_other_projects_and_contacts_without_external_id(self):
         other_project = Project.objects.create(name="Other")
         other_sector = Sector.objects.create(
