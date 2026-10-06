@@ -82,8 +82,8 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["assigned_agents"], 5)
         self.assertEqual(response.data["connected_by"], "edu")
         self.assertTrue(response.data["is_connected"])
-        self.assertEqual(response.data["disconnected_by"], "")
-        self.assertIsNone(response.data["disconnected_on"])
+        self.assertEqual(response.data["disconnect_by"], "")
+        self.assertIsNone(response.data["disconnect_on"])
         self.assertEqual(response.data["project_uuid"], connect_data["uuid"])
         integration = CopilotIntegration.objects.get(uuid=response.data["uuid"])
         self.assertTrue(integration.is_connected)
@@ -490,6 +490,15 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
             {str(item["project_uuid"]) for item in response.data},
             {str(self.copilot_uuid), str(other_uuid)},
         )
+
+    def test_list_connections_hides_disconnected_integration(self):
+        self.integration.is_connected = False
+        self.integration.save(update_fields=["is_connected"])
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
 
     def test_list_connections_fills_sector_from_secondary_project_when_principal(self):
         secondary = Project.objects.create(

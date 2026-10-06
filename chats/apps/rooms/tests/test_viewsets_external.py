@@ -568,6 +568,43 @@ class RoomsFlowStartExternalTests(APITestCase):
         self.assertEqual(response.json().get("uuid"), str(self.room.pk))
         self.assertTrue(flow_start.is_deleted)
 
+    def _move_flow_start_to_secondary_project(self):
+        secondary = Project.objects.create(name="CRL", timezone=self.project.timezone)
+        flow_start = self.room_flowstart
+        flow_start.project = secondary
+        flow_start.save(update_fields=["project"])
+        return secondary, flow_start
+
+    def _post_existing_room_flow(self, flow_start):
+        data = {
+            "queue_uuid": str(self.queue_1.pk),
+            "contact": {
+                "external_id": self.room.contact.external_id,
+                "name": "John Doe",
+                "urn": "whatsapp:5521917078236?auth=eyJhbGciOiAiSFM",
+            },
+            "flow_uuid": flow_start.flow,
+        }
+        return self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
+
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_reuses_flow_start_on_secondary_project(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
+        secondary, flow_start = self._move_flow_start_to_secondary_project()
+        Sector.objects.filter(pk=self.queue_1.sector_id).update(
+            secondary_project={"uuid": str(secondary.uuid)}
+        )
+
+        response = self._post_existing_room_flow(flow_start)
+        flow_start.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json().get("uuid"), str(self.room.pk))
+        self.assertTrue(flow_start.is_deleted)
+
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_deleted_flow_start(
