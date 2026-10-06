@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.urls import reverse
 from django.utils import timezone
@@ -35,6 +36,12 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         self.queue = Queue.objects.create(name="Queue", sector=self.sector)
         self.url = reverse("contacts-out-off-whatsapp-response-window")
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        flag_patcher = patch(
+            "chats.apps.api.v1.contacts.views.is_out_off_whatsapp_response_window_enabled",
+            return_value=True,
+        )
+        self._feature_flag = flag_patcher.start()
+        self.addCleanup(flag_patcher.stop)
 
     def _contact(self, name, external_id, email="", document=""):
         return Contact.objects.create(
@@ -69,6 +76,11 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
     def test_unknown_project_returns_404(self):
         response = self._get(project="00000000-0000-0000-0000-000000000000")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_feature_flag_off_returns_403(self):
+        self._feature_flag.return_value = False
+        response = self._get()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_user_without_permission_returns_404(self):
         _, token = create_user_and_token("outsider")
