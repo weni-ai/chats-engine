@@ -520,7 +520,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         try:
             return Project.objects.get(uuid=secondary_project_uuid)
-        except (Project.DoesNotExist, DjangoValidationError, ValueError, TypeError):
+        except (Project.DoesNotExist, DjangoValidationError, ValueError, TypeError) as e:
+            logger.warning(
+                "Could not resolve secondary_project_uuid=%s, falling back to project=%s. Error: %s",
+                secondary_project_uuid,
+                project.pk,
+                e,
+            )
             return project
 
     def validate_unique_active_project(self, contact, project):
