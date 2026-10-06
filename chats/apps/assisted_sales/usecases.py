@@ -11,10 +11,8 @@ from django.utils.dateparse import parse_datetime
 from chats.apps.assisted_sales.clients import CopilotConnectClient
 from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
-    CopilotFeatureDisabled,
     CopilotIntegrationAlreadyExists,
 )
-from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -185,9 +183,6 @@ class UpdateOrLinkCopilotUseCase:
     def _ensure_can_manage(self, user, project):
         if not ProjectPermission.objects.filter(user=user, project=project).exists():
             raise PermissionDenied()
-        project_uuid = getattr(project, "uuid", project)
-        if not is_assisted_sales_copilot_enabled(project_uuid):
-            raise CopilotFeatureDisabled()
 
 
 class UpdateCopilotIntegrationUseCase:
@@ -240,8 +235,6 @@ class ReconnectCopilotIntegrationUseCase:
             user=user, project=integration.project
         ).exists():
             raise PermissionDenied()
-        if not is_assisted_sales_copilot_enabled(integration.project_id):
-            raise CopilotFeatureDisabled()
 
         with transaction.atomic():
             integration.is_connected = True
@@ -584,9 +577,6 @@ class UpdateCopilotWwcChannelUseCase:
         if not integration:
             return None
 
-        if not is_assisted_sales_copilot_enabled(integration.project_id):
-            return None
-
         connection = dict(integration.connection or {})
         if not connection:
             connection = build_webchat_connection(
@@ -613,9 +603,6 @@ def get_room_for_copilot_feedback(user, room_uuid) -> Room:
     project = room.queue.sector.project
     if not ProjectPermission.objects.filter(user=user, project=project).exists():
         raise PermissionDenied()
-
-    if not is_assisted_sales_copilot_enabled(project.uuid):
-        raise CopilotFeatureDisabled()
 
     return room
 

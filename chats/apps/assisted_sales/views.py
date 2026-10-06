@@ -9,10 +9,8 @@ from rest_framework.views import APIView
 
 from chats.apps.assisted_sales.exceptions import (
     CopilotConnectError,
-    CopilotFeatureDisabled,
     CopilotIntegrationAlreadyExists,
 )
-from chats.apps.assisted_sales.feature_flags import is_assisted_sales_copilot_enabled
 from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
 from chats.apps.assisted_sales.serializers import (
     CopilotConnectionSerializer,
@@ -43,13 +41,6 @@ HTTP_CLIENT_ERROR_MIN = 400
 HTTP_SERVER_ERROR_MAX = 600
 
 
-def _copilot_feature_forbidden():
-    return Response(
-        {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
-        status=status.HTTP_403_FORBIDDEN,
-    )
-
-
 class CopilotProjectCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -71,9 +62,6 @@ class CopilotProjectCreateView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        if not is_assisted_sales_copilot_enabled(project.uuid):
-            return _copilot_feature_forbidden()
 
         sector = serializer.validated_data.get("sector")
         if sector and sector.project_id != project.uuid:
@@ -144,8 +132,6 @@ class CopilotProjectUpdateView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        except CopilotFeatureDisabled:
-            return _copilot_feature_forbidden()
         except CopilotIntegrationAlreadyExists:
             return Response(
                 {
@@ -195,9 +181,6 @@ class CopilotProjectRemoveView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not is_assisted_sales_copilot_enabled(integration.project_id):
-            return _copilot_feature_forbidden()
-
         try:
             RemoveCopilotIntegrationUseCase().execute(
                 integration=integration,
@@ -233,9 +216,6 @@ class CopilotLinkedProjectView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        if not is_assisted_sales_copilot_enabled(project.uuid):
-            return _copilot_feature_forbidden()
 
         sector = None
         sector_uuid = request.query_params.get("sector")
@@ -287,9 +267,6 @@ class CopilotListConnectionsView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not is_assisted_sales_copilot_enabled(project.uuid):
-            return _copilot_feature_forbidden()
-
         integrations = ListCopilotConnectionsUseCase().execute(
             project=project,
             is_principal=_query_flag_is_true(request.query_params.get("is_principal")),
@@ -320,9 +297,6 @@ class CopilotCreatePermissionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not is_assisted_sales_copilot_enabled(project.uuid):
-            return _copilot_feature_forbidden()
-
         try:
             can_create = CheckCopilotCreatePermissionUseCase().execute(
                 org_uuid=str(project.org) if project.org else "",
@@ -352,11 +326,6 @@ class CopilotExistingProjectsView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        if not any(
-            is_assisted_sales_copilot_enabled(project_id) for project_id in project_ids
-        ):
-            return _copilot_feature_forbidden()
 
         try:
             projects = ListExistingCopilotsUseCase().execute(
@@ -419,9 +388,6 @@ class CopilotRoomMessagesView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not is_assisted_sales_copilot_enabled(project.uuid):
-            return _copilot_feature_forbidden()
-
         try:
             data = ListCopilotRoomMessagesUseCase().execute(
                 project=project,
@@ -467,8 +433,6 @@ class CopilotMessageFeedbackView(APIView):
                 {"status_code": status.HTTP_403_FORBIDDEN, "error": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if isinstance(exc, CopilotFeatureDisabled):
-            return _copilot_feature_forbidden()
         raise exc
 
     def get(self, request, room_uuid):
@@ -483,7 +447,6 @@ class CopilotMessageFeedbackView(APIView):
             Room.DoesNotExist,
             CopilotMessageFeedback.DoesNotExist,
             PermissionDenied,
-            CopilotFeatureDisabled,
         ) as exc:
             return self._error_response(exc)
 
@@ -512,7 +475,7 @@ class CopilotMessageFeedbackView(APIView):
                 text=data.get("text"),
                 tags=data.get("tags"),
             )
-        except (Room.DoesNotExist, PermissionDenied, CopilotFeatureDisabled) as exc:
+        except (Room.DoesNotExist, PermissionDenied) as exc:
             return self._error_response(exc)
 
         return Response(
