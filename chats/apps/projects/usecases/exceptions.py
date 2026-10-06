@@ -40,3 +40,7 @@ class StartFlowPermissionError(Exception):
 
 class ActiveFlowStartError(Exception):
     pass
+
+
+class NoContactsToStartFlowError(Exception):
+    pass
