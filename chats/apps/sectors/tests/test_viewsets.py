@@ -950,6 +950,66 @@ class SectorTicketerCreationTests(APITestCase):
         self.assertEqual(mock_integrate_individual.call_count, 1)
 
 
+class SectorNameSyncToFlowsTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create(
+            email="admin-rename@test.com", first_name="Admin", last_name="User"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.project = Project.objects.create(
+            name="Normal Project",
+            timezone="America/Sao_Paulo",
+            date_format="D",
+        )
+        ProjectPermission.objects.create(
+            user=self.user,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Setor antigo",
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+
+    def _rename(self, name):
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        return self.client.patch(url, data={"name": name}, format="json")
+
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
+    @patch("chats.apps.sectors.usecases.sync_sector_name.FlowRESTClient")
+    def test_renaming_sector_updates_ticketer_name(
+        self, mock_client_cls, mock_settings
+    ):
+        mock_settings.USE_WENI_FLOWS = True
+        client = mock_client_cls.return_value
+        client.get_ticketer_by_sector.return_value = "ticketer-uuid"
+        client.update_ticketer.return_value = Mock(status_code=status.HTTP_200_OK)
+
+        response = self._rename("Setor novo")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        client.get_ticketer_by_sector.assert_called_once_with(
+            self.project, str(self.sector.uuid)
+        )
+        client.update_ticketer.assert_called_once_with("ticketer-uuid", "Setor novo")
+
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
+    @patch("chats.apps.sectors.usecases.sync_sector_name.FlowRESTClient")
+    def test_update_without_name_change_does_not_call_flows(
+        self, mock_client_cls, mock_settings
+    ):
+        mock_settings.USE_WENI_FLOWS = True
+
+        response = self._rename("Setor antigo")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_client_cls.assert_not_called()
+
+
 class SectorEndAllChatsTests(APITestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
