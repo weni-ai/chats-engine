@@ -542,16 +542,9 @@ class Room(BaseModel, BaseConfigurableModel):
             self.clear_pins()
 
             self.save()
-            from chats.apps.assisted_sales.feature_flags import (
-                is_assisted_sales_copilot_enabled,
-            )
             from chats.apps.assisted_sales.tasks import enqueue_set_room_copilot_channel
 
-            project_uuid = None
-            if self.queue_id and self.queue.sector_id:
-                project_uuid = self.queue.sector.project_id
-            if is_assisted_sales_copilot_enabled(project_uuid):
-                enqueue_set_room_copilot_channel(str(self.pk))
+            enqueue_set_room_copilot_channel(str(self.pk))
 
         if self.user:
             project = None

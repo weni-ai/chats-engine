@@ -18,25 +18,13 @@ from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
-class CopilotFeatureFlagMixin:
-    def setUp(self):
-        super().setUp()
-        for target in (
-            "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
-            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
-        ):
-            patcher = patch(target, return_value=True)
-            patcher.start()
-            self.addCleanup(patcher.stop)
-
-
 @override_settings(
     CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
     NEXUS_API_URL="https://nexus.example.com",
     WENI_WEBCHAT_HOST="https://flows.weni.ai",
     WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
 )
-class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotProjectCreateViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -154,28 +142,12 @@ class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_client_cls.return_value.create_copilot_project.assert_not_called()
 
-    @patch(
-        "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
-        return_value=False,
-    )
-    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
-    def test_create_forbidden_when_feature_flag_is_off(self, mock_client_cls, _flag):
-        response = self.client.post(
-            self.url,
-            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        mock_client_cls.return_value.create_copilot_project.assert_not_called()
-        self.assertFalse(CopilotIntegration.objects.exists())
-
 
 @override_settings(
     CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
     NEXUS_API_URL="https://nexus.example.com",
 )
-class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotProjectUpdateViewTests(APITestCase):
     EXPECTED_ASSIGNED_AGENTS = 3
     EXPECTED_ASSIGNED_AGENTS_SWITCH = 1
 
@@ -318,7 +290,7 @@ class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(self.integration.copilot_project_uuid, self.old_copilot_uuid)
 
 
-class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotProjectRemoveViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -365,7 +337,7 @@ class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
         )
 
 
-class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotLinkedProjectViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -425,7 +397,7 @@ class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data, {})
 
 
-class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotListConnectionsViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -532,7 +504,7 @@ class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotExistingProjectsViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -583,7 +555,7 @@ class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
 
 
 @override_settings(CONNECT_API_URL="https://connect.example.com")
-class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotCreatePermissionViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -687,7 +659,7 @@ class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["error"], "Connect unavailable")
 
 
-class CopilotRoomMessagesViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotRoomMessagesViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -790,7 +762,7 @@ class CopilotRoomMessagesViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.assertEqual(response.data["error"], "Flows unavailable")
 
 
-class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
+class CopilotMessageFeedbackViewTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.user, self.token = create_user_and_token("edu")
@@ -971,16 +943,6 @@ class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
 
         response = self._post({"message_id": "msg-1", "liked": True})
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertFalse(CopilotMessageFeedback.objects.exists())
-
-    def test_feature_flag_disabled_returns_403(self):
-        with patch(
-            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
-            return_value=False,
-        ):
-            response = self._post({"message_id": "msg-1", "liked": True})
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(CopilotMessageFeedback.objects.exists())
