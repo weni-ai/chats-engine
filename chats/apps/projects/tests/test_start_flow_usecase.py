@@ -57,7 +57,7 @@ class StartFlowUseCaseTests(TestCase):
 
     def _mock_client(self, mock_client_cls):
         mock_instance = mock_client_cls.return_value
-        mock_instance.start_flow.return_value = MOCK_FLOW_START_RESPONSE
+        mock_instance.start_flow.return_value = (200, MOCK_FLOW_START_RESPONSE)
         return mock_instance
 
     def _room(self, days_old=2, is_active=True):
@@ -197,7 +197,7 @@ class StartOutOffWhatsappFlowUseCaseTests(TestCase):
 
     def _mock_client(self, mock_client_cls):
         mock_instance = mock_client_cls.return_value
-        mock_instance.start_flow.return_value = MOCK_FLOW_START_RESPONSE
+        mock_instance.start_flow.return_value = (200, MOCK_FLOW_START_RESPONSE)
         return mock_instance
 
     def _expired_contact(self, name, external_id, user=None):
