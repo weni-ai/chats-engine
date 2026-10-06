@@ -177,6 +177,35 @@ class OutOffWhatsappStartFlowTests(APITestCase):
         sent = mock_instance.start_flow.call_args[0][1]["contacts"]
         self.assertEqual(sent, ["ext-maria"])
 
+    def test_included_contacts_do_not_dispatch_the_rest(self, mock_client_cls):
+        mock_instance = self._mock_client(mock_client_cls)
+        self._room(self._contact("Ana", "ext-ana"), "whatsapp:5500000000001")
+        self._room(self._contact("Ana Dois", "ext-ana-2"), "whatsapp:5500000000002")
+        self._room(self._contact("Bruno", "ext-bruno"), "whatsapp:5500000000003")
+
+        response = self._post(
+            {
+                "flow": "flow-uuid-001",
+                "send_to_all": False,
+                "included_contacts": ["ext-ana", "ext-ana-2"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sent = mock_instance.start_flow.call_args[0][1]["contacts"]
+        self.assertEqual(sent, ["ext-ana", "ext-ana-2"])
+
+    def test_empty_included_contacts_does_not_call_flows(self, mock_client_cls):
+        mock_instance = self._mock_client(mock_client_cls)
+        self._room(self._contact("Ana", "ext-ana"), "whatsapp:5500000000001")
+
+        response = self._post(
+            {"flow": "flow-uuid-001", "send_to_all": False, "included_contacts": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        mock_instance.start_flow.assert_not_called()
+
     def test_all_ignored_does_not_call_flows(self, mock_client_cls):
         mock_instance = self._mock_client(mock_client_cls)
         self._room(self._contact("Ana", "ext-ana"), "whatsapp:5500000000001")
