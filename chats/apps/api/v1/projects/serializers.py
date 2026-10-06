@@ -135,7 +135,13 @@ class ProjectFlowStartSerializer(serializers.Serializer):
 
 class OutOffWhatsappStartFlowSerializer(serializers.Serializer):
     flow = serializers.CharField()
+    send_to_all = serializers.BooleanField(required=False, default=True)
     ignored_contacts = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    included_contacts = serializers.ListField(
         child=serializers.CharField(),
         required=False,
         default=list,

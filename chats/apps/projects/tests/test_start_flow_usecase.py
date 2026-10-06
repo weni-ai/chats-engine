@@ -257,6 +257,25 @@ class StartOutOffWhatsappFlowUseCaseTests(TestCase):
             list(refs.values_list("external_id", flat=True)), ["ext-bruno"]
         )
 
+    def test_included_contacts_are_the_only_recipients(self, mock_client_cls):
+        mock_instance = self._mock_client(mock_client_cls)
+        self._expired_contact("Ana", "ext-ana")
+        self._expired_contact("Ana Dois", "ext-ana-2")
+        self._expired_contact("Bruno", "ext-bruno")
+
+        StartOutOffWhatsappFlowUseCase().execute(
+            project=self.project,
+            user=self.user,
+            flow="flow-uuid-001",
+            ignored_contacts=["ext-bruno"],
+            filters={},
+            send_to_all=False,
+            included_contacts=["ext-ana", "ext-ana-2", "ext-missing"],
+        )
+
+        sent = mock_instance.start_flow.call_args[0][1]
+        self.assertEqual(sent["contacts"], ["ext-ana", "ext-ana-2"])
+
     def test_flows_failure_rolls_back_the_bulk_flow_start(self, mock_client_cls):
         mock_instance = self._mock_client(mock_client_cls)
         mock_instance.start_flow.side_effect = RuntimeError("flows down")
