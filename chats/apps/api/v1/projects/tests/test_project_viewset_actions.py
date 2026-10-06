@@ -314,7 +314,7 @@ MOCK_FLOW_START_RESPONSE = {
 }
 
 
-@patch("chats.apps.api.v1.projects.viewsets.FlowRESTClient")
+@patch("chats.apps.projects.usecases.start_flow.FlowRESTClient")
 class StartFlowTestCase(APITestCase):
     """Tests for ProjectViewset.start_flow (POST /project/{uuid}/start_flow/)"""
 
@@ -543,7 +543,7 @@ class StartFlowTestCase(APITestCase):
         flow_start = FlowStart.objects.get(project=self.project)
         self.assertIsNone(flow_start.room)
 
-    @patch("chats.apps.api.v1.projects.viewsets.create_room_feedback_message")
+    @patch("chats.apps.projects.usecases.start_flow.create_room_feedback_message")
     @patch.object(Room, "notify_room")
     @patch.object(Room, "request_callback")
     @patch.object(Room, "is_24h_valid", new_callable=PropertyMock, return_value=False)
@@ -569,7 +569,7 @@ class StartFlowTestCase(APITestCase):
         self._mock_client(mock_client_cls)
 
         with patch(
-            "chats.apps.api.v1.projects.viewsets.create_room_feedback_message"
+            "chats.apps.projects.usecases.start_flow.create_room_feedback_message"
         ) as mock_feedback:
             self.client.post(self.url, self.base_payload, format="json")
             mock_feedback.assert_not_called()
