@@ -52,6 +52,12 @@ class OutOffWhatsappStartFlowTests(APITestCase):
             kwargs={"uuid": str(self.project.uuid)},
         )
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        flag_patcher = patch(
+            "chats.apps.api.v1.projects.viewsets.is_out_off_whatsapp_response_window_enabled",
+            return_value=True,
+        )
+        self._feature_flag = flag_patcher.start()
+        self.addCleanup(flag_patcher.stop)
 
     def _mock_client(self, mock_client_cls):
         mock_instance = mock_client_cls.return_value
@@ -89,6 +95,17 @@ class OutOffWhatsappStartFlowTests(APITestCase):
         self._mock_client(mock_client_cls)
         response = self.client.post(self.url, {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_feature_flag_off_does_not_call_flows(self, mock_client_cls):
+        mock_instance = self._mock_client(mock_client_cls)
+        self._feature_flag.return_value = False
+        self._room(self._contact("Ana", "ext-ana"), "whatsapp:5500000000001")
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_instance.start_flow.assert_not_called()
+        self.assertEqual(FlowStart.objects.filter(project=self.project).count(), 0)
 
     def test_user_without_permission_returns_404(self, mock_client_cls):
         self._mock_client(mock_client_cls)
