@@ -1,10 +1,14 @@
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.api.v1.contacts.serializers import (
     OutOffWhatsappResponseWindowContactSerializer,
+)
+from chats.apps.contacts.feature_flags import (
+    is_out_off_whatsapp_response_window_enabled,
 )
 from chats.apps.contacts.usecases.out_off_whatsapp_response_window import (
     InvalidOutOffWindowFilter,
@@ -37,6 +41,9 @@ class OutOffWhatsappResponseWindowContactsView(GenericAPIView):
                 {"project": "Project not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        if not is_out_off_whatsapp_response_window_enabled(project.uuid):
+            raise PermissionDenied("Feature not available for this project.")
 
         try:
             contacts, rooms = out_off_whatsapp_response_window(
