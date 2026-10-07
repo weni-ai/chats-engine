@@ -31,7 +31,8 @@ from rest_framework.exceptions import PermissionDenied
 logger = logging.getLogger(__name__)
 
 
-def get_active_room_flow_start(contact, flow_uuid, project):
+def get_active_room_flow_start(contact, flow_uuid, project, config_project=None):
+    config_project = config_project or project
     query_filters = {
         "references__external_id": contact.external_id,
         "flow": flow_uuid,
@@ -47,7 +48,7 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
-        config = project.config or {}
+        config = config_project.config or {}
 
         if config.get("ignore_close_rooms_on_flow_start", False):
             return None
@@ -428,7 +429,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         flow_start_project = self._get_flow_start_project(sector, project)
 
-        room = get_active_room_flow_start(contact, flow_uuid, flow_start_project)
+        room = get_active_room_flow_start(
+            contact, flow_uuid, flow_start_project, config_project=project
+        )
 
         if room is not None:
             update_fields = []
@@ -524,14 +527,21 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         try:
             return Project.objects.get(uuid=secondary_project_uuid)
-        except (Project.DoesNotExist, DjangoValidationError, ValueError, TypeError) as e:
-            logger.warning(
-                "Could not resolve secondary_project_uuid=%s, falling back to project=%s. Error: %s",
+        except (
+            Project.DoesNotExist,
+            DjangoValidationError,
+            ValueError,
+            TypeError,
+        ) as e:
+            logger.error(
+                "Could not resolve secondary_project_uuid=%s for project=%s. Error: %s",
                 secondary_project_uuid,
                 project.pk,
                 e,
             )
-            return project
+            raise ValidationError(
+                {"detail": _("Sector secondary project could not be resolved")}
+            ) from e
 
     def validate_unique_active_project(self, contact, project):
         queryset = Room.objects.filter(

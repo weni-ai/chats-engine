@@ -8,5 +8,8 @@ class GetLatestUnifiedSacMigrationUseCase:
         if not org:
             return None
         return (
-            UnifiedSacMigration.objects.filter(org=org).order_by("-created_on").first()
+            UnifiedSacMigration.objects.filter(org=org)
+            .only("uuid", "status", "error", "started_at", "finished_at")
+            .order_by("-created_on")
+            .first()
         )

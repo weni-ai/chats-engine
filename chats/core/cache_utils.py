@@ -17,6 +17,10 @@ USER_OBJECT_CACHE_TTL = getattr(settings, "USER_OBJECT_CACHE_TTL", 300)
 USER_OBJECT_CACHE_ENABLED = getattr(settings, "USER_OBJECT_CACHE_ENABLED", True)
 NEXUS_SETTINGS_CACHE_TTL = getattr(settings, "NEXUS_SETTINGS_CACHE_TTL", 300)
 NEXUS_SETTINGS_CACHE_ENABLED = getattr(settings, "NEXUS_SETTINGS_CACHE_ENABLED", True)
+NEXUS_MULTI_AGENTS_CACHE_TTL = getattr(settings, "NEXUS_MULTI_AGENTS_CACHE_TTL", 300)
+NEXUS_MULTI_AGENTS_CACHE_ENABLED = getattr(
+    settings, "NEXUS_MULTI_AGENTS_CACHE_ENABLED", True
+)
 
 
 def _normalize_email(email: Optional[str]) -> Optional[str]:
@@ -429,3 +433,37 @@ def set_nexus_settings_cache(project_uuid: str, data: Dict[str, Any]) -> None:
 
     cache_key = f"nexus_settings:{project_uuid}"
     redis_conn.setex(cache_key, NEXUS_SETTINGS_CACHE_TTL, json.dumps(data))
+
+
+def get_nexus_multi_agents_cached(project_uuid: str) -> Optional[Dict[str, Any]]:
+    if not NEXUS_MULTI_AGENTS_CACHE_ENABLED:
+        return None
+
+    if not project_uuid:
+        return None
+
+    redis_conn = _get_redis_connection_safe()
+    if not redis_conn:
+        return None
+
+    cache_key = f"nexus_multi_agents:{project_uuid}"
+    cached_value = redis_conn.get(cache_key)
+    if cached_value:
+        return json.loads(cached_value)
+
+    return None
+
+
+def set_nexus_multi_agents_cache(project_uuid: str, data: Dict[str, Any]) -> None:
+    if not NEXUS_MULTI_AGENTS_CACHE_ENABLED:
+        return
+
+    if not project_uuid:
+        return
+
+    redis_conn = _get_redis_connection_safe()
+    if not redis_conn:
+        return
+
+    cache_key = f"nexus_multi_agents:{project_uuid}"
+    redis_conn.setex(cache_key, NEXUS_MULTI_AGENTS_CACHE_TTL, json.dumps(data))
