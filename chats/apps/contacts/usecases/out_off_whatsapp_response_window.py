@@ -50,25 +50,16 @@ def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=
     """Rooms outside the WhatsApp 24h window, and the contacts that own them."""
     cutoff = timezone.now() - timedelta(days=WHATSAPP_RESPONSE_WINDOW_DAYS)
     recent_contact_message = Message.objects.filter(
+        room_id=OuterRef("pk"),
         contact_id=OuterRef("contact_id"),
-        room__urn=OuterRef("urn"),
         created_on__gte=cutoff,
     )
-    recent_room = Room.objects.filter(
-        contact_id=OuterRef("contact_id"),
-        urn=OuterRef("urn"),
-        created_on__gt=cutoff,
-    )
-    rooms = (
-        Room.objects.filter(
-            queue__sector__project=project,
-            urn__startswith="whatsapp",
-            created_on__lte=cutoff,
-            contact__isnull=False,
-        )
-        .exclude(Exists(recent_contact_message))
-        .exclude(Exists(recent_room))
-    )
+    rooms = Room.objects.filter(
+        queue__sector__project=project,
+        urn__startswith="whatsapp",
+        created_on__lte=cutoff,
+        contact__isnull=False,
+    ).exclude(Exists(recent_contact_message))
 
     sector_ids = _parse_uuids(sectors, "sectors")
     queue_ids = _parse_uuids(queues, "queues")
