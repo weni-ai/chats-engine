@@ -13,6 +13,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 5
+
 
 class OutOffWhatsappResponseWindowContactsTests(APITestCase):
     def setUp(self):
@@ -26,7 +28,7 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -131,7 +133,7 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         other_sector = Sector.objects.create(
             name="Other",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -154,7 +156,7 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         other_sector = Sector.objects.create(
             name="Other",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -205,7 +207,7 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         other_sector = Sector.objects.create(
             name="Other",
             project=other_project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
