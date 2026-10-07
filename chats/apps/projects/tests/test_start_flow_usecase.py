@@ -26,6 +26,9 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 5
+WHATSAPP_WINDOW_EXPIRED_DAYS = 2
+
 MOCK_FLOW_START_RESPONSE = {
     "uuid": "ext-flow-start-uuid",
     "flow": {"name": "Test Flow", "uuid": "flow-uuid-001"},
@@ -48,7 +51,7 @@ class StartFlowUseCaseTests(TestCase):
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -60,7 +63,7 @@ class StartFlowUseCaseTests(TestCase):
         mock_instance.start_flow.return_value = (200, MOCK_FLOW_START_RESPONSE)
         return mock_instance
 
-    def _room(self, days_old=2, is_active=True):
+    def _room(self, days_old=WHATSAPP_WINDOW_EXPIRED_DAYS, is_active=True):
         room = Room.objects.create(
             queue=self.queue,
             contact=self.contact,
@@ -189,7 +192,7 @@ class StartOutOffWhatsappFlowUseCaseTests(TestCase):
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -210,7 +213,7 @@ class StartOutOffWhatsappFlowUseCaseTests(TestCase):
             is_active=True,
         )
         Room.objects.filter(pk=room.pk).update(
-            created_on=timezone.now() - timedelta(days=2)
+            created_on=timezone.now() - timedelta(days=WHATSAPP_WINDOW_EXPIRED_DAYS)
         )
         return contact
 
