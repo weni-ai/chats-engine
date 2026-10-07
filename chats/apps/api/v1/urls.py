@@ -22,6 +22,7 @@ from chats.apps.api.v1.dashboard.viewsets import (
     ReportFieldsValidatorViewSet,
 )
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
+from chats.apps.api.v1.multi_agents.views import MultiAgentsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.rooms.viewsets import (
@@ -107,6 +108,11 @@ urlpatterns = [
         "human-support/<str:project_uuid>/",
         HumanSupportNexusSettingsView.as_view(),
         name="human_support_nexus_settings",
+    ),
+    path(
+        "multi-agents/<str:project_uuid>/",
+        MultiAgentsView.as_view(),
+        name="multi_agents_nexus",
     ),
     path(
         "project/copilot/create",
