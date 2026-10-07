@@ -108,6 +108,26 @@ class OutOffWhatsappResponseWindowContactsTests(APITestCase):
         response = self._get()
         self.assertEqual(response.data["count"], 0)
 
+    def test_hides_urn_when_another_room_has_a_recent_contact_message(self):
+        contact = self._contact("Maria", "ext-maria")
+        self._room(contact, "whatsapp:5500000000001")
+        other = self._room(contact, "whatsapp:5500000000001", days_old=0)
+        Message.objects.create(room=other, contact=contact, text="oi")
+        Room.objects.filter(pk=other.pk).update(
+            created_on=timezone.now() - timedelta(days=2)
+        )
+
+        response = self._get()
+        self.assertEqual(response.data["count"], 0)
+
+    def test_hides_urn_when_a_newer_room_of_the_same_urn_exists(self):
+        contact = self._contact("Maria", "ext-maria")
+        self._room(contact, "whatsapp:5500000000001")
+        self._room(contact, "whatsapp:5500000000001", days_old=0)
+
+        response = self._get()
+        self.assertEqual(response.data["count"], 0)
+
     def test_ignores_non_whatsapp_and_recent_rooms(self):
         mail_contact = self._contact("Mail", "ext-mail")
         self._room(mail_contact, "mailto:mail@example.com")

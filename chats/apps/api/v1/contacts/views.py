@@ -1,4 +1,3 @@
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -9,11 +8,12 @@ from chats.apps.api.v1.contacts.serializers import (
 )
 from chats.apps.contacts.usecases.out_off_whatsapp_response_window import (
     InvalidOutOffWindowFilter,
+    ProjectNotFound,
     build_out_off_window_contact_payload,
+    get_project_for_user,
     out_off_whatsapp_response_window,
     parse_csv,
 )
-from chats.apps.projects.models import Project
 
 
 class OutOffWhatsappResponseWindowContactsView(GenericAPIView):
@@ -31,9 +31,8 @@ class OutOffWhatsappResponseWindowContactsView(GenericAPIView):
             )
 
         try:
-            project = Project.objects.get(uuid=project_uuid)
-            project.permissions.get(user=request.user)
-        except (Project.DoesNotExist, ObjectDoesNotExist, ValidationError, ValueError):
+            project = get_project_for_user(project_uuid, request.user)
+        except ProjectNotFound:
             return Response(
                 {"project": "Project not found"},
                 status=status.HTTP_404_NOT_FOUND,

@@ -1,11 +1,13 @@
 import uuid
 from datetime import timedelta
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 
 WHATSAPP_RESPONSE_WINDOW_DAYS = 1
@@ -13,6 +15,19 @@ WHATSAPP_RESPONSE_WINDOW_DAYS = 1
 
 class InvalidOutOffWindowFilter(Exception):
     pass
+
+
+class ProjectNotFound(Exception):
+    pass
+
+
+def get_project_for_user(project_uuid, user):
+    try:
+        project = Project.objects.get(uuid=project_uuid)
+        project.permissions.get(user=user)
+        return project
+    except (Project.DoesNotExist, ObjectDoesNotExist, ValidationError, ValueError):
+        raise ProjectNotFound()
 
 
 def parse_csv(value):
@@ -35,16 +50,25 @@ def out_off_whatsapp_response_window(project, sectors=None, queues=None, search=
     """Rooms outside the WhatsApp 24h window, and the contacts that own them."""
     cutoff = timezone.now() - timedelta(days=WHATSAPP_RESPONSE_WINDOW_DAYS)
     recent_contact_message = Message.objects.filter(
-        room_id=OuterRef("pk"),
         contact_id=OuterRef("contact_id"),
+        room__urn=OuterRef("urn"),
         created_on__gte=cutoff,
     )
-    rooms = Room.objects.filter(
-        queue__sector__project=project,
-        urn__startswith="whatsapp",
-        created_on__lte=cutoff,
-        contact__isnull=False,
-    ).exclude(Exists(recent_contact_message))
+    recent_room = Room.objects.filter(
+        contact_id=OuterRef("contact_id"),
+        urn=OuterRef("urn"),
+        created_on__gt=cutoff,
+    )
+    rooms = (
+        Room.objects.filter(
+            queue__sector__project=project,
+            urn__startswith="whatsapp",
+            created_on__lte=cutoff,
+            contact__isnull=False,
+        )
+        .exclude(Exists(recent_contact_message))
+        .exclude(Exists(recent_room))
+    )
 
     sector_ids = _parse_uuids(sectors, "sectors")
     queue_ids = _parse_uuids(queues, "queues")
