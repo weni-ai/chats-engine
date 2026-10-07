@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.db import transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -204,17 +205,18 @@ class StartOutOffWhatsappFlowUseCaseTests(TestCase):
         return mock_instance
 
     def _expired_contact(self, name, external_id, user=None):
-        contact = Contact.objects.create(name=name, external_id=external_id)
-        room = Room.objects.create(
-            queue=self.queue,
-            contact=contact,
-            user=user or self.user,
-            urn="whatsapp:5500000000001",
-            is_active=True,
-        )
-        Room.objects.filter(pk=room.pk).update(
-            created_on=timezone.now() - timedelta(days=WHATSAPP_WINDOW_EXPIRED_DAYS)
-        )
+        with transaction.atomic():
+            contact = Contact.objects.create(name=name, external_id=external_id)
+            room = Room.objects.create(
+                queue=self.queue,
+                contact=contact,
+                user=user or self.user,
+                urn="whatsapp:5500000000001",
+                is_active=True,
+            )
+            Room.objects.filter(pk=room.pk).update(
+                created_on=timezone.now() - timedelta(days=WHATSAPP_WINDOW_EXPIRED_DAYS)
+            )
         return contact
 
     def test_empty_contact_list_does_not_call_flows(self, mock_client_cls):
