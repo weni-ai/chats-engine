@@ -35,6 +35,11 @@ class NexusRESTClient(InternalAuthentication):
         response = session.patch(url=url, headers=self.headers, json=data, timeout=10)
         return response
 
+    def get_multi_agents(self, project_uuid: str) -> requests.Response:
+        url = f"{self.base_url}/api/project/{project_uuid}/multi-agents"
+        session = self._get_session()
+        return session.get(url=url, headers=self.headers, timeout=10)
+
     def get_projects_agents(self, project_uuids) -> requests.Response:
         if isinstance(project_uuids, (list, tuple)):
             uuids = ",".join(str(uuid) for uuid in project_uuids)
