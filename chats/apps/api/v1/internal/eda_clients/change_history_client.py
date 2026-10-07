@@ -3,7 +3,13 @@ import logging
 from django.conf import settings
 from django.db import models, transaction
 from django.utils import timezone
-from weni_commons.change_history import Action, Entity, Module, Notifier
+
+from chats.apps.api.v1.internal.eda_clients.change_history import (
+    Action,
+    Entity,
+    Module,
+    Notifier,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +63,7 @@ def _user_ip(request):
 
 def publish_change_history(before=None, after=None, user=None, request=None):
     """
-    Publish a change-history event via weni-commons ``Notifier``.
+    Publish a change-history event via ``Notifier``.
 
     Infers CREATE/ADD/UPDATE/DELETE from ``before`` / ``after``.
     Payload fields are captured immediately so soft-delete mutations that

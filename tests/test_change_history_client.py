@@ -4,13 +4,13 @@ from unittest import mock
 from django.test import TransactionTestCase, override_settings
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.internal.eda_clients.change_history import Entity
 from chats.apps.api.v1.internal.eda_clients.change_history_client import (
     publish_change_history,
 )
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
-from weni_commons.change_history import Entity
 
 
 @override_settings(AMQ_BROKER_HOST="localhost")
@@ -27,9 +27,7 @@ class PublishChangeHistoryTests(TransactionTestCase):
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.user = User.objects.create(email="manager@test.com")
 
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
-    )
+    @mock.patch("chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier")
     def test_create_queue(self, mock_notifier):
         publish_change_history(after=self.queue, user=self.user)
 
@@ -41,9 +39,7 @@ class PublishChangeHistoryTests(TransactionTestCase):
         self.assertEqual(args[4], Entity.QUEUE)
         self.assertEqual(args[5].value, "LIVE_DESK")
 
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
-    )
+    @mock.patch("chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier")
     def test_update_queue_sends_name_diff(self, mock_notifier):
         after = Queue.objects.get(pk=self.queue.pk)
         after.name = "Renamed"
@@ -53,16 +49,10 @@ class PublishChangeHistoryTests(TransactionTestCase):
         kwargs = mock_notifier.notify_change.call_args[1]
         self.assertEqual(kwargs["old_value"], "Test Queue")
         self.assertEqual(kwargs["new_value"], "Renamed")
-        self.assertEqual(
-            mock_notifier.notify_change.call_args[0][3].value, "UPDATE"
-        )
+        self.assertEqual(mock_notifier.notify_change.call_args[0][3].value, "UPDATE")
 
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
-    )
-    def test_delete_keeps_object_name_after_soft_delete_mutation(
-        self, mock_notifier
-    ):
+    @mock.patch("chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier")
+    def test_delete_keeps_object_name_after_soft_delete_mutation(self, mock_notifier):
         publish_change_history(before=self.queue, user=self.user)
 
         # Soft delete mutates the in-memory instance after scheduling publish.
@@ -71,13 +61,9 @@ class PublishChangeHistoryTests(TransactionTestCase):
 
         kwargs = mock_notifier.notify_change.call_args[1]
         self.assertEqual(kwargs["object_name"], "Test Queue")
-        self.assertEqual(
-            mock_notifier.notify_change.call_args[0][3].value, "DELETE"
-        )
+        self.assertEqual(mock_notifier.notify_change.call_args[0][3].value, "DELETE")
 
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
-    )
+    @mock.patch("chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier")
     def test_add_agent_uses_action_add_and_entity_user(self, mock_notifier):
         permission = ProjectPermission.objects.create(
             project=self.project,
@@ -101,9 +87,7 @@ class PublishChangeHistoryTests(TransactionTestCase):
             publish_change_history()
 
     @override_settings(AMQ_BROKER_HOST="")
-    @mock.patch(
-        "chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier"
-    )
+    @mock.patch("chats.apps.api.v1.internal.eda_clients.change_history_client.Notifier")
     def test_skips_when_amq_host_not_configured(self, mock_notifier):
         publish_change_history(after=self.queue, user=self.user)
         mock_notifier.notify_change.assert_not_called()
