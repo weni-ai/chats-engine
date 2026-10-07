@@ -139,18 +139,22 @@ class StartOutOffWhatsappFlowUseCase:
         included_contacts=None,
     ):
         contacts, _ = out_off_whatsapp_response_window(project, **filters)
-        eligible = list(contacts.values_list("external_id", flat=True))
         if send_to_all:
-            ignored = set(ignored_contacts or [])
-            external_ids = [
-                external_id for external_id in eligible if external_id not in ignored
-            ]
+            ignored = list(ignored_contacts or [])
+            external_ids = list(
+                contacts.exclude(external_id__in=ignored).values_list(
+                    "external_id", flat=True
+                )
+            )
         else:
-            eligible_ids = set(eligible)
+            included = list(dict.fromkeys(included_contacts or []))
+            eligible_ids = set(
+                contacts.filter(external_id__in=included).values_list(
+                    "external_id", flat=True
+                )
+            )
             external_ids = [
-                external_id
-                for external_id in dict.fromkeys(included_contacts or [])
-                if external_id in eligible_ids
+                external_id for external_id in included if external_id in eligible_ids
             ]
         return StartFlowUseCase().execute_for_contacts(
             project, user, flow, external_ids
