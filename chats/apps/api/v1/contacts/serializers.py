@@ -91,6 +91,17 @@ class ContactWSSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class UrnSerializer(serializers.Serializer):
+    scheme = serializers.CharField()
+    path = serializers.CharField()
+
+
+class OutOffWhatsappResponseWindowContactSerializer(serializers.Serializer):
+    uuid = serializers.CharField()
+    name = serializers.CharField()
+    urns = UrnSerializer(many=True)
+
+
 class ContactSimpleSerializer(ContactSerializer):
     class Meta:
         model = Contact

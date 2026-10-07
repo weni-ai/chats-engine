@@ -17,6 +17,7 @@ from chats.apps.api.v1.ai_features.views import (
     HistorySummaryFeedbackTagsView,
 )
 from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
+from chats.apps.api.v1.contacts.views import OutOffWhatsappResponseWindowContactsView
 from chats.apps.api.v1.dashboard.viewsets import (
     ModelFieldsViewSet,
     ReportFieldsValidatorViewSet,
@@ -172,6 +173,11 @@ urlpatterns = [
         "agent/update_queue_permissions/",
         UpdateQueuePermissionsView.as_view(),
         name="update_queue_permissions",
+    ),
+    path(
+        "contacts/out_off_whatsapp_response_window/",
+        OutOffWhatsappResponseWindowContactsView.as_view(),
+        name="contacts-out-off-whatsapp-response-window",
     ),
     path("", include(router.urls)),
 ]
