@@ -7,6 +7,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
+from weni_commons.auth import SessionTokenAuthentication
+from weni_commons.kong import api_gateway_expose
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -69,7 +71,12 @@ class MessageFlowViewset(
 
     @cached_property
     def authentication_classes(self):
-        return get_token_auth_classes(self.request)
+        classes = [
+            cls
+            for cls in get_token_auth_classes(self.request)
+            if cls is not SessionTokenAuthentication
+        ]
+        return [SessionTokenAuthentication] + classes
 
     @cached_property
     def permission_classes(self):
@@ -79,11 +86,16 @@ class MessageFlowViewset(
             return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
+    @api_gateway_expose(alias="room-messages")
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List messages filtered by room or other criteria."""
         return super().list(request, *args, **kwargs)
 
+    @api_gateway_expose(
+        alias="room-messages",
+        methods=["POST"],
+    )
     @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
         """Create a new message in a room (incoming or outgoing direction)."""
@@ -98,13 +110,13 @@ class MessageFlowViewset(
         # Adicionando logs para verificar os dados brutos da requisição
         print("\n\n===== REQUEST DATA IN PERFORM_CREATE =====")
         print("Request data:", self.request.data)
-        if 'metadata' in self.request.data:
-            print("Metadata in request:", self.request.data['metadata'])
-            print("Metadata type:", type(self.request.data['metadata']))
+        if "metadata" in self.request.data:
+            print("Metadata in request:", self.request.data["metadata"])
+            print("Metadata type:", type(self.request.data["metadata"]))
         else:
             print("Metadata not found in request!")
         print("===== END REQUEST DATA IN PERFORM_CREATE =====\n\n")
-        
+
         # Código original
         validated_data = serializer.validated_data
         room = validated_data.get("room")
