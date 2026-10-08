@@ -7,7 +7,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models.models import Project, RoomRoutingType
+from chats.apps.projects.models.models import (
+    Project,
+    ProjectPermission,
+    RoomRoutingType,
+)
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import (
@@ -64,6 +68,130 @@ class ConstraintTests(APITestCase):
         self.assertTrue(
             'duplicate key value violates unique constraint "unique_tag_name"'
             in str(context.exception)
+        )
+
+
+class SectorAuthorizationSoftDeleteTestCase(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Soft Delete Auth Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+        )
+        self.manager = User.objects.create_user(
+            email="manager@test.com", password="pw"
+        )
+        self.manager_2 = User.objects.create_user(
+            email="manager2@test.com", password="pw"
+        )
+        self.manager_permission = self.manager.project_permissions.create(
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
+        )
+        self.manager_2_permission = self.manager_2.project_permissions.create(
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
+        )
+        self.sector_auth = SectorAuthorization.objects.create(
+            permission=self.manager_permission,
+            sector=self.sector,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+        self.sector_auth_2 = SectorAuthorization.objects.create(
+            permission=self.manager_2_permission,
+            sector=self.sector,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+    def test_authorizations_reverse_relation_excludes_soft_deleted(self):
+        self.assertTrue(
+            self.sector.authorizations.filter(
+                permission__user=self.manager
+            ).exists()
+        )
+
+        self.sector_auth.delete()
+
+        self.assertFalse(
+            self.sector.authorizations.filter(
+                permission__user=self.manager
+            ).exists()
+        )
+        self.assertTrue(
+            self.sector.authorizations.filter(
+                permission__user=self.manager_2
+            ).exists()
+        )
+
+    def test_authorizations_manager_excludes_soft_deleted(self):
+        self.sector_auth.delete()
+
+        self.assertFalse(
+            SectorAuthorization.objects.filter(pk=self.sector_auth.pk).exists()
+        )
+        self.assertTrue(
+            SectorAuthorization.all_objects.filter(pk=self.sector_auth.pk).exists()
+        )
+
+    def test_is_manager_returns_false_for_soft_deleted_authorization(self):
+        self.assertTrue(self.sector.is_manager(self.manager))
+
+        self.sector_auth.delete()
+
+        self.assertFalse(self.sector.is_manager(self.manager))
+        self.assertTrue(self.sector.is_manager(self.manager_2))
+
+    def test_manager_authorizations_excludes_soft_deleted(self):
+        self.assertEqual(self.sector.manager_authorizations.count(), 2)
+
+        self.sector_auth.delete()
+
+        self.assertEqual(self.sector.manager_authorizations.count(), 1)
+        self.assertFalse(
+            self.sector.manager_authorizations.filter(pk=self.sector_auth.pk).exists()
+        )
+
+    def test_managers_excludes_soft_deleted_authorization(self):
+        self.assertEqual(self.sector.managers.count(), 2)
+
+        self.sector_auth.delete()
+
+        self.assertEqual(self.sector.managers.count(), 1)
+        self.assertFalse(self.sector.managers.filter(pk=self.manager.pk).exists())
+        self.assertTrue(self.sector.managers.filter(pk=self.manager_2.pk).exists())
+
+    def test_online_managers_excludes_soft_deleted_authorization(self):
+        self.manager_permission.status = "ONLINE"
+        self.manager_permission.save(update_fields=["status"])
+        self.manager_2_permission.status = "ONLINE"
+        self.manager_2_permission.save(update_fields=["status"])
+
+        self.assertEqual(self.sector.online_managers.count(), 2)
+
+        self.sector_auth.delete()
+
+        self.assertEqual(self.sector.online_managers.count(), 1)
+        self.assertFalse(
+            self.sector.online_managers.filter(pk=self.manager.pk).exists()
+        )
+        self.assertTrue(
+            self.sector.online_managers.filter(pk=self.manager_2.pk).exists()
+        )
+
+    def test_recreate_after_soft_delete_should_not_violate_uniqueness(self):
+        self.sector_auth.delete()
+
+        recreated = SectorAuthorization.objects.create(
+            permission=self.manager_permission,
+            sector=self.sector,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+        self.assertFalse(recreated.is_deleted)
+        self.assertTrue(
+            SectorAuthorization.objects.filter(pk=recreated.pk).exists()
+        )
+        self.assertTrue(
+            SectorAuthorization.all_objects.filter(pk=self.sector_auth.pk).exists()
         )
 
 
@@ -337,7 +465,7 @@ class SectorHolidayCacheInvalidationTests(TestCase):
         with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
 
@@ -357,7 +485,7 @@ class SectorHolidayCacheInvalidationTests(TestCase):
         with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
         self.assertIn(cache_key, self.cache.store)
@@ -418,7 +546,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(self.sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
 
@@ -460,7 +588,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(self.sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started outside the holiday working hours",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 
@@ -493,7 +621,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 
@@ -557,7 +685,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started outside the holiday working hours",
+            "Contact can't be done outside holiday working hours",
             str(cm.exception),
         )
 
@@ -586,7 +714,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 

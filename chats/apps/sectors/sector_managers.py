@@ -1,5 +1,3 @@
-from django.db import models
-
 from chats.core.managers import SoftDeletableManager
 
 
@@ -7,7 +5,7 @@ class SectorManager(SoftDeletableManager):
     pass
 
 
-class SectorAuthorizationManager(models.Manager):
+class SectorAuthorizationManager(SoftDeletableManager):
     def __init__(self, *args, include_deleted: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.include_deleted = include_deleted

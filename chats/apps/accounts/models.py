@@ -105,10 +105,10 @@ class Profile(BaseModel):
         User, related_name="profile", verbose_name=_("User"), on_delete=models.CASCADE
     )
     sound_new_room = models.BooleanField(
-        _("New room messages notification sound"), default=True
+        _("Notification sound for new room messages"), default=True
     )
     sound_chat_msg = models.BooleanField(
-        _("Chat messages notification sound"), default=True
+        _("Notification sound for chat messages"), default=True
     )
     sound_action = models.BooleanField(_("Action sound"), default=True)
     config = models.JSONField(

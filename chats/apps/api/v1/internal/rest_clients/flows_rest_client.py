@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 import requests
 from django.conf import settings
@@ -15,7 +15,6 @@ from chats.apps.rooms.exceptions import (
     FlowsTicketerNotFoundError,
 )
 from chats.core.requests import get_request_session_with_retries
-
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -63,11 +62,25 @@ def retry_request_and_refresh_flows_auth_token(
 
 
 class FlowsQueueMixin:
-    def create_queue(self, uuid: str, name: str, sector_uuid: str, project_uuid: str):
+    def create_queue(
+        self,
+        uuid: str,
+        name: str,
+        sector_uuid: str,
+        project_uuid: str,
+        queue_purpose: Optional[str] = None,
+    ):
+        payload = {
+            "uuid": uuid,
+            "name": name,
+            "project_uuid": project_uuid,
+        }
+        if queue_purpose is not None:
+            payload["queue_purpose"] = queue_purpose
         response = requests.post(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/",
             headers=self.headers,
-            json={"uuid": uuid, "name": name, "project_uuid": project_uuid},
+            json=payload,
         )
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -79,11 +92,20 @@ class FlowsQueueMixin:
             )
         return response
 
-    def update_queue(self, uuid: str, name: str, sector_uuid: str):
+    def update_queue(
+        self,
+        uuid: str,
+        name: str,
+        sector_uuid: str,
+        queue_purpose: Optional[str] = None,
+    ):
+        payload = {"name": name}
+        if queue_purpose is not None:
+            payload["queue_purpose"] = queue_purpose
         response = requests.patch(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
             headers=self.headers,
-            json={"name": name},
+            json=payload,
         )
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -267,6 +289,41 @@ class FlowRESTClient(
                 if flow["labels"] != [] and check_flows_labels(flow["labels"])
             ]
         return flows
+
+    def flow_exists(self, project, flow_uuid: str) -> bool:
+        """
+        Check whether a flow UUID still exists in Flows.
+
+        Returns True on transient/unexpected errors so callers do not prune
+        valid links when Flows is temporarily unavailable.
+        """
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/flows.json?uuid={flow_uuid}",
+        )
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return False
+        if response.status_code != status.HTTP_200_OK:
+            LOGGER.warning(
+                "Unexpected status checking flow %s existence: %s",
+                flow_uuid,
+                response.status_code,
+            )
+            return True
+        try:
+            data = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from flow_exists: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            return True
+
+        results = data.get("results") or []
+        return any(str(flow.get("uuid", "")) == str(flow_uuid) for flow in results)
 
     def retrieve_flow_definitions(self, project, flow_uuid, dependencies="all"):
         response = retry_request_and_refresh_flows_auth_token(

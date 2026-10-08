@@ -1,2 +1,0 @@
-class FeatureFlagInactiveError(Exception):
-    pass

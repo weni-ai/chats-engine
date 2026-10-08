@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
+    "chats.apps.assisted_sales",
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
@@ -275,6 +276,15 @@ REST_FRAMEWORK = {
         "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
         "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
         "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "external_room_history_second": env.str(
+            "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+        ),
+        "external_room_history_minute": env.str(
+            "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+        ),
+        "external_room_history_hour": env.str(
+            "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+        ),
         "ai_text_improvement": env.str(
             "AI_TEXT_IMPROVEMENT_LIMIT", default="20/minute"
         ),
@@ -289,6 +299,40 @@ EXTERNAL_MINUTE_LIMIT = env.str("EXTERNAL_MINUTE_LIMIT", default="600/minute")
 EXTERNAL_HOUR_LIMIT = env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour")
 EXTERNAL_ANON_LIMIT = env.str("EXTERNAL_ANON_LIMIT", default="100/hour")
 EXTERNAL_CRITICAL_LIMIT = env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute")
+EXTERNAL_ROOM_HISTORY_SECOND_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+)
+EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+)
+EXTERNAL_ROOM_HISTORY_HOUR_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+)
+
+ROOM_HISTORY_CACHE_TTL = env.int("ROOM_HISTORY_CACHE_TTL", default=300)
+
+BULK_SEND_HAS_PAST_MESSAGES_CACHE_TTL = env.int(
+    "BULK_SEND_HAS_PAST_MESSAGES_CACHE_TTL",
+    default=60 * 60 * 24,  # 24h
+)
+
+BULK_SEND_RECENT_HISTORY_WINDOW_MINUTES = env.int(
+    "BULK_SEND_RECENT_HISTORY_WINDOW_MINUTES",
+    default=60,
+)
+
+BULK_SEND_PROGRESS_COOLDOWN_SECONDS = env.int(
+    "BULK_SEND_PROGRESS_COOLDOWN_SECONDS",
+    default=1,
+)
+BULK_SEND_PROGRESS_RETRY_DELAY = env.int(
+    "BULK_SEND_PROGRESS_RETRY_DELAY",
+    default=1,
+)
+BULK_SEND_STALE_FINISH_MINUTES = env.int(
+    "BULK_SEND_STALE_FINISH_MINUTES",
+    default=30,
+)
 
 # Logging
 
@@ -319,6 +363,7 @@ USE_APM = env.bool("USE_APM", default=False)
 
 if USE_APM:
     INSTALLED_APPS.append("elasticapm.contrib.django")
+    MIDDLEWARE.insert(0, "elasticapm.contrib.django.middleware.TracingMiddleware")
 
     ELASTIC_APM = {
         "SERVICE_NAME": env("APM_SERVICE_NAME", default="chats-production"),
@@ -381,12 +426,24 @@ INTERNAL_CLIENTS_PERM_CACHE_TTL = env.int(
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
+CONNECT_COPILOT_CREATE_URL = env.str("CONNECT_COPILOT_CREATE_URL", default="")
+CONNECT_COPILOT_UPDATE_URL = env.str("CONNECT_COPILOT_UPDATE_URL", default="")
+CONNECT_COPILOT_REMOVE_URL = env.str("CONNECT_COPILOT_REMOVE_URL", default="")
+CONNECT_COPILOT_LIST_URL = env.str("CONNECT_COPILOT_LIST_URL", default="")
+WENI_WEBCHAT_HOST = env.str("WENI_WEBCHAT_HOST", default="https://flows.weni.ai")
+WENI_WEBCHAT_SOCKET_URL = env.str(
+    "WENI_WEBCHAT_SOCKET_URL", default="wss://websocket.weni.ai"
+)
 
 INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 NEXUS_API_URL = env.str("NEXUS_API_URL", default="")
 NEXUS_SETTINGS_CACHE_TTL = env.int("NEXUS_SETTINGS_CACHE_TTL", default=300)
 NEXUS_SETTINGS_CACHE_ENABLED = env.bool("NEXUS_SETTINGS_CACHE_ENABLED", default=True)
+NEXUS_MULTI_AGENTS_CACHE_TTL = env.int("NEXUS_MULTI_AGENTS_CACHE_TTL", default=300)
+NEXUS_MULTI_AGENTS_CACHE_ENABLED = env.bool(
+    "NEXUS_MULTI_AGENTS_CACHE_ENABLED", default=True
+)
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
 FLOWS_AUTH_TOKEN_RETRIES = env.int(
@@ -453,6 +510,9 @@ if USE_SENTRY:
         environment=env.str("ENVIRONMENT", default="develop"),
     )
 
+# JWT
+JWT_SECRET_KEY = env.str("JWT_SECRET_KEY", default="").replace("\\n", "\n")
+JWT_PUBLIC_KEY = env.str("JWT_PUBLIC_KEY", default="").replace("\\n", "\n")
 
 # Query Limiters
 
@@ -474,6 +534,7 @@ UNPERMITTED_AUDIO_TYPES = env.list(
         "webm",
     ],
 )
+MESSAGE_MEDIA_MAX_ATTACHMENTS = env.int("MESSAGE_MEDIA_MAX_ATTACHMENTS", default=5)
 
 # Maximum audio duration in seconds for transcription (default: 5 minutes)
 AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
@@ -489,6 +550,30 @@ CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
 DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
+# Inactivity feature defaults (in seconds)
+DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
+DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
+
+# Inactivity task safety caps: hard ceiling on how many rooms each periodic
+# execution may warn or close. Anything above the cap is processed by the
+# next run (the task runs every minute). Prevents one execution from
+# overflowing past the schedule window even in worst-case spikes.
+INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
+    "INACTIVITY_MAX_WARNINGS_PER_RUN", default=1000
+)
+INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
+    "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
+)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int("INACTIVITY_QUERYSET_CHUNK_SIZE", default=200)
+
+# Distributed lock used by `check_inactivity_rooms` to guarantee only one
+# instance of the task runs at a time, even if a previous run overlaps the
+# 1-minute schedule.
+INACTIVITY_TASK_LOCK_NAME = env.str(
+    "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
+)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int("INACTIVITY_TASK_LOCK_TIMEOUT", default=120)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
@@ -501,6 +586,26 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# Dedicated Celery queue for the inactivity feature so a backlog on the
+# default queue (reports, exports, archives, etc.) cannot delay the
+# `check_inactivity_rooms` beat tick, and vice versa. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
+INACTIVITY_CELERY_QUEUE = env.str("INACTIVITY_CELERY_QUEUE", default="celery")
+
+# Dedicated Celery queue for the risk alert / metric goal alerts feature,
+# following the same pattern as the inactivity queue. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
+RISK_ALERT_CELERY_QUEUE = env.str("RISK_ALERT_CELERY_QUEUE", default="celery")
+
+CELERY_TASK_ROUTES = {
+    "check_inactivity_rooms": {"queue": INACTIVITY_CELERY_QUEUE},
+    "check_metric_goal_violations": {"queue": RISK_ALERT_CELERY_QUEUE},
+    "send_metric_goal_email": {"queue": RISK_ALERT_CELERY_QUEUE},
+}
+ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
+ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
+FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS = 300.0
+
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
@@ -512,9 +617,39 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(
+            hour=ARCHIVE_CHATS_SCHEDULE_HOUR,
+            minute=ARCHIVE_CHATS_SCHEDULE_MINUTE,
+        ),
+    },
+    "check-inactivity-rooms": {
+        "task": "check_inactivity_rooms",
+        "schedule": crontab(minute="*"),
+        "options": {"queue": INACTIVITY_CELERY_QUEUE},
+    },
+    "check-metric-goal-violations": {
+        "task": "check_metric_goal_violations",
+        "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
+        "options": {"queue": RISK_ALERT_CELERY_QUEUE},
+    },
+    "finish-stale-bulk-message-sends": {
+        "task": "finish_stale_bulk_message_sends",
+        "schedule": FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS,
+    },
+    "finish-stale-bulk-quick-message-sends": {
+        "task": "finish_stale_bulk_quick_message_sends",
+        "schedule": FINISH_STALE_BULK_SENDS_SCHEDULE_SECONDS,
     },
 }
+
+METRIC_GOAL_STATE_TTL_SECONDS = env.int(
+    "METRIC_GOAL_STATE_TTL_SECONDS", default=30 * 60
+)
+METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
+    "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
+)
+# Base URL of the Weni dashboard used as the CTA link in risk alert emails.
+WENI_DASHBOARD_URL = env.str("WENI_DASHBOARD_URL", default="https://dash.weni.ai")
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
@@ -675,6 +810,17 @@ BULK_TRANSFER_MAX_ROOMS = env.int("BULK_TRANSFER_MAX_ROOMS", default=200)
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
 MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
 
+# Agent WebSocket message create idempotency (request_id)
+AGENT_MESSAGE_CREATE_REQUEST_ID_CACHE_TTL = env.int(
+    "AGENT_MESSAGE_CREATE_REQUEST_ID_CACHE_TTL", default=(60 * 60 * 24)
+)  # 24 hours
+AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_ATTEMPTS = env.int(
+    "AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_ATTEMPTS", default=10
+)
+AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_INTERVAL_SECONDS = env.float(
+    "AGENT_MESSAGE_CREATE_REQUEST_ID_POLL_INTERVAL_SECONDS", default=0.1
+)
+
 
 # Growthbook
 GROWTHBOOK_HOST_BASE_URL = env.str("GROWTHBOOK_HOST_BASE_URL", default="")
@@ -697,9 +843,6 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 # Feature flags
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
-)
-AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
 WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
     "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
@@ -733,10 +876,6 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
 )
 
 # Keys
-WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
-    "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
-    default="weniChatsPinRoomsOptimization",
-)
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
@@ -765,6 +904,15 @@ CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
     default="weniChatsChangeTicketerOnTransfer",
 )
 
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
+)
+
 
 # REPORT STATUS CACHE
 REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
@@ -773,6 +921,13 @@ REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 
+# QUICK MESSAGES CACHE
+QUICK_MESSAGES_CACHE_TTL = env.int("QUICK_MESSAGES_CACHE_TTL", default=300)
+
+# SECTOR QUICK MESSAGES CACHE
+SECTOR_QUICK_MESSAGES_CACHE_TTL = env.int(
+    "SECTOR_QUICK_MESSAGES_CACHE_TTL", default=300
+)
 
 # ROOM 24H VALID CACHE
 ROOM_24H_VALID_CACHE_TTL = env.int(
@@ -797,6 +952,17 @@ ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
 )
+# Page size for keyset-paginated message iteration during archive.
+# Keeps peak memory bounded to one page of messages + their medias.
+ARCHIVE_CHATS_MESSAGE_PAGE_SIZE = env.int(
+    "ARCHIVE_CHATS_MESSAGE_PAGE_SIZE", default=500
+)
+# Soft-lock threshold used by ArchiveChatsService to decide whether an
+# in-progress RoomArchivedConversation is still being processed by another
+# worker or stale enough to be reclaimed.
+ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS = env.int(
+    "ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS", default=12
+)
 
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
@@ -808,11 +974,6 @@ INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 # they are not part of the organizations operational team.
 VTEX_INTERNAL_DOMAINS = env.list(
     "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
-)
-
-# Queue Limit
-QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
-    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
 )
 
 # Bulk Queue Create Settings
@@ -831,6 +992,10 @@ USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
     "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
     default="weniChatsUseFlowsMediaUrl",
 )
+NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY = env.str(
+    "NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY",
+    default="weniChatsNinthDigitSearch",
+)
 
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
 
@@ -840,17 +1005,38 @@ AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY = env.str(
     default="weniChatsAgentCapacityRecheck",
 )
 
-# Improve User Message
-IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
-    default="weniChatsAITextImprovement",
-)
-
 # Agents Management (Quick Agent Setup)
 AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
 )
+
+ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY = env.str(
+    "ASSISTED_SALES_COPILOT_FEATURE_FLAG_KEY",
+    default="weniChatsAssistedSalesCopilot",
+)
+
+# Product catalog/carousel messages sent by agents via WebSocket and
+# forwarded to the mailroom. Separate from the Copilot flag above.
+MESSAGE_CATALOG_FEATURE_FLAG_KEY = env.str(
+    "MESSAGE_CATALOG_FEATURE_FLAG_KEY",
+    default="weniChatsAssistedSales",
+)
+
+# Metric Goal Alerts (risk alerts)
+METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY = env.str(
+    "METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY",
+    default="weniChatsMetricGoalAlerts",
+)
+OUT_OFF_WHATSAPP_RESPONSE_WINDOW_FEATURE_FLAG_KEY = env.str(
+    "OUT_OFF_WHATSAPP_RESPONSE_WINDOW_FEATURE_FLAG_KEY",
+    default="weniChatsOutOffWhatsappResponseWindow",
+)
+METRIC_GOAL_ALERTS_FEATURE_FLAG_CACHE_TTL = env.int(
+    "METRIC_GOAL_ALERTS_FEATURE_FLAG_CACHE_TTL",
+    default=30,
+)
+
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )

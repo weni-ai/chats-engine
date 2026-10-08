@@ -1,0 +1,1042 @@
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
+
+from django.test import override_settings
+from django.utils import timezone
+from django.utils.crypto import get_random_string
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from chats.apps.api.utils import create_user_and_token
+from chats.apps.assisted_sales.enums import CopilotMessageFeedbackTags
+from chats.apps.assisted_sales.exceptions import CopilotConnectError
+from chats.apps.assisted_sales.models import CopilotIntegration, CopilotMessageFeedback
+from chats.apps.contacts.models import Contact
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
+
+
+class CopilotFeatureFlagMixin:
+    def setUp(self):
+        super().setUp()
+        for target in (
+            "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+        ):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+
+@override_settings(
+    CONNECT_COPILOT_CREATE_URL="https://connect.example.com/copilot/create",
+    NEXUS_API_URL="https://nexus.example.com",
+    WENI_WEBCHAT_HOST="https://flows.weni.ai",
+    WENI_WEBCHAT_SOCKET_URL="wss://websocket.weni.ai",
+)
+class CopilotProjectCreateViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.user.first_name = "edu"
+        self.user.save(update_fields=["first_name"])
+        self.project = Project.objects.create(
+            name="Live Desk",
+            timezone="UTC",
+            org=str(uuid4()),
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.url = "/v1/project/copilot/create"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _connect_payload(self):
+        return {
+            "uuid": str(uuid4()),
+            "name": "projeto copilot teste",
+            "created_on": "2026-08-12T12:00:00Z",
+            "channel_uuid": str(uuid4()),
+        }
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_create_copilot_integration(self, mock_client_cls):
+        connect_data = self._connect_payload()
+        mock_client = MagicMock()
+        mock_client.create_copilot_project.return_value = connect_data
+        mock_client.get_assigned_agents.return_value = 5
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "projeto copilot teste")
+        self.assertEqual(response.data["assigned_agents"], 5)
+        self.assertEqual(response.data["connected_by"], "edu")
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnect_by"], "")
+        self.assertIsNone(response.data["disconnect_on"])
+        self.assertEqual(response.data["project_uuid"], connect_data["uuid"])
+        integration = CopilotIntegration.objects.get(uuid=response.data["uuid"])
+        self.assertTrue(integration.is_connected)
+        self.assertIsNone(integration.disconnected_by)
+        self.assertIsNone(integration.disconnected_on)
+        self.assertEqual(integration.assigned_agents, 5)
+        self.assertEqual(str(integration.copilot_project_uuid), connect_data["uuid"])
+        self.assertEqual(integration.connection["connectOn"], "mount")
+        self.assertEqual(
+            integration.connection["channelUuid"], connect_data["channel_uuid"]
+        )
+        mock_client.create_copilot_project.assert_called_once_with(
+            name="projeto copilot teste",
+            parent_project_uuid=str(self.project.uuid),
+            organization_uuid=str(self.project.org),
+            timezone="UTC",
+            date_format=self.project.date_format,
+            authorization=f"Token {self.token.key}",
+        )
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_create_fails_when_connect_fails(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.create_copilot_project.side_effect = CopilotConnectError(
+            status_code=502, error="Connect unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Connect unavailable")
+        self.assertFalse(CopilotIntegration.objects.exists())
+
+    def test_create_forbidden_without_permission(self):
+        other, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CopilotIntegration.objects.exists())
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_create_rejects_duplicate_integration(self, mock_client_cls):
+        CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=uuid4(),
+            name="existing",
+            assigned_agents=1,
+            connected_by=self.user,
+        )
+
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        mock_client_cls.return_value.create_copilot_project.assert_not_called()
+
+    @patch(
+        "chats.apps.assisted_sales.views.is_assisted_sales_copilot_enabled",
+        return_value=False,
+    )
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_create_forbidden_when_feature_flag_is_off(self, mock_client_cls, _flag):
+        response = self.client.post(
+            self.url,
+            {"name": "projeto copilot teste", "project": str(self.project.uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_client_cls.return_value.create_copilot_project.assert_not_called()
+        self.assertFalse(CopilotIntegration.objects.exists())
+
+
+@override_settings(
+    CONNECT_COPILOT_UPDATE_URL="https://connect.example.com/copilot/{uuid}",
+    NEXUS_API_URL="https://nexus.example.com",
+)
+class CopilotProjectUpdateViewTests(CopilotFeatureFlagMixin, APITestCase):
+    EXPECTED_ASSIGNED_AGENTS = 3
+    EXPECTED_ASSIGNED_AGENTS_SWITCH = 1
+
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.user.first_name = "edu"
+        self.user.save(update_fields=["first_name"])
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.old_copilot_uuid = uuid4()
+        self.new_copilot_uuid = uuid4()
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.old_copilot_uuid,
+            name="copilot antigo",
+            assigned_agents=2,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/update/{self.integration.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_copilot_integration(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.switch_copilot_project.return_value = {
+            "uuid": str(self.new_copilot_uuid),
+            "name": "copilot novo",
+            "channel_uuid": str(uuid4()),
+        }
+        mock_client.get_assigned_agents.return_value = 7
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            self.url, {"new_uuid": str(self.new_copilot_uuid)}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "copilot novo")
+        self.assertEqual(response.data["assigned_agents"], 7)
+        self.assertEqual(str(response.data["uuid"]), str(self.integration.uuid))
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.name, "copilot novo")
+        self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
+        self.assertEqual(self.integration.assigned_agents, 7)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_fails_when_connect_fails(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.switch_copilot_project.side_effect = CopilotConnectError(
+            status_code=502, error="Connect unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            self.url, {"new_uuid": str(self.new_copilot_uuid)}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.copilot_project_uuid, self.old_copilot_uuid)
+
+    def test_update_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.put(
+            self.url, {"new_uuid": str(self.new_copilot_uuid)}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_with_live_desk_uuid_links_existing_copilot(self, mock_client_cls):
+        self.integration.delete()
+        mock_client = MagicMock()
+        mock_client.get_assigned_agents.return_value = self.EXPECTED_ASSIGNED_AGENTS
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            f"/v1/project/copilot/update/{self.project.uuid}",
+            {"new_uuid": str(self.new_copilot_uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_client.create_copilot_project.assert_not_called()
+        mock_client.switch_copilot_project.assert_not_called()
+        integration = CopilotIntegration.objects.get(project=self.project)
+        self.assertEqual(integration.copilot_project_uuid, self.new_copilot_uuid)
+        self.assertEqual(integration.assigned_agents, self.EXPECTED_ASSIGNED_AGENTS)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_update_with_live_desk_uuid_switches_when_integration_exists(
+        self, mock_client_cls
+    ):
+        mock_client = MagicMock()
+        mock_client.switch_copilot_project.return_value = {
+            "uuid": str(self.new_copilot_uuid),
+            "name": "copilot novo",
+        }
+        mock_client.get_assigned_agents.return_value = (
+            self.EXPECTED_ASSIGNED_AGENTS_SWITCH
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.put(
+            f"/v1/project/copilot/update/{self.project.uuid}",
+            {"new_uuid": str(self.new_copilot_uuid)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_client.switch_copilot_project.assert_called_once()
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.copilot_project_uuid, self.new_copilot_uuid)
+
+    def test_put_reconnects_integration(self):
+        self.integration.is_connected = False
+        self.integration.disconnected_by = self.user
+        self.integration.disconnected_on = timezone.now()
+        self.integration.save(
+            update_fields=["is_connected", "disconnected_by", "disconnected_on"]
+        )
+
+        response = self.client.put(self.url, {"is_connected": True}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnect_by"], "")
+        self.assertIsNone(response.data["disconnect_on"])
+        self.integration.refresh_from_db()
+        self.assertTrue(self.integration.is_connected)
+        self.assertIsNone(self.integration.disconnected_by)
+        self.assertIsNone(self.integration.disconnected_on)
+        self.assertEqual(self.integration.copilot_project_uuid, self.old_copilot_uuid)
+
+
+class CopilotProjectRemoveViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=uuid4(),
+            name="copilot",
+            assigned_agents=2,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/remove/{self.integration.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_remove_copilot_integration(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"status": 200})
+        self.integration.refresh_from_db()
+        self.assertFalse(self.integration.is_connected)
+        self.assertEqual(self.integration.disconnected_by, self.user)
+        self.assertIsNotNone(self.integration.disconnected_on)
+        mock_client.remove_copilot_project.assert_not_called()
+
+    def test_remove_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(
+            CopilotIntegration.objects.filter(uuid=self.integration.uuid).exists()
+        )
+
+
+class CopilotLinkedProjectViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.user.first_name = "edu"
+        self.user.save(update_fields=["first_name"])
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            assigned_agents=2,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/linked_project/{self.project.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_get_linked_copilot_project(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_assigned_agents.return_value = 5
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "Projeto copilot teste")
+        self.assertEqual(response.data["assigned_agents"], 5)
+        self.assertEqual(response.data["connect_by"], "edu")
+        self.assertTrue(response.data["is_connected"])
+        self.assertEqual(response.data["disconnect_by"], "")
+        self.assertIsNone(response.data["disconnect_on"])
+        self.assertEqual(str(response.data["uuid"]), str(self.integration.uuid))
+        self.assertEqual(str(response.data["project_uuid"]), str(self.copilot_uuid))
+        self.integration.refresh_from_db()
+        self.assertEqual(self.integration.assigned_agents, 5)
+
+    def test_get_linked_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_linked_returns_empty_when_integration_is_missing(self):
+        self.integration.delete()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+
+class CopilotListConnectionsViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        self.connection = {
+            "socketUrl": "wss://websocket.weni.ai",
+            "channelUuid": "channel-uuid",
+            "host": "https://flows.weni.ai",
+            "connectOn": "mount",
+            "storage": "local",
+            "callbackUrl": "",
+        }
+        self.integration = CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/{self.project.uuid}/copilot/list_connections"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def test_list_connections_returns_one_item_when_not_principal(self):
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["sector"], None)
+        self.assertEqual(str(response.data[0]["project_uuid"]), str(self.copilot_uuid))
+        self.assertEqual(response.data[0]["conection"], self.connection)
+
+    def test_list_connections_returns_org_integrations_when_principal(self):
+        other_project = Project.objects.create(
+            name="Other Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        other_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=other_project,
+            copilot_project_uuid=other_uuid,
+            name="Outro copiloto",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+
+        response = self.client.get(self.url, {"is_principal": "true"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(
+            {str(item["project_uuid"]) for item in response.data},
+            {str(self.copilot_uuid), str(other_uuid)},
+        )
+
+    def test_list_connections_hides_disconnected_integration(self):
+        self.integration.is_connected = False
+        self.integration.save(update_fields=["is_connected"])
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_list_connections_fills_sector_from_secondary_project_when_principal(self):
+        secondary = Project.objects.create(
+            name="Secundario CSAT 2", timezone="UTC", org=str(self.org_uuid)
+        )
+        sector = Sector.objects.create(
+            name="Secundário CSAT 2",
+            project=self.project,
+            rooms_limit=5,
+            secondary_project={"uuid": str(secondary.uuid)},
+        )
+        copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=secondary,
+            copilot_project_uuid=copilot_uuid,
+            name="Secundário CSAT 2",
+            connection=self.connection,
+            connected_by=self.user,
+        )
+
+        response = self.client.get(self.url, {"is_principal": "true"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_copilot = {str(item["project_uuid"]): item for item in response.data}
+        self.assertEqual(str(by_copilot[str(copilot_uuid)]["sector"]), str(sector.uuid))
+        self.assertIsNone(by_copilot[str(self.copilot_uuid)]["sector"])
+
+    def test_list_connections_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url, {"is_principal": "false"})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CopilotExistingProjectsViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="Projeto copilot teste",
+            assigned_agents=5,
+            connected_by=self.user,
+        )
+        self.url = f"/v1/project/copilot/list_existing_projects/{self.org_uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @override_settings(CONNECT_API_URL="", CONNECT_COPILOT_LIST_URL="")
+    def test_list_existing_from_local_integrations(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["name"], "Projeto copilot teste")
+        self.assertEqual(response.data[0]["assigned_agents"], 5)
+        self.assertEqual(str(response.data[0]["uuid"]), str(self.copilot_uuid))
+
+    @override_settings(CONNECT_API_URL="", CONNECT_COPILOT_LIST_URL="")
+    def test_list_existing_filters_by_name(self):
+        response = self.client.get(self.url, {"name": "inexistente"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_list_existing_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(CONNECT_API_URL="https://connect.example.com")
+class CopilotCreatePermissionViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.org_uuid = uuid4()
+        self.project = Project.objects.create(
+            name="Live Desk", timezone="UTC", org=str(self.org_uuid)
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.url = f"/v1/project/copilot/can_create/{self.project.uuid}"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _organization(self, role):
+        return {
+            "uuid": str(self.org_uuid),
+            "authorization": {
+                "user__username": self.user.email,
+                "user__email": self.user.email,
+                "role": role,
+                "is_admin": role == 3,
+            },
+            "authorizations": {
+                "count": 1,
+                "users": [
+                    {
+                        "username": self.user.email,
+                        "first_name": "Edu",
+                        "last_name": "",
+                        "role": role,
+                        "photo_user": None,
+                    }
+                ],
+            },
+        }
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_true_when_user_is_org_admin(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_organization.return_value = self._organization(3)
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": True})
+        mock_client.get_organization.assert_called_once_with(
+            str(self.org_uuid), f"Token {self.token.key}"
+        )
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_false_when_user_is_not_org_admin(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_organization.return_value = self._organization(2)
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": False})
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_false_when_project_has_no_org(self, mock_client_cls):
+        self.project.org = None
+        self.project.save(update_fields=["org"])
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"can_create": False})
+        mock_client_cls.return_value.get_organization.assert_not_called()
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_forbidden_without_permission(self, mock_client_cls):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_client_cls.return_value.get_organization.assert_not_called()
+
+    def test_returns_not_found_for_unknown_project(self):
+        response = self.client.get(f"/v1/project/copilot/can_create/{uuid4()}")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_connect_error(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.get_organization.side_effect = CopilotConnectError(
+            status_code=502, error="Connect unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Connect unavailable")
+
+
+class CopilotRoomMessagesViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+        self.room = Room.objects.create(
+            queue=self.queue, contact=self.contact, urn="ext:57619149186@"
+        )
+        self.copilot_uuid = uuid4()
+        CopilotIntegration.objects.create(
+            project=self.project,
+            copilot_project_uuid=self.copilot_uuid,
+            name="copilot",
+        )
+        self.url = f"/v1/room/{self.room.uuid}/copilot/messages/"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_lists_messages_and_rewrites_next_url(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.list_internal_messages.return_value = {
+            "next": (
+                "https://flows.example.com/api/v2/internals/messages"
+                "?cursor=abc123&project_uuid=copilot"
+            ),
+            "previous": None,
+            "results": [
+                {
+                    "id": 123,
+                    "contact": {"uuid": "c1", "name": "Junior"},
+                    "urn": str(self.room.uuid),
+                    "channel": {"uuid": "ch1", "name": "WWC"},
+                    "direction": "in",
+                    "text": "Test message 1",
+                    "created_on": "2026-09-01T12:00:00.000000Z",
+                }
+            ],
+        }
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(
+            self.url, {"project": str(self.project.uuid)}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"][0]["text"], "Test message 1")
+        self.assertIsNone(response.data["previous"])
+        self.assertIn(
+            f"/v1/room/{self.room.uuid}/copilot/messages/", response.data["next"]
+        )
+        self.assertIn("cursor=abc123", response.data["next"])
+        self.assertIn(f"project={self.project.uuid}", response.data["next"])
+        mock_client.list_internal_messages.assert_called_once()
+
+    def test_requires_project(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "Project not provided")
+
+    def test_forbidden_without_permission(self):
+        _, other_token = create_user_and_token("other")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self.client.get(self.url, {"project": str(self.project.uuid)})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_not_found_without_integration(self):
+        CopilotIntegration.objects.all().delete()
+
+        response = self.client.get(self.url, {"project": str(self.project.uuid)})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("chats.apps.assisted_sales.usecases.CopilotConnectClient")
+    def test_returns_flows_error(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.list_internal_messages.side_effect = CopilotConnectError(
+            status_code=502, error="Flows unavailable"
+        )
+        mock_client_cls.return_value = mock_client
+
+        response = self.client.get(self.url, {"project": str(self.project.uuid)})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["error"], "Flows unavailable")
+
+
+class CopilotMessageFeedbackViewTests(CopilotFeatureFlagMixin, APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.user, self.token = create_user_and_token("edu")
+        self.project = Project.objects.create(name="Live Desk", timezone="UTC")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+        self.room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            urn="ext:57619149186@",
+            user=self.user,
+        )
+        self.url = f"/v1/room/{self.room.uuid}/copilot/feedback/"
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _post(self, data, room_uuid=None):
+        url = (
+            self.url if room_uuid is None else f"/v1/room/{room_uuid}/copilot/feedback/"
+        )
+        return self.client.post(url, data, format="json")
+
+    def test_thumb_up_creates_feedback(self):
+        response = self._post(
+            {"message_id": "msg-1", "liked": True, "text": "", "tags": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["message_id"], "msg-1")
+        self.assertTrue(response.data["liked"])
+        self.assertEqual(response.data["text"], "")
+        self.assertEqual(response.data["tags"], [])
+        self.assertEqual(str(response.data["room"]), str(self.room.uuid))
+
+        feedback = CopilotMessageFeedback.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(feedback.user, self.user)
+        self.assertEqual(feedback.room, self.room)
+        self.assertEqual(feedback.message_id, "msg-1")
+
+    def test_resubmit_updates_feedback_without_duplicating(self):
+        first = self._post({"message_id": "msg-1", "liked": True})
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": "Needs work",
+                "tags": [CopilotMessageFeedbackTags.INCORRECT_ANSWER],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], first.data["uuid"])
+        self.assertFalse(response.data["liked"])
+        self.assertEqual(response.data["text"], "Needs work")
+        self.assertEqual(
+            response.data["tags"], [CopilotMessageFeedbackTags.INCORRECT_ANSWER]
+        )
+        self.assertEqual(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1"
+            ).count(),
+            1,
+        )
+
+    def test_same_message_from_another_user_creates_separate_record(self):
+        first = self._post({"message_id": "msg-1", "liked": True})
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        other_user, other_token = create_user_and_token("other")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=other_user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.room.user = other_user
+        self.room.save(update_fields=["user"])
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotEqual(response.data["uuid"], first.data["uuid"])
+        self.assertEqual(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1"
+            ).count(),
+            2,
+        )
+        self.assertTrue(
+            CopilotMessageFeedback.objects.filter(
+                room=self.room, message_id="msg-1", user=other_user
+            ).exists()
+        )
+
+    def test_invalid_tag_returns_400(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "tags": ["INVALID_TAG"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_text_exceeds_max_length_returns_400(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": get_random_string(length=151),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("text", response.data)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_negative_feedback_without_tag_or_text_returns_400(self):
+        response = self._post(
+            {"message_id": "msg-1", "liked": False, "text": "", "tags": []}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_negative_feedback_with_text_only_is_accepted(self):
+        response = self._post(
+            {
+                "message_id": "msg-1",
+                "liked": False,
+                "text": "Suggested items were unrelated",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["text"], "Suggested items were unrelated")
+        self.assertEqual(response.data["tags"], [])
+
+    def test_missing_liked_returns_400(self):
+        response = self._post({"message_id": "msg-1"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("liked", response.data)
+
+    def test_missing_message_id_returns_400(self):
+        response = self._post({"liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("message_id", response.data)
+
+    def test_room_does_not_exist_returns_404(self):
+        response = self._post({"message_id": "msg-1", "liked": True}, room_uuid=uuid4())
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_is_not_the_room_agent_returns_403(self):
+        other_user, other_token = create_user_and_token("other-agent")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=other_user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {other_token.key}")
+
+        response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_feature_flag_disabled_returns_403(self):
+        with patch(
+            "chats.apps.assisted_sales.usecases.is_assisted_sales_copilot_enabled",
+            return_value=False,
+        ):
+            response = self._post({"message_id": "msg-1", "liked": True})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CopilotMessageFeedback.objects.exists())
+
+    def test_get_feedback_by_message_id(self):
+        created = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+
+        response = self.client.get(self.url, {"message_id": "msg-1"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(str(response.data["uuid"]), str(created.uuid))
+        self.assertEqual(response.data["message_id"], "msg-1")
+        self.assertTrue(response.data["liked"])
+
+    def test_get_feedback_by_message_id_not_found(self):
+        response = self.client.get(self.url, {"message_id": "msg-missing"})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_list_returns_only_current_user_feedbacks(self):
+        other_user, _ = create_user_and_token("other-list")
+        mine_first = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-1",
+            liked=True,
+        )
+        mine_second = CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=self.user,
+            message_id="msg-2",
+            liked=False,
+            tags=[CopilotMessageFeedbackTags.SLOW_TO_LOAD],
+        )
+        CopilotMessageFeedback.objects.create(
+            room=self.room,
+            user=other_user,
+            message_id="msg-1",
+            liked=False,
+            text="Other user",
+            tags=[CopilotMessageFeedbackTags.INCORRECT_ANSWER],
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            [str(item["uuid"]) for item in results],
+            [str(mine_first.uuid), str(mine_second.uuid)],
+        )
+        self.assertEqual(results[0]["message_id"], "msg-1")
+        self.assertEqual(results[1]["message_id"], "msg-2")

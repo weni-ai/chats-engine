@@ -1,5 +1,8 @@
 from django.urls import re_path
 
+from chats.apps.api.websockets.dashboard.consumers.metric_goal_alerts import (
+    MetricGoalAlertConsumer,
+)
 from chats.apps.api.websockets.rooms.consumers import agent, contact, manager
 
 websocket_urlpatterns = [
@@ -7,5 +10,9 @@ websocket_urlpatterns = [
     re_path(r"ws/manager/rooms", manager.ManagerAgentRoomConsumer.as_asgi()),
     re_path(
         r"ws/contact/room/(?P<room>[0-9a-f-]+)/$", contact.ContactRoomConsumer.as_asgi()
+    ),
+    re_path(
+        r"ws/dashboard/metric-goals/?$",
+        MetricGoalAlertConsumer.as_asgi(),
     ),
 ]

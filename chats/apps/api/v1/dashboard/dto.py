@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from chats.apps.projects.models import Project, ProjectPermission
 
-
 EXCLUDED_DOMAINS = ["weni.ai", "vtex.com", "inspiria.studio"]
 
 
@@ -57,6 +56,7 @@ class Filters:
     sector: list = None
     queue: list = None
     tag: list = None
+    channels: list = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None

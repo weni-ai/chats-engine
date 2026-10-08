@@ -66,6 +66,37 @@ class BulkQueueCreationUseCaseTests(TestCase):
         self.assertTrue(queue.is_queue_limit_active)
 
     @override_settings(USE_WENI_FLOWS=False)
+    def test_persists_queue_purpose(self):
+        self._make_use_case(
+            queues_data=[
+                {
+                    "name": "Fila Com Purpose",
+                    "queue_purpose": "Atendimento prioritário",
+                }
+            ],
+        ).execute()
+
+        queue = Queue.objects.get(sector=self.sector, name="Fila Com Purpose")
+        self.assertEqual(queue.queue_purpose, "Atendimento prioritário")
+
+    @override_settings(USE_WENI_FLOWS=True)
+    @patch("chats.apps.queues.usecases.bulk_queue_creation.FlowRESTClient")
+    def test_syncs_queue_purpose_with_flows(self, mock_flows):
+        mock_flows.return_value.create_queue.return_value = make_flows_response()
+
+        self._make_use_case(
+            queues_data=[
+                {
+                    "name": "Fila Com Purpose",
+                    "queue_purpose": "Atendimento prioritário",
+                }
+            ],
+        ).execute()
+
+        call_kwargs = mock_flows.return_value.create_queue.call_args.kwargs
+        self.assertEqual(call_kwargs["queue_purpose"], "Atendimento prioritário")
+
+    @override_settings(USE_WENI_FLOWS=False)
     def test_creates_queue_authorizations_for_agents_with_project_permission(self):
         agent = User.objects.create(email="agent@test.com")
         ProjectPermission.objects.create(

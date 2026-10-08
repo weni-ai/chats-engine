@@ -28,6 +28,39 @@ class QueueLimitSerializer(serializers.Serializer):
         return data
 
 
+def apply_selected_flows(serializer, data):
+    """
+    Sync selected_flows with bond_flows_queue.
+
+    The frontend always sends the full desired list (replace, not append).
+    When the feature is disabled, selected_flows must be an empty list.
+    """
+    initial = serializer.initial_data or {}
+    instance = serializer.instance
+
+    bond = data.get(
+        "bond_flows_queue",
+        getattr(instance, "bond_flows_queue", False) if instance else False,
+    )
+
+    if not bond:
+        if (
+            "bond_flows_queue" in initial
+            or "selected_flows" in initial
+            or instance is None
+        ):
+            data["selected_flows"] = []
+        return data
+
+    if "selected_flows" in initial:
+        flows = data.get("selected_flows") or []
+        data["selected_flows"] = [str(flow_uuid) for flow_uuid in flows]
+    elif instance is None:
+        data.setdefault("selected_flows", [])
+
+    return data
+
+
 class QueueSerializer(AuditableModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
@@ -35,6 +68,10 @@ class QueueSerializer(AuditableModelSerializer):
         source="sector.required_tags", read_only=True
     )
     queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
 
     class Meta:
         model = Queue
@@ -48,13 +85,19 @@ class QueueSerializer(AuditableModelSerializer):
             "is_deleted",
             "config",
             "name",
+            "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "sector",
         ]
 
-    def _get_audit_project(self):
+    def _get_audit_project(self, data=None):
         if self.instance is not None:
             return self.instance.sector.project
-        sector = (self.validated_data or {}).get("sector")
+        source = data if data is not None else getattr(self, "_validated_data", None)
+        if not source:
+            return None
+        sector = source.get("sector")
         return sector.project if sector else None
 
     def validate(self, data):
@@ -64,20 +107,18 @@ class QueueSerializer(AuditableModelSerializer):
         name = data.get("name")
         if name:
             if name == "":
-                raise serializers.ValidationError(
-                    {"detail": _("The name field can't be blank.")}
-                )
+                raise serializers.ValidationError({"detail": _("Enter a name")})
             if self.instance:
                 if Queue.objects.filter(
                     sector=self.instance.sector, name=name
                 ).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
             else:
                 if Queue.objects.filter(sector=data["sector"], name=name).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
 
         queue_limit = data.pop("queue_limit_info", None)
@@ -89,7 +130,7 @@ class QueueSerializer(AuditableModelSerializer):
             if "limit" in queue_limit:
                 data["queue_limit"] = queue_limit.get("limit")
 
-        return data
+        return apply_selected_flows(self, data)
 
 
 class QueueSimpleSerializer(serializers.ModelSerializer):
@@ -99,11 +140,19 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
 
 
 class QueueUpdateSerializer(AuditableModelSerializer):
+    selected_flows = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
+
     class Meta:
         model = Queue
         fields = "__all__"
 
         extra_kwargs = {field: {"required": False} for field in fields}
+
+    def validate(self, data):
+        return apply_selected_flows(self, data)
 
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
@@ -117,6 +166,9 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "name",
+            "queue_purpose",
+            "bond_flows_queue",
+            "selected_flows",
             "agents",
             "created_on",
             "sector_name",
@@ -151,7 +203,7 @@ class QueueAuthorizationSerializer(AuditableModelSerializer):
         )
         if queue_user:
             raise serializers.ValidationError(
-                {"detail": _("you cant add a user two times in same queue.")}
+                {"detail": _("You can't add a user twice to the same queue")}
             )
         return data
 
@@ -195,14 +247,38 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
         ]
 
     def get_status(self, obj):
+        # Prefer annotations set by the view to avoid N+1 queries.
+        pause_name = getattr(obj, "_pause_name", None)
+        if pause_name:
+            return pause_name
+
+        is_online = getattr(obj, "_is_online", None)
+        if is_online is not None:
+            return "online" if is_online else "offline"
+
         project = self.context.get("project")
-        if project:
-            project_permission = obj.project_permissions.filter(project=project)
-            if (
-                project_permission.exists()
-                and project_permission.first().status == "ONLINE"
-            ):
-                return "online"
+        if not project:
+            return "offline"
+
+        from chats.apps.projects.models.models import CustomStatus
+
+        active_pause = (
+            CustomStatus.objects.filter(
+                user_id=obj.email, project=project, is_active=True
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .select_related("status_type")
+            .order_by("-created_on")
+            .first()
+        )
+        if active_pause:
+            return active_pause.status_type.name
+
+        project_permission = obj.project_permissions.filter(
+            project=project, is_deleted=False
+        ).first()
+        if project_permission and project_permission.status == "ONLINE":
+            return "online"
         return "offline"
 
 
@@ -221,6 +297,9 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
+    queue_purpose = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(
@@ -286,23 +365,5 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                     "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing_names)}."
                 }
             )
-
-        if request:
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                request.user.email,
-                str(sector.project.uuid),
-            )
-            for queue_data in queues:
-                queue_limit = queue_data.get("queue_limit")
-                if (
-                    queue_limit
-                    and not is_queue_limit_feature_active
-                    and queue_limit.get("is_active") is True
-                ):
-                    raise serializers.ValidationError(
-                        {"detail": _("Queue limit feature is not active.")},
-                        code="queue_limit_feature_flag_is_off",
-                    )
 
         return data

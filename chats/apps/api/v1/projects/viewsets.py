@@ -9,11 +9,16 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -35,39 +40,60 @@ from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
+    OutOffWhatsappStartFlowSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
     UpdateProjectSerializer,
 )
+from chats.apps.contacts.feature_flags import (
+    is_out_off_whatsapp_response_window_enabled,
+)
 from chats.apps.contacts.models import Contact
+from chats.apps.contacts.usecases.out_off_whatsapp_response_window import (
+    InvalidOutOffWindowFilter,
+    parse_csv,
+)
 from chats.apps.projects.models import (
-    ContactGroupFlowReference,
     CustomStatus,
     CustomStatusType,
     Project,
     ProjectPermission,
 )
+from chats.apps.projects.usecases.close_org_rooms import CloseOrgRoomsUseCase
 from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
+    ActiveFlowStartError,
+    NoContactsToStartFlowError,
+    StartFlowPermissionError,
 )
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
+from chats.apps.projects.usecases.get_latest_unified_sac_migration import (
+    GetLatestUnifiedSacMigrationUseCase,
+)
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.start_flow import (
+    StartFlowUseCase,
+    StartOutOffWhatsappFlowUseCase,
+)
+from chats.apps.projects.usecases.start_unified_sac_migration import (
+    StartUnifiedSacMigrationError,
+    StartUnifiedSacMigrationUseCase,
+    UnifiedSacMigrationInProgressError,
+)
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.usecases.filter_flows_by_queue import filter_flows_by_user_queues
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
-from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 
 logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
+    MetricGoalActionsMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -280,6 +306,12 @@ class ProjectViewset(
         flow_list = FlowRESTClient().list_flows(
             project, cursor=cursor, verify_chats_tag=verify_chats_tag
         )
+        flow_list = filter_flows_by_user_queues(
+            flow_list,
+            project,
+            request.user,
+            queue_uuid=request.query_params.get("queue") or None,
+        )
 
         return Response(flow_list, status.HTTP_200_OK)
 
@@ -309,20 +341,7 @@ class ProjectViewset(
 
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
-
-        try:
-            result = usecase.execute(flow_uuid)
-        except (FlowTemplateNotFound, FlowTemplateChannelsNotFound) as exc:
-            logger.warning(
-                "Flow templates retrieval failed: project=%s flow=%s error=%s",
-                project.uuid,
-                flow_uuid,
-                exc,
-            )
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        result = usecase.execute(flow_uuid)
 
         templates = [
             {
@@ -341,24 +360,6 @@ class ProjectViewset(
             status=status.HTTP_200_OK,
         )
 
-    def _create_flow_start_instances(self, data, flow_start):
-        groups = data.get("groups", [])
-        contacts = data.get("contacts", [])
-        instances = []
-        for group in groups:
-            reference = ContactGroupFlowReference(
-                receiver_type="group", external_id=group, flow_start=flow_start
-            )
-            instances.append(reference)
-
-        for contact in contacts:
-            reference = ContactGroupFlowReference(
-                receiver_type="contact", external_id=contact, flow_start=flow_start
-            )
-            instances.append(reference)
-
-        flow_start.references.bulk_create(instances)
-
     @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
@@ -372,61 +373,56 @@ class ProjectViewset(
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        flow = data.get("flow", None)
-
         try:
-            perm = project.permissions.get(user=request.user)
-        except ObjectDoesNotExist:
-            return Response(
-                {"Detail": "the user does not have permission in this project"},
-                status.HTTP_401_UNAUTHORIZED,
+            flow_start = StartFlowUseCase().execute(
+                project, request.user, serializer.validated_data
             )
-        contact_id = data.get("contacts")[0]
-        flow_start_data = {
-            "permission": perm,
-            "flow": flow,
-            "contact_data": {
-                "name": data.pop("contact_name"),
-                "external_id": contact_id,
-            },
+        except StartFlowPermissionError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_401_UNAUTHORIZED)
+        except ActiveFlowStartError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
+        return Response(flow_start, status.HTTP_200_OK)
+
+    @swagger_auto_schema(auto_schema=None)
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="out_off_whatsapp_response_window/start_flow",
+        url_name="out_off_whatsapp_response_window_start_flow",
+        serializer_class=OutOffWhatsappStartFlowSerializer,
+    )
+    def start_out_off_whatsapp_response_window_flow(self, request, *args, **kwargs):
+        """Start a flow for contacts outside the WhatsApp 24h window."""
+        project = self.get_object()
+        if not is_out_off_whatsapp_response_window_enabled(project.uuid):
+            raise PermissionDenied("Feature not available for this project.")
+
+        serializer = OutOffWhatsappStartFlowSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        filters = {
+            "sectors": parse_csv(request.query_params.get("sectors")),
+            "queues": parse_csv(request.query_params.get("queues")),
+            "search": request.query_params.get("search"),
+            "user_email": request.query_params.get("user"),
         }
-        room_id = data.get("room", None)
 
         try:
-            room = Room.objects.get(
-                pk=room_id, is_active=True, contact__external_id=contact_id
+            flow_start = StartOutOffWhatsappFlowUseCase().execute(
+                project=project,
+                user=request.user,
+                flow=serializer.validated_data["flow"],
+                ignored_contacts=serializer.validated_data.get("ignored_contacts"),
+                filters=filters,
+                send_to_all=serializer.validated_data.get("send_to_all", True),
+                included_contacts=serializer.validated_data.get("included_contacts"),
             )
-            if room.flowstarts.filter(is_deleted=False).exists():
-                return Response(
-                    {"Detail": "There already is an active flow start for this room"},
-                    status.HTTP_400_BAD_REQUEST,
-                )
-
-            if not room.is_24h_valid:
-                flow_start_data["room"] = room
-                room.request_callback(room.serialized_ws_data)
-                room.is_waiting = True
-                room.save()
-        except (ObjectDoesNotExist, ValidationError):
-            pass
-
-        chats_flow_start = project.flowstarts.create(**flow_start_data)
-        self._create_flow_start_instances(data, chats_flow_start)
-
-        status_code, flow_start = FlowRESTClient().start_flow(project, data)
-        chats_flow_start.external_id = flow_start.get("uuid")
-        chats_flow_start.name = flow_start.get("flow").get("name")
-        chats_flow_start.save()
-        feedback = {"name": chats_flow_start.name}
-        if chats_flow_start.room:
-            create_room_feedback_message(
-                room,
-                feedback,
-                method=RoomFeedbackMethods.FLOW_START,
-                requested_by=request.user,
-            )
-            room.notify_room("update")
+        except InvalidOutOffWindowFilter as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except StartFlowPermissionError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_401_UNAUTHORIZED)
+        except NoContactsToStartFlowError as exc:
+            return Response({"Detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
         return Response(flow_start, status.HTTP_200_OK)
 
     @swagger_auto_schema(auto_schema=None)
@@ -573,9 +569,58 @@ class ProjectViewset(
         org_projects = Project.objects.filter(org=project.org).exclude(pk=project.pk)
         org_projects.update(config={"its_principal": False})
 
+        CloseOrgRoomsUseCase().execute(project, closed_by=request.user)
+
         return Response(
             {
                 "detail": "Project set as principal and other projects in the same org set as secondary."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="start-unified-sac-migration",
+    )
+    def start_unified_sac_migration(self, request, *args, **kwargs):
+        """Start the Unified SAC migration for this project's organization."""
+        project = self.get_object()
+        try:
+            migration = StartUnifiedSacMigrationUseCase().execute(
+                project, user=request.user
+            )
+        except UnifiedSacMigrationInProgressError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
+        except StartUnifiedSacMigrationError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"uuid": str(migration.uuid), "status": migration.status},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="unified-sac-migration",
+    )
+    def unified_sac_migration_status(self, request, *args, **kwargs):
+        """Return the latest Unified SAC migration status for this project's org."""
+        project = self.get_object()
+        migration = GetLatestUnifiedSacMigrationUseCase().execute(org=project.org)
+        if migration is None:
+            return Response(
+                {"detail": "No Unified SAC migration for this organization."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {
+                "uuid": str(migration.uuid),
+                "status": migration.status,
+                "error": migration.error,
+                "started_at": migration.started_at,
+                "finished_at": migration.finished_at,
             },
             status=status.HTTP_200_OK,
         )
@@ -681,12 +726,16 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     swagger_tag = "Custom Status"
     queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
-    permission_classes = [
-        IsAuthenticated,
-        ProjectAnyPermission,
-    ]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [IsAuthenticatedOrHasInternalJWT()]
+        return [IsAuthenticated(), ProjectAnyPermission()]
 
     def get_queryset(self):
         return CustomStatusType.objects.filter(

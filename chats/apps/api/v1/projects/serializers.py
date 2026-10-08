@@ -1,4 +1,5 @@
 import json
+
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
@@ -27,11 +28,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             "org",
             "room_routing_type",
             "is_chats_summary_enabled",
+            "is_live_desk_copilot",
+            "parent_project_uuid",
         ]
         read_only_fields = [
             "timezone",
             "room_routing_type",
             "is_chats_summary_enabled",
+            "is_live_desk_copilot",
+            "parent_project_uuid",
         ]
 
     def get_config(self, project: Project):
@@ -125,6 +130,21 @@ class ProjectFlowStartSerializer(serializers.Serializer):
     params = serializers.JSONField(required=False)
     contact_name = serializers.CharField(
         required=False, allow_blank=True, allow_null=True
+    )
+
+
+class OutOffWhatsappStartFlowSerializer(serializers.Serializer):
+    flow = serializers.CharField()
+    send_to_all = serializers.BooleanField(required=False, default=True)
+    ignored_contacts = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    included_contacts = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
     )
 
 

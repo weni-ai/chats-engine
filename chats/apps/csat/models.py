@@ -25,8 +25,8 @@ class CSATSurvey(BaseModel):
     answered_on = models.DateTimeField(_("Answered on"))
 
     class Meta:
-        verbose_name = _("CSAT Survey")
-        verbose_name_plural = _("CSAT Surveys")
+        verbose_name = _("CSAT survey")
+        verbose_name_plural = _("CSAT surveys")
 
     def __str__(self):
         return f"{self.room.uuid} - {self.rating}"
@@ -53,8 +53,8 @@ class CSATFlowProjectConfig(BaseModel):
     tracker = FieldTracker(fields=["flow_uuid"])
 
     class Meta:
-        verbose_name = _("CSAT Flow Project Config")
-        verbose_name_plural = _("CSAT Flow Project Configs")
+        verbose_name = _("CSAT flow project config")
+        verbose_name_plural = _("CSAT flow project configs")
 
     def __str__(self):
         return f"{self.project.name} - {self.flow_uuid}"

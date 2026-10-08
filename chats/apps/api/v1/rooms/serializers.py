@@ -25,9 +25,26 @@ from chats.apps.history.filters.rooms_filter import (
 )
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
+
+
+def _get_room_inactivity_timeout_time(room: Room) -> int:
+    """
+    Returns the inactivity warning timeout (in seconds) configured for the
+    room's sector, falling back to the default when not configured.
+    """
+    try:
+        sector_config = room.queue.sector.inactivity_timeout
+    except AttributeError:
+        sector_config = None
+
+    if sector_config and sector_config.get("message_timeout_time"):
+        return sector_config["message_timeout_time"]
+
+    return get_default_inactivity_timeout()["message_timeout_time"]
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -73,6 +90,52 @@ class RoomsCountByQueueResponseSerializer(serializers.Serializer):
     sectors = SectorRoomsCountSerializer(many=True)
 
 
+class LastMessageSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(allow_null=True)
+    text = serializers.CharField(allow_blank=True)
+    created_on = serializers.DateTimeField(allow_null=True)
+    user = serializers.EmailField(allow_null=True)
+    contact = serializers.UUIDField(allow_null=True)
+    media = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    bulk_message = serializers.JSONField(allow_null=True)
+
+    @classmethod
+    def from_room(cls, room: Room, *, missing_as_empty: bool = False):
+        if not room.last_message_id:
+            if missing_as_empty:
+                return cls(
+                    {
+                        "uuid": None,
+                        "text": "",
+                        "created_on": None,
+                        "user": None,
+                        "contact": None,
+                        "media": [],
+                        "bulk_message": None,
+                    }
+                ).data
+            return None
+
+        metadata = room.last_message_metadata or {}
+        return cls(
+            {
+                "uuid": room.last_message_id,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": (
+                    room.last_message_user.email if room.last_message_user else None
+                ),
+                "contact": (
+                    room.last_message_contact.uuid
+                    if room.last_message_contact
+                    else None
+                ),
+                "media": room.last_message_media or [],
+                "bulk_message": metadata.get("bulk_message"),
+            }
+        ).data
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)
@@ -92,6 +155,8 @@ class RoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -111,8 +176,10 @@ class RoomSerializer(serializers.ModelSerializer):
             "flowstart_data",
             "has_history",
             "imported_history_url",
+            "inactivity_timeout_time",
             "is_24h_valid",
             "is_active",
+            "is_inactive",
             "is_waiting",
             "last_interaction",
             "last_message",
@@ -176,22 +243,7 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.get_is_waiting()
 
     def get_last_message(self, room: Room):
-        if room.last_message_id:
-            return {
-                "uuid": room.last_message.uuid,
-                "text": room.last_message_text or "",
-                "created_on": room.last_interaction,
-                "user": (
-                    room.last_message_user.email if room.last_message_user else None
-                ),
-                "contact": (
-                    room.last_message_contact.uuid
-                    if room.last_message_contact
-                    else None
-                ),
-                "media": room.last_message_media or [],
-            }
-        return None
+        return LastMessageSerializer.from_room(room)
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
@@ -215,6 +267,12 @@ class RoomSerializer(serializers.ModelSerializer):
             room.contact, user, room.queue.sector.project
         ).exists()
 
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        return bool(room.is_inactive)
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -234,6 +292,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -254,6 +314,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "protocol",
             "service_chat",
             "is_active",
+            "is_inactive",
+            "inactivity_timeout_time",
             "config",
             "imported_history_url",
             "is_pinned",
@@ -296,31 +358,17 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_last_message(self, room: Room):
-        if room.last_message_id:
-            return {
-                "uuid": room.last_message.uuid,
-                "text": room.last_message_text or "",
-                "created_on": room.last_interaction,
-                "user": (
-                    room.last_message_user.email if room.last_message_user else None
-                ),
-                "contact": (
-                    room.last_message_contact.uuid
-                    if room.last_message_contact
-                    else None
-                ),
-                "media": room.last_message_media or [],
-            }
-        return {
-            "uuid": None,
-            "text": "",
-            "created_on": None,
-            "user": None,
-            "contact": None,
-            "media": [],
-        }
+        return LastMessageSerializer.from_room(room, missing_as_empty=True)
 
     def get_is_pinned(self, room: Room) -> bool:
+        pinned_ids = self.context.get("pinned_ids")
+        if pinned_ids is not None:
+            return room.pk in pinned_ids
+
+        annotated = getattr(room, "is_pinned", None)
+        if annotated is not None:
+            return bool(annotated)
+
         request = self.context.get("request")
 
         if not request:
@@ -360,6 +408,12 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return room_24h_valid
 
         return None
+
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        return bool(room.is_inactive)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -836,7 +890,7 @@ class BulkTakeSerializer(serializers.Serializer):
         max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
         if len(value) > max_rooms:
             raise serializers.ValidationError(
-                _("Cannot take more than %(max_rooms)s rooms at once")
+                _("Can't take more than %(max_rooms)s rooms at once")
                 % {"max_rooms": max_rooms}
             )
 
@@ -852,7 +906,7 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in queue"))
+            raise serializers.ValidationError(_("No available rooms found in the queue"))
         attrs["rooms"] = rooms
         return super().validate(attrs)
 

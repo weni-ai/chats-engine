@@ -62,6 +62,27 @@ class TestProjectViewSetAsAnonymousUser(BaseTestProjectViewSet):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class TestProjectViewSetAsSuperuser(BaseTestProjectViewSet):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.user = User.objects.create(
+            email="superuser@test.com", is_superuser=True
+        )
+        self.client.force_authenticate(self.user)
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_superuser_without_explicit_permission_is_denied(self):
+        response = self.retrieve(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_superuser_with_explicit_permission_is_allowed(self):
+        response = self.retrieve(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
 class TestProjectViewSetAsAuthenticatedUser(BaseTestProjectViewSet):
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")

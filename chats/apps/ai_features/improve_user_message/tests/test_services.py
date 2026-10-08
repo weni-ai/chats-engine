@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -17,7 +17,6 @@ from chats.apps.ai_features.improve_user_message.services import (
 from chats.apps.ai_features.integrations.dataclass import PromptMessage
 from chats.apps.ai_features.models import FeaturePrompt
 from chats.apps.contacts.models import Contact
-from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
@@ -349,10 +348,6 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
         self.assertEqual(cached_clarity.model, "model-b")
 
 
-@patch(
-    "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-    return_value=True,
-)
 class GenerateImprovedMessageTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -362,7 +357,7 @@ class GenerateImprovedMessageTests(TestCase):
         self.service = ImproveUserMessageService(self.mock_client_class)
         self.project = Project.objects.create(name="Test Project")
 
-    def test_generates_improved_message(self, _mock_ff):
+    def test_generates_improved_message(self):
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -382,7 +377,7 @@ class GenerateImprovedMessageTests(TestCase):
         self.mock_client_class.assert_called_once_with("test-model")
         self.mock_client_instance.generate_text.assert_called_once()
 
-    def test_passes_correct_prompt_messages(self, _mock_ff):
+    def test_passes_correct_prompt_messages(self):
         FeaturePrompt.objects.create(
             feature="clarity",
             model="test-model",
@@ -412,7 +407,7 @@ class GenerateImprovedMessageTests(TestCase):
             prompt_msgs_arg[1], PromptMessage(text="unclear text", should_cache=False)
         )
 
-    def test_includes_suffix_after_message_placeholder(self, _mock_ff):
+    def test_includes_suffix_after_message_placeholder(self):
         FeaturePrompt.objects.create(
             feature="clarity",
             model="test-model",
@@ -445,7 +440,7 @@ class GenerateImprovedMessageTests(TestCase):
             PromptMessage(text=". Be concise and formal.", should_cache=True),
         )
 
-    def test_no_suffix_when_placeholder_is_at_end(self, _mock_ff):
+    def test_no_suffix_when_placeholder_is_at_end(self):
         FeaturePrompt.objects.create(
             feature="clarity",
             model="test-model",
@@ -466,7 +461,7 @@ class GenerateImprovedMessageTests(TestCase):
 
         self.assertEqual(len(prompt_msgs_arg), 2)
 
-    def test_raises_when_prompt_missing_message_placeholder(self, _mock_ff):
+    def test_raises_when_prompt_missing_message_placeholder(self):
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -483,7 +478,7 @@ class GenerateImprovedMessageTests(TestCase):
 
         self.assertIn("{message}", str(ctx.exception))
 
-    def test_raises_when_prompt_has_multiple_message_placeholders(self, _mock_ff):
+    def test_raises_when_prompt_has_multiple_message_placeholders(self):
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -500,7 +495,7 @@ class GenerateImprovedMessageTests(TestCase):
 
         self.assertIn("exactly one", str(ctx.exception))
 
-    def test_uses_latest_feature_prompt_version(self, _mock_ff):
+    def test_uses_latest_feature_prompt_version(self):
         FeaturePrompt.objects.create(
             feature="more_empathy",
             model="old-model",
@@ -524,36 +519,3 @@ class GenerateImprovedMessageTests(TestCase):
         )
 
         self.mock_client_class.assert_called_once_with("new-model")
-
-    def test_raises_when_feature_flag_is_inactive(self, mock_ff):
-        mock_ff.return_value = False
-
-        with self.assertRaises(FeatureFlagInactiveError) as ctx:
-            self.service.generate_improved_message(
-                user_message_text="hello",
-                improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
-                project=self.project,
-            )
-
-        self.assertIn("Feature flag is not active for this project", str(ctx.exception))
-
-    def test_feature_flag_called_with_project_uuid(self, mock_ff):
-        FeaturePrompt.objects.create(
-            feature="grammar_and_spelling",
-            model="test-model",
-            prompt="Fix: {message}",
-            settings={"temperature": 0.5},
-            version=1,
-        )
-        self.mock_client_instance.generate_text.return_value = "Improved text"
-
-        self.service.generate_improved_message(
-            user_message_text="hello",
-            improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
-            project=self.project,
-        )
-
-        mock_ff.assert_called_once_with(
-            "weniChatsAITextImprovement",
-            {"projectUUID": str(self.project.uuid)},
-        )

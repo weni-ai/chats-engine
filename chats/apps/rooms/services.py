@@ -192,7 +192,7 @@ class RoomsReportService:
                 )
 
                 dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
-                subject = _("Rooms report for project %(project)s - %(date)s") % {
+                subject = _("Room report for project %(project)s - %(date)s") % {
                     "project": self.project.name,
                     "date": dt,
                 }
@@ -208,7 +208,7 @@ class RoomsReportService:
                     "rooms/emails/report_is_ready.html", context
                 )
                 text_content = _(
-                    "The rooms report for project %(project)s is ready and attached to this email."
+                    "The room report for project %(project)s is ready and attached to this email."
                 ) % {"project": self.project.name}
 
                 email = EmailMultiAlternatives(
@@ -242,7 +242,7 @@ class RoomsReportService:
 
                 dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
                 subject = _(
-                    "Error generating rooms report for project %(project)s - %(date)s"
+                    "Error generating room report for project %(project)s - %(date)s"
                 ) % {"project": self.project.name, "date": dt}
 
                 context = {

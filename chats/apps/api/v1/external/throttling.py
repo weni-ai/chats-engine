@@ -60,3 +60,21 @@ class ExternalCriticalRateThrottle(ExternalBaseThrottle):
     """Para endpoints como POST rooms com volume muito alto"""
 
     scope = "external_critical"
+
+
+class ExternalRoomHistorySecondRateThrottle(ExternalBaseThrottle):
+    """Per-second throttle for the external room history endpoint"""
+
+    scope = "external_room_history_second"
+
+
+class ExternalRoomHistoryMinuteRateThrottle(ExternalBaseThrottle):
+    """Per-minute throttle for the external room history endpoint"""
+
+    scope = "external_room_history_minute"
+
+
+class ExternalRoomHistoryHourRateThrottle(ExternalBaseThrottle):
+    """Per-hour throttle for the external room history endpoint"""
+
+    scope = "external_room_history_hour"

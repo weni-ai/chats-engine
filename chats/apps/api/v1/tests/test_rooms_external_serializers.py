@@ -93,7 +93,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         self.assertTrue(serializer.is_valid())
         with self.assertRaises(ValidationError) as cm:
             serializer.save()
-        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
+        self.assertIn("Contact can't be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sunday_closed(self):
         """Test room creation on Sunday when sector is closed"""
@@ -123,7 +123,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         self.assertTrue(serializer.is_valid())
         with self.assertRaises(ValidationError) as cm:
             serializer.save()
-        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
+        self.assertIn("Contact can't be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sector_not_open_weekends(self):
         """Test room creation on weekend when sector doesn't operate"""
@@ -177,7 +177,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         self.assertTrue(serializer.is_valid())
         with self.assertRaises(ValidationError) as cm:
             serializer.save()
-        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
+        self.assertIn("Contact can't be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sector_open_all_weekend(self):
         """Test room creation on weekend when sector operates 24h"""

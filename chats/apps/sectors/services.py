@@ -7,7 +7,7 @@ from django.db import transaction
 from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType, Message
 from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
 
@@ -95,7 +95,9 @@ class AutomaticMessagesService:
         if (
             room.queue.sector.is_automatic_message_active is False
             or not room.queue.sector.automatic_message_text
-            or hasattr(room, "automatic_message")
+            or room.automatic_messages.filter(
+                automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN
+            ).exists()
             or room.messages.filter(user__isnull=False).exists()
         ):
             logger.info(
@@ -116,6 +118,7 @@ class AutomaticMessagesService:
                 AutomaticMessage.objects.create(
                     room=room,
                     message=message,
+                    automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
                 )
 
                 Room.objects.filter(pk=room.pk).update(

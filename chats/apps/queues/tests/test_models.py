@@ -377,6 +377,55 @@ class PropertyTests(QueueSetUpMixin, APITestCase):
         self.assertEqual(self.agent_auth.can_list, True)
 
 
+class QueueAuthorizationSoftDeleteTestCase(QueueSetUpMixin, TestCase):
+    def test_authorizations_reverse_relation_excludes_soft_deleted(self):
+        self.assertTrue(
+            self.queue.authorizations.filter(permission__user=self.agent).exists()
+        )
+
+        self.agent_auth.delete()
+
+        self.assertFalse(
+            self.queue.authorizations.filter(permission__user=self.agent).exists()
+        )
+        self.assertTrue(
+            self.queue.authorizations.filter(permission__user=self.agent_2).exists()
+        )
+
+    def test_authorizations_manager_excludes_soft_deleted(self):
+        self.agent_auth.delete()
+
+        self.assertFalse(QueueAuthorization.objects.filter(pk=self.agent_auth.pk).exists())
+        self.assertTrue(
+            QueueAuthorization.all_objects.filter(pk=self.agent_auth.pk).exists()
+        )
+
+    def test_is_agent_returns_false_for_soft_deleted_authorization(self):
+        self.assertTrue(self.queue.is_agent(self.agent))
+
+        self.agent_auth.delete()
+
+        self.assertFalse(self.queue.is_agent(self.agent))
+        self.assertTrue(self.queue.is_agent(self.agent_2))
+
+    def test_agent_count_excludes_soft_deleted_authorization(self):
+        self.assertEqual(self.queue.agent_count, 2)
+
+        self.agent_auth.delete()
+
+        self.assertEqual(self.queue.agent_count, 1)
+
+    def test_agents_excludes_soft_deleted_authorization(self):
+        self.assertIn(self.agent, self.queue.agents)
+        self.assertIn(self.agent_2, self.queue.agents)
+
+        self.agent_auth.delete()
+
+        agents = list(self.queue.agents)
+        self.assertNotIn(self.agent, agents)
+        self.assertIn(self.agent_2, agents)
+
+
 class TestQueueOnlineAgents(TestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test chat Project 1")

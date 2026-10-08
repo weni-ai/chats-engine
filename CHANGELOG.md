@@ -1,3 +1,279 @@
+# 3.80.0
+# Add
+  - Support for sending product catalog/carousel messages via WebSocket, forwarded to mailroom (behind weniChatsAssistedSales flag)
+
+# 3.79.1
+# Fix
+  - Inactivity automatic messages skipped for closed rooms and expired WhatsApp windows
+
+# 3.79.0
+# Add
+  - Unified pagination for pinned and unpinned rooms
+
+# 3.78.0
+# Add
+  - Channel filters and icons for rooms and dashboard
+# Fix
+  - Bulk quick message progress when no matching rooms are found
+# Refactor
+  - Internal notes creation with atomic transaction
+
+# 3.77.0
+# Add
+  - Media messages with accompanying text
+# Fix
+  - File type detection after media conversion
+
+# 3.76.0
+# Add
+  - Internal endpoint for closed room message history
+
+# 3.75.1
+# Remove
+  - Media messages with accompanying text (reverted)
+
+# 3.75.0
+# Add
+  - Media messages with accompanying text
+  - Last message metadata on rooms for bulk send
+
+# 3.74.0
+# Add
+  - Bulk send of quick messages with async delivery, progress tracking, and HTTP endpoint
+
+# 3.73.6
+# Add
+  - Message field to BulkSendHistorySerializer and update related test case
+
+# 3.73.5
+# Add
+  - Queue bonding with Flows, including selected flows, listing verification, and related filters
+
+# 3.73.4
+# Add
+  - Tag filter in the external rooms endpoint
+
+# 3.73.3
+# Refactor
+  - Unused feature flag gates for inactivity, queue purpose/limit, and AI text improvement
+
+# 3.73.2
+# Add
+  - Tag search
+
+# 3.73.1
+# Add
+  - Soft delete support to SectorAuthorization
+# Fix
+  - Sector and queue filters for the CSAT widget
+
+# 3.73.0
+# Add
+  - Message creation via WebSocket
+# Fix
+  - Bulk send history date handling
+
+# 3.72.0
+# Add
+  - Bulk send messages with room count, history, progress, and message metadata
+
+# 3.71.7
+# Fix
+  - Risk alert rearm on room-threshold crossings and toast scoped to email recipients
+  - Export link URL
+
+# 3.71.6
+# Add
+  - Config to exclude moderators from the transfer agents list
+
+# 3.71.5
+# Fix
+  - Soft-deleted queue authorizations excluded from agent retrieval
+
+# 3.71.4
+# Fix
+  - UUID removed from metric goal serializer
+  - Risk alert email template
+  - Waiting time field used in risk alert calculation
+
+# 3.71.3
+# Add
+  - Logging for project connection status updates
+
+# 3.71.2
+# Fix
+  - Room lookup when listing notes
+
+# 3.71.1
+# Add
+  - Risk alert tasks routed to dedicated Celery queue
+
+# 3.71.0
+# Add
+  - Metric goal alerts with CRUD, risk and inactivity alerts on time metrics, WebSocket notifications, and email alerts behind feature flag
+
+# 3.70.5
+# Fix
+  - User, queue, and sector filters in dashboard reports
+# Add
+  - Email-based agent filtering in dashboard reports
+
+# 3.70.4
+# Add
+  - Configurable Celery worker concurrency for the archive chats queue
+
+# 3.70.3
+# Add
+  - Keyset pagination and configurable page size for archived message processing
+
+# 3.70.2
+# Add
+  - Weni EDA dependency and updated Weni Commons and feature flags packages
+
+# 3.70.1
+# Fix
+  - Queue migration branches merged to prevent migration conflicts
+
+# 3.70.0
+# Add
+  - CSAT ratings and comments in room history for project administrators
+  - Queue purpose field with feature flag support and Flows synchronization
+  - Dedicated Celery queues for inactivity and risk alert tasks
+
+# 3.69.0
+# Add
+  - CSAT-specific JWT authentication
+  - Romanian localization
+# Fix
+  - English, Spanish, and Brazilian Portuguese translations
+
+# 3.68.10
+# Fix
+  - Queue authorization uniqueness constraint for soft-deleted records
+
+# 3.68.9
+# Fix
+  - Spanish and Brazilian Portuguese room export email subject translations
+
+# 3.68.8
+# Fix
+  - Room exports and email notifications generated in the user's language
+
+# 3.68.7
+# Add
+  - Room export email templates and notifications
+  - Configurable archive chats schedule
+  - JWT authentication for additional internal endpoints
+# Fix
+  - Pinned room pagination and ordering
+  - Flow template retrieval to skip stale templates and support multiple variables
+
+# 3.68.6
+# Add
+  - Media download endpoint for message attachments
+# Fix
+  - Message media permission logic for queue association
+  - Archive rooms messages task schedule extended to hours 0-6
+# Refactor
+  - Internal authentication verification to require explicit permission
+
+# 3.68.5
+# Fix
+  - External ID field type changed to text field for reply index
+
+# 3.68.4
+# Fix
+  - Additional WAMID trailer markers support
+
+# 3.68.3
+# Remove
+  - Return all flow templates feature (reverted)
+
+# 3.68.2
+# Refactor
+  - RoomPin creation updated to include project association and filters
+
+# 3.68.1
+# Add
+  - Return all flow templates
+
+# 3.68.0
+# Add
+  - Project association to RoomPin model
+  - Soft delete support to QueueAuthorization model
+
+# 3.67.5
+# Add
+  - JWT authentication and authorization
+# Fix
+  - Inactivity last message update on room closure
+  - Room filtering to exclude deleted entities
+# Refactor
+  - Optimized inactivity feature
+
+# 3.67.4
+# Add
+  - Optimized media handling in archived chat messages
+# Fix
+  - Handle missing replied messages in MessageSerializerV2
+
+# 3.67.3
+# Add
+  - 9-digit phone number support
+
+# 3.67.2
+# Add
+  - APM tracers to requests
+# Fix
+  - Exclude active custom statuses from historical date filter
+
+# 3.67.1
+# Refactor
+  - Optimized pinned room retrieval and serialization performance
+
+# 3.67.0
+# Add
+  - Quick Messages feature with caching and API endpoints
+  - Sector quick messages functionality
+  - External room history endpoint with throttling and caching
+
+# 3.66.3
+# Fix
+  - Error when closing rooms
+
+# 3.66.2
+# Add
+  - Inactivity timeout feature V2
+# Fix
+  - Archive rooms messages task schedule
+
+# 3.66.1
+# Remove
+  - Inactivity feature fields (reverted)
+  - Room export translation fixes (reverted)
+
+# 3.66.0
+# Add
+  - Inactivity timeout fields and CRUD with feature flag
+  - Updated archive chats schedule
+# Fix
+  - Translations, URN, and hour format in room export
+
+# 3.65.4
+# Fix
+  - VTEX logo dimensions and SVG paths in conversation report template
+
+# 3.65.3
+# Add
+  - Custom status in transfer endpoint
+  - Logging to ProjectPermissionConsumer for better traceability
+
+# 3.65.2
+# Add
+  - Improved room archiving logic and transaction handling
+# Fix
+  - Test coverage setup with parallel execution and Redis isolation
+
 # 3.65.1
 # Fix
   - Restrict accounts userdata endpoint permissions

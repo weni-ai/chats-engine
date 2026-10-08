@@ -7,6 +7,7 @@ from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
+from chats.apps.rooms.channel_filters import channel_name_from_urn
 from chats.apps.rooms.models import Room
 
 
@@ -25,6 +26,7 @@ class RoomInternalListSerializerV2(serializers.ModelSerializer):
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
     csat_rating = serializers.SerializerMethodField()
+    channel_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -34,6 +36,7 @@ class RoomInternalListSerializerV2(serializers.ModelSerializer):
             "user_email",
             "contact",
             "urn",
+            "channel_name",
             "is_active",
             "ended_at",
             "sector",
@@ -47,7 +50,11 @@ class RoomInternalListSerializerV2(serializers.ModelSerializer):
             "queue_time",
             "csat_rating",
             "protocol",
+            "automatic_closed",
         ]
+
+    def get_channel_name(self, obj) -> str:
+        return channel_name_from_urn(getattr(obj, "urn", None))
 
     def _agent_permission_is_deleted(self, obj: Room) -> bool:
         """

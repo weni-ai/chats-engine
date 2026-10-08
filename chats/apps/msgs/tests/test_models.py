@@ -6,7 +6,13 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
-from chats.apps.msgs.models import Message, MessageMedia, AutomaticMessage
+from chats.apps.msgs.models import (
+    AutomaticMessage,
+    AutomaticMessageType,
+    Message,
+    MessageCatalog,
+    MessageMedia,
+)
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -117,6 +123,37 @@ class TestMessageModel(TestCase):
         self.assertEqual(msg.metadata["context"]["from"], "")
         self.assertEqual(msg.metadata["context"]["id"], "")
 
+    def test_serialized_data_includes_catalog(self):
+        catalog_data = {
+            "carousel": True,
+            "action": "Ver produtos",
+            "header": "Novidades",
+            "footer": "Deslize para o lado",
+            "products": [
+                {
+                    "product": "destaques",
+                    "product_retailer_ids": ["5371#1", "5372#1"],
+                    "product_retailer_info": [
+                        {"retailer_id": "5371#1", "name": "Blusa UV Coyote"}
+                    ],
+                }
+            ],
+        }
+        msg = Message.objects.create(room=self.room, text="Confira")
+        MessageCatalog.objects.create(message=msg, data=catalog_data)
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertEqual(serialized_data["catalog"], catalog_data)
+
+    def test_serialized_data_catalog_is_none_without_catalog(self):
+        msg = Message.objects.create(room=self.room, text="Regular message")
+
+        serialized_data = msg.serialized_ws_data
+
+        self.assertIn("catalog", serialized_data)
+        self.assertIsNone(serialized_data["catalog"])
+
     def test_message_with_null_metadata_values(self):
         """
         Test message with null values in the metadata.
@@ -131,11 +168,80 @@ class TestMessageModel(TestCase):
     def test_message_without_automatic_message(self):
         msg = Message.objects.create(room=self.room)
         self.assertFalse(msg.is_automatic_message)
+        self.assertIsNone(msg.automatic_message_type)
 
-    def test_message_with_automatic_message(self):
+    def test_message_with_automatic_message_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
+        )
+
+    def test_message_with_inactive_warning_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_WARNING
+        )
+
+    def test_message_with_inactive_close_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_CLOSE
+        )
+
+    def test_legacy_automatic_message_relation_flips_flag(self):
+        """
+        The source of truth for `is_automatic_message` is the existence of
+        the related `AutomaticMessage` row. The default type for legacy
+        rows is `automatic_open`, so the flag returns True for them.
+        """
         msg = Message.objects.create(room=self.room)
         AutomaticMessage.objects.create(message=msg, room=self.room)
+        msg.refresh_from_db()
         self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
+        )
+
+    def test_multiple_automatic_messages_per_room_are_allowed(self):
+        """
+        After moving `room` from OneToOne to ForeignKey, a single room can
+        own multiple `AutomaticMessage` rows (one welcome + N inactivity
+        warnings/closes).
+        """
+        msg1 = Message.objects.create(room=self.room)
+        msg2 = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg1,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        )
+        AutomaticMessage.objects.create(
+            message=msg2,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
+        self.assertEqual(self.room.automatic_messages.count(), 2)
 
 
 class TestMessageMediaModel(TestCase):
@@ -157,6 +263,24 @@ class TestMessageMediaModel(TestCase):
         msg_media = MessageMedia.objects.create(message=self.msg)
 
         self.assertEqual(msg_media.created_on.date(), timezone.now().date())
+
+    def test_create_unattached_media(self):
+        media = MessageMedia.objects.create(
+            message=None,
+            content_type="image/png",
+            media_url="https://example.com/image.png",
+        )
+
+        self.assertIsNone(media.message_id)
+        self.assertIn("unattached", str(media))
+
+    def test_callback_noop_when_unattached(self):
+        media = MessageMedia.objects.create(
+            message=None,
+            content_type="image/png",
+            media_url="https://example.com/image.png",
+        )
+        media.callback()
 
 
 class TestMessageNotifyRoom(TestCase):
@@ -301,6 +425,41 @@ class TestMessageNotifyRoom(TestCase):
         # O erro não será logado porque raise_for_status está comentado
         # Então verificamos que a notificação base foi chamada
         mock_base_notification.assert_called_once()
+
+    @patch("chats.apps.rooms.models.Room.base_notification")
+    @patch("chats.apps.msgs.models.get_request_session_with_retries")
+    def test_notify_room_callback_includes_catalog(
+        self, mock_get_session, mock_base_notification
+    ):
+        """The mailroom webhook payload carries the catalog payload as-is."""
+        catalog_data = {
+            "carousel": True,
+            "action": "Ver produtos",
+            "header": "Novidades",
+            "footer": "Deslize para o lado",
+            "products": [
+                {
+                    "product": "destaques",
+                    "product_retailer_ids": ["5371#1"],
+                    "product_retailer_info": [
+                        {"retailer_id": "5371#1", "name": "Blusa UV Coyote"}
+                    ],
+                }
+            ],
+        }
+        MessageCatalog.objects.create(message=self.message, data=catalog_data)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_session = Mock()
+        mock_session.post.return_value = mock_response
+        mock_get_session.return_value = mock_session
+
+        self.message.notify_room(action="create", callback=True)
+
+        post_data = json.loads(mock_session.post.call_args[1]["data"])
+        self.assertEqual(post_data["type"], "msg.create")
+        self.assertEqual(post_data["content"]["catalog"], catalog_data)
 
     @patch("chats.apps.rooms.models.Room.base_notification")
     def test_notify_room_without_callback(self, mock_base_notification):

@@ -13,21 +13,21 @@ class MessageFilter(filters.FilterSet):
         field_name="contact",
         required=False,
         method="filter_contact",
-        help_text=_("Contact's UUID"),
+        help_text=_("Contact UUID"),
     )
 
     room = filters.UUIDFilter(
         field_name="room",
         required=False,
         method="filter_room",
-        help_text=_("Room's UUID"),
+        help_text=_("Room UUID"),
     )
 
     project = filters.UUIDFilter(
         field_name="project",
         required=False,
         method="filter_project",
-        help_text=_("Projects's UUID"),
+        help_text=_("Project UUID"),
     )
 
     is_active = filters.BooleanFilter(

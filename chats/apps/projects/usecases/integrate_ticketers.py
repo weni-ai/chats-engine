@@ -137,6 +137,7 @@ class IntegratedTicketers:
                 content = {
                     "uuid": str(queue.uuid),
                     "name": queue.name,
+                    "queue_purpose": queue.queue_purpose,
                     "sector_uuid": str(queue.sector.uuid),
                     "project_uuid": str(secondary_project.uuid),
                 }
@@ -266,6 +267,7 @@ class IntegratedTicketers:
                 content = {
                     "uuid": str(queue.uuid),
                     "name": queue.name,
+                    "queue_purpose": queue.queue_purpose,
                     "sector_uuid": str(queue.sector.uuid),
                     "project_uuid": str(secondary_project_uuid),
                 }

@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
-from rest_framework.test import APITestCase
 from rest_framework import status
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.accounts.tests.decorators import with_internal_auth
@@ -135,6 +137,57 @@ class RoomFilterTestCase(TestCase):
 
         self.assertIn(self.room_angela, filtered_queryset)
 
+    def _filter_contact(self, contact_term, ninth_digit_enabled=True):
+        request = MagicMock()
+        request.query_params = {"project": str(self.project.uuid)}
+        request.user.email = "test@test.com"
+        request.user.is_authenticated = True
+        with patch(
+            "chats.apps.api.v1.internal.rooms.filters.ninth_digit_search_enabled_from_request",
+            return_value=ninth_digit_enabled,
+        ):
+            room_filter = RoomFilter(
+                data={"contact": contact_term, "project": str(self.project.uuid)},
+                queryset=Room.objects.all(),
+                request=request,
+            )
+            return room_filter.qs
+
+    def test_filter_contact_finds_room_without_ninth_digit(self):
+        contact = Contact.objects.create(name="Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:5584992126050",
+        )
+        self.assertIn(room, self._filter_contact("992126050"))
+
+    def test_filter_contact_finds_room_with_ninth_digit(self):
+        contact = Contact.objects.create(name="No Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:558492126050",
+        )
+        self.assertIn(room, self._filter_contact("992126050"))
+
+    def test_filter_contact_without_flag_does_not_find_room_without_ninth_digit(self):
+        contact = Contact.objects.create(name="No Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:558492126050",
+        )
+        self.assertNotIn(
+            room, self._filter_contact("992126050", ninth_digit_enabled=False)
+        )
+
     def test_filter_contact_no_matches(self):
         """
         Testa quando não há correspondências.
@@ -146,6 +199,45 @@ class RoomFilterTestCase(TestCase):
         filtered_queryset = room_filter.qs
 
         self.assertEqual(filtered_queryset.count(), 0)
+
+    def test_filter_channels_whatsapp(self):
+        instagram_room = Room.objects.create(
+            contact=Contact.objects.create(name="IG"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="instagram:user",
+        )
+        room_filter = RoomFilter(
+            data={"channels": "whatsapp", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        qs = room_filter.qs
+        self.assertIn(self.room_angela, qs)
+        self.assertNotIn(instagram_room, qs)
+
+    def test_filter_channels_others(self):
+        telegram_room = Room.objects.create(
+            contact=Contact.objects.create(name="TG"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="telegram:1",
+        )
+        room_filter = RoomFilter(
+            data={"channels": "others", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        qs = list(room_filter.qs)
+        self.assertIn(telegram_room, qs)
+        self.assertNotIn(self.room_angela, qs)
+
+    def test_urn_contact_search_is_unchanged_when_channels_absent(self):
+        room_filter = RoomFilter(
+            data={"urn": "5511999999991", "project": str(self.project.uuid)},
+            queryset=Room.objects.all(),
+        )
+        self.assertIn(self.room_angela, room_filter.qs)
 
 
 class InternalRoomsViewSetFilterTestCase(APITestCase):

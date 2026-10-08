@@ -58,9 +58,9 @@ class DiscussionMessageMedia(BaseModel):
         null=True,
     )
 
-    content_type = models.CharField(_("Content Type"), max_length=300)
+    content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"),
+        _("Media file"),
         null=True,
         blank=True,
         max_length=300,
@@ -68,8 +68,8 @@ class DiscussionMessageMedia(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Discussion Message Media")
-        verbose_name_plural = _("Discussion Message Medias")
+        verbose_name = _("Discussion message media")
+        verbose_name_plural = _("Discussion message media")
 
     def __str__(self):
         return f"{self.message.pk} - {self.url}"

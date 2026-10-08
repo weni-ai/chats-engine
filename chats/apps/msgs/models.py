@@ -18,6 +18,34 @@ from chats.core.requests import get_request_session_with_retries
 logger = logging.getLogger(__name__)
 
 
+class AutomaticMessageType(models.TextChoices):
+    AUTOMATIC_OPEN = "automatic_open", _("Automatic open")
+    INACTIVE_WARNING = "inactive_warning", _("Inactive warning")
+    INACTIVE_CLOSE = "inactive_close", _("Inactive close")
+
+
+class BulkMessageSendStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    FINISHED = "FINISHED", _("Finished")
+
+
+class BulkMessageSendMessageStatus(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    FAILED = "FAILED", _("Failed")
+
+
+class BulkQuickMessageSendStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    FINISHED = "FINISHED", _("Finished")
+
+
+class BulkQuickMessageSendMessageStatus(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    FAILED = "FAILED", _("Failed")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -75,10 +103,10 @@ class Message(BaseModelWithManualCreatedOn):
         null=True,
     )
     is_read = models.CharField(
-        _("message is read"), max_length=50, blank=True, null=True
+        _("message was read"), max_length=50, blank=True, null=True
     )
     is_delivered = models.CharField(
-        _("message is delivered"), max_length=50, blank=True, null=True
+        _("message was delivered"), max_length=50, blank=True, null=True
     )
 
     class Meta:
@@ -88,12 +116,12 @@ class Message(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         if self.room.is_24h_valid is False and self.user is not None:
             raise ValidationError(
                 {
                     "detail": _(
-                        "You cannot send messages after 24h from the last contact message"
+                        "You can't send messages after 24h from the last contact message"
                     )
                 }
             )
@@ -207,27 +235,35 @@ class Message(BaseModelWithManualCreatedOn):
     def is_automatic_message(self):
         return hasattr(self, "automatic_message") and self.automatic_message is not None
 
+    @property
+    def automatic_message_type(self):
+        if not self.is_automatic_message:
+            return None
+        return self.automatic_message.automatic_message_type
+
 
 class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
         Message,
         related_name="medias",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
-    content_type = models.CharField(_("Content Type"), max_length=300)
+    content_type = models.CharField(_("Content type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"),
+        _("Media file"),
         null=True,
         blank=True,
         max_length=300,
         upload_to=message_media_upload_to,
     )
-    media_url = models.TextField(_("Media url"), null=True, blank=True)
+    media_url = models.TextField(_("Media URL"), null=True, blank=True)
 
     class Meta:
-        verbose_name = _("MessageMedia")
-        verbose_name_plural = _("MessageMedias")
+        verbose_name = _("Message media")
+        verbose_name_plural = _("Message media")
         indexes = [
             models.Index(
                 fields=["content_type"],
@@ -236,11 +272,12 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         ]
 
     def __str__(self):
-        return f"{self.message.pk} - {self.url}"
+        message_pk = self.message_id or "unattached"
+        return f"{message_pk} - {self.url}"
 
     def save(self, *args, **kwargs) -> None:
-        if self.message.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+        if self.message_id and self.message.room.is_active is False:
+            raise ValidationError({"detail": _("Closed rooms can't receive messages")})
         return super().save(*args, **kwargs)
 
     @property
@@ -313,10 +350,13 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return f"{settings.FLOWS_BASE_URL}/api/v2/internals/media/download/{object_key}"
 
     def get_authorization(self, user):
-        return self.room.get_authorization(user)
+        return self.message.room.get_authorization(user)
 
     def callback(self):
         """Send webhook callback for MessageMedia"""
+        if not self.message_id:
+            return
+
         msg_data = self.message.serialized_ws_data
         msg_data["text"] = ""
 
@@ -388,6 +428,8 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     def notify_room(self, action: str = "create", callback: bool = False):
         """Delegate room notification to the associated Message"""
+        if not self.message_id:
+            return
         self.message.notify_room(action, callback)
 
     @property
@@ -395,9 +437,54 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return self.message.project
 
 
+class MessageCatalog(BaseModel):
+    """Product catalog/carousel payload attached to a Message.
+
+    Kept in its own table (instead of a column on ``Message``) because the
+    messages table has billions of rows and we want to avoid ``ALTER TABLE``
+    and backfills there. Only rows for catalog-carrying messages exist here.
+    """
+
+    message = models.OneToOneField(
+        Message,
+        related_name="catalog",
+        verbose_name=_("Message"),
+        on_delete=models.CASCADE,
+    )
+    data = models.JSONField(_("catalog data"), default=dict)
+
+    class Meta:
+        verbose_name = _("Message catalog")
+        verbose_name_plural = _("Message catalogs")
+
+    def __str__(self):
+        return f"{self.message_id} - catalog"
+
+
 class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=255, unique=True, db_index=True
+    )
+    # Stable hex "core" of the WAMID payload (see ``extract_wamid_core``).
+    # Stored alongside ``external_id`` so replies can be resolved even when
+    # Meta sends a different WAMID envelope inside ``context.id`` (HBgM vs
+    # HBgT). Nullable because legacy rows and non-WAMID identifiers may not
+    # have one; not unique because two distinct WAMIDs can resolve to the same
+    # core during the rollout window.
+    #
+    # ``TextField`` (no length cap) on purpose: a ``CharField(max_length=64)``
+    # caused a production ``DataError`` because the LID-based envelope
+    # (``HBgT<LID>...``, e.g. when a contact replies to their own message)
+    # wraps a longer internal id whose hex core is consistently 66 chars —
+    # not a rare outlier. Rather than guess a "safe" max for every current
+    # and future Meta envelope, store this as unbounded text; Postgres
+    # indexes ``text`` columns the same way as ``varchar`` and our values are
+    # always tiny (well under 1KB), so there's no practical cost.
+    external_id_core = models.TextField(
+        _("External ID core"),
+        null=True,
+        blank=True,
+        db_index=True,
     )
     message = models.ForeignKey(
         "Message", on_delete=models.CASCADE, related_name="reply_indexes"
@@ -406,23 +493,48 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = "Chat Message Reply Index"
         verbose_name_plural = "Chat Message Reply Indexes"
+        indexes = [
+            # Serves the fallback query in ``_resolve_reply_index``:
+            # ``WHERE external_id_core = ? ORDER BY created_on DESC LIMIT 1``.
+            # Additive on top of the standalone ``external_id_core`` index so
+            # the migration carries no risk of dropping anything existing.
+            models.Index(
+                fields=["external_id_core", "-created_on"],
+                name="cmri_core_created_desc_idx",
+            ),
+        ]
 
 
 class AutomaticMessage(BaseModel):
     """
     Automatic message for a room.
 
-    This is only used as a reference for a message that is sent automatically
-    when the room is first assigned to a user.
+    Stores metadata for messages sent automatically by the system. The
+    `automatic_message_type` classifies the message (welcome, inactivity
+    warning, inactivity closure) so the front can render specific UI for
+    each kind.
 
-    A room can only have one automatic message.
+    Each `Message` has at most one `AutomaticMessage` (OneToOne). A room can
+    have multiple `AutomaticMessage` rows because, with the inactivity
+    feature, the same room may receive warnings/closures in addition to the
+    legacy welcome message.
     """
 
     message = models.OneToOneField(
         "msgs.Message", on_delete=models.CASCADE, related_name="automatic_message"
     )
-    room = models.OneToOneField(
-        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_message"
+    room = models.ForeignKey(
+        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_messages"
+    )
+    automatic_message_type = models.CharField(
+        _("automatic message type"),
+        max_length=32,
+        choices=AutomaticMessageType.choices,
+        default=AutomaticMessageType.AUTOMATIC_OPEN,
+        help_text=_(
+            "Classification for automatic messages sent by the system "
+            "(welcome, inactivity warning, inactivity closure)."
+        ),
     )
 
     class Meta:
@@ -431,3 +543,199 @@ class AutomaticMessage(BaseModel):
 
     def __str__(self):
         return f"{self.room.uuid} - {self.message.uuid}"
+
+
+class BulkMessageSend(BaseModel):
+    """
+    Metadata for a bulk message send request.
+
+    Stores who requested the send, the message text, the project scope, and a
+    snapshot of the status/queue/agent filters applied when the request was created.
+    Actual message delivery is handled asynchronously in a later step.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="bulk_message_sends",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="bulk_message_sends",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    filter_snapshot = models.JSONField(
+        _("filter snapshot"),
+        default=dict,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkMessageSendStatus.choices,
+        default=BulkMessageSendStatus.PENDING,
+    )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk message send")
+        verbose_name_plural = _("Bulk message sends")
+
+    def __str__(self):
+        return f"{self.uuid} - {self.status}"
+
+
+class BulkMessageSendMessage(BaseModel):
+    """
+    Tracks the outcome of sending a bulk message to a single room.
+
+    On success, ``message`` points to the delivered ``Message``. On failure,
+    ``message`` is null and ``errors`` stores the failure reason/traceback.
+    One row per room attempt; many rows per bulk send.
+    """
+
+    bulk_message_send = models.ForeignKey(
+        BulkMessageSend,
+        related_name="bulk_messages",
+        verbose_name=_("bulk message send"),
+        on_delete=models.CASCADE,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="bulk_message_send_messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    message = models.OneToOneField(
+        Message,
+        related_name="bulk_message_send_message",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkMessageSendMessageStatus.choices,
+    )
+    errors = models.JSONField(
+        _("errors"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk message send message")
+        verbose_name_plural = _("Bulk message send messages")
+
+    def __str__(self):
+        return f"{self.bulk_message_send.uuid} - {self.room.uuid} - {self.status}"
+
+
+class BulkQuickMessageSend(BaseModel):
+    """
+    Metadata for a bulk quick-message send request.
+
+    Stores who requested the send, the message text, the project scope, and
+    the contact targeting applied when the request was created.
+
+    ``contacts`` is ``null`` when the send targets all ongoing rooms of the
+    requesting attendant in the project. A list of contact UUID strings
+    narrows the send to those contacts. Actual message delivery is handled
+    asynchronously by ``process_bulk_quick_message_send``.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="bulk_quick_message_sends",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    contacts = models.JSONField(
+        _("contacts"),
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkQuickMessageSendStatus.choices,
+        default=BulkQuickMessageSendStatus.PENDING,
+    )
+    rooms_qty = models.PositiveIntegerField(
+        _("rooms quantity"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk quick message send")
+        verbose_name_plural = _("Bulk quick message sends")
+
+    def __str__(self):
+        return f"{self.uuid} - {self.status}"
+
+
+class BulkQuickMessageSendMessage(BaseModel):
+    """
+    Tracks the outcome of sending a bulk quick message to a single room.
+
+    On success, ``message`` points to the delivered ``Message``. On failure,
+    ``message`` is null and ``errors`` stores the failure reason/traceback.
+    One row per room attempt; many rows per bulk quick-message send.
+    """
+
+    bulk_quick_message_send = models.ForeignKey(
+        BulkQuickMessageSend,
+        related_name="bulk_quick_messages",
+        verbose_name=_("bulk quick message send"),
+        on_delete=models.CASCADE,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="bulk_quick_message_send_messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    message = models.OneToOneField(
+        Message,
+        related_name="bulk_quick_message_send_message",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=20,
+        choices=BulkQuickMessageSendMessageStatus.choices,
+    )
+    errors = models.JSONField(
+        _("errors"),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Bulk quick message send message")
+        verbose_name_plural = _("Bulk quick message send messages")
+
+    def __str__(self):
+        return (
+            f"{self.bulk_quick_message_send.uuid} - {self.room.uuid} - {self.status}"
+        )

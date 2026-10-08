@@ -1,7 +1,6 @@
 import uuid
 from unittest.mock import MagicMock, patch
 
-from django.conf import settings
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -21,16 +20,6 @@ def make_flows_response(status_code=201):
     mock.status_code = status_code
     mock.content = b""
     return mock
-
-
-def feature_flag_off_for(*disabled_keys):
-    """Return a side_effect that only turns OFF the given flag keys."""
-    disabled = set(disabled_keys)
-
-    def _side_effect(key, *args, **kwargs):
-        return key not in disabled
-
-    return _side_effect
 
 
 class TestBulkQueueCreateUnauthenticated(APITestCase):
@@ -197,51 +186,6 @@ class TestBulkQueueCreate(APITestCase):
         self.assertEqual(queue.queue_limit, 0)
         self.assertTrue(queue.is_queue_limit_active)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
-    @with_project_permission()
-    def test_queue_limit_active_with_feature_flag_off_returns_400(
-        self, mock_feature_flag
-    ):
-        mock_feature_flag.side_effect = feature_flag_off_for(
-            settings.QUEUE_LIMIT_FEATURE_FLAG_KEY
-        )
-        response = self.client.post(
-            self._url(),
-            data=self._payload(
-                queues=[
-                    {"name": "Fila 1", "queue_limit": {"is_active": True, "limit": 5}}
-                ]
-            ),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code, "queue_limit_feature_flag_is_off"
-        )
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
-    @with_project_permission()
-    def test_queue_limit_inactive_with_feature_flag_off_is_allowed(
-        self, mock_feature_flag
-    ):
-        mock_feature_flag.side_effect = feature_flag_off_for(
-            settings.QUEUE_LIMIT_FEATURE_FLAG_KEY
-        )
-        with override_settings(USE_WENI_FLOWS=False):
-            response = self.client.post(
-                self._url(),
-                data=self._payload(
-                    queues=[
-                        {
-                            "name": "Fila 1",
-                            "queue_limit": {"is_active": False, "limit": 5},
-                        }
-                    ]
-                ),
-                format="json",
-            )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
@@ -383,6 +327,21 @@ class TestBulkQueueCreate(APITestCase):
             self.assertEqual(kwargs.get("project_uuid"), str(self.project.uuid))
             self.assertIn("uuid", kwargs)
             self.assertIn("name", kwargs)
+
+    @override_settings(USE_WENI_FLOWS=True)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @patch("chats.apps.queues.usecases.bulk_queue_creation.FlowRESTClient")
+    @with_project_permission()
+    def test_flows_calls_include_queue_purpose(self, mock_flows_cls, mock_feature_flag):
+        mock_flows_cls.return_value.create_queue.return_value = make_flows_response(201)
+
+        payload = self._payload(
+            queues=[{"name": "Fila 1", "queue_purpose": "Atendimento comercial"}]
+        )
+        self.client.post(self._url(), data=payload, format="json")
+
+        call_kwargs = mock_flows_cls.return_value.create_queue.call_args.kwargs
+        self.assertEqual(call_kwargs["queue_purpose"], "Atendimento comercial")
 
     @override_settings(USE_WENI_FLOWS=True)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)

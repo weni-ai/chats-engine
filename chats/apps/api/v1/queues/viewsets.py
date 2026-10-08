@@ -2,6 +2,16 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import (
+    Case,
+    CharField,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Subquery,
+    Value,
+    When,
+)
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -25,7 +35,8 @@ from chats.apps.core.internal_domains import (
     exclude_vtex_internal_domains,
     is_vtex_internal_domain,
 )
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
@@ -120,6 +131,7 @@ class QueueViewset(ModelViewSet):
             content = {
                 "uuid": str(instance.uuid),
                 "name": instance.name,
+                "queue_purpose": instance.queue_purpose,
                 "sector_uuid": str(instance.sector.uuid),
                 "project_uuid": str(instance.sector.project.uuid),
             }
@@ -145,6 +157,7 @@ class QueueViewset(ModelViewSet):
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
+            "queue_purpose": instance.queue_purpose,
             "sector_uuid": str(instance.sector.uuid),
         }
 
@@ -367,17 +380,21 @@ class QueueViewset(ModelViewSet):
         project = Project.objects.get(sectors__queues=instance)
         project_admins = project.admins
 
-        combined_permissions = queue_agents.union(sector_agents, project_admins)
+        project_config = project.config if isinstance(project.config, dict) else {}
+        filter_offline_agents = project_config.get("filter_offline_agents", False)
+        filter_moderators = project_config.get("filter_moderators", False)
 
-        if isinstance(project.config, dict) and project.config.get(
-            "filter_offline_agents", False
-        ):
+        if filter_offline_agents:
             online_queue_agents = instance.online_agents
             online_sector_managers = sector.online_managers
-            online_admins = project.online_admins
-            combined_permissions = online_queue_agents.union(
-                online_sector_managers, online_admins
-            )
+            combined_permissions = online_queue_agents.union(online_sector_managers)
+            if not filter_moderators:
+                online_admins = project.online_admins
+                combined_permissions = combined_permissions.union(online_admins)
+        else:
+            combined_permissions = queue_agents.union(sector_agents)
+            if not filter_moderators:
+                combined_permissions = combined_permissions.union(project_admins)
 
         agents_pks = set(combined_permissions.values_list("id", flat=True))
         agents = User.objects.filter(id__in=agents_pks)
@@ -386,6 +403,35 @@ class QueueViewset(ModelViewSet):
 
         if not is_vtex_internal_domain(user_email):
             agents = exclude_vtex_internal_domains(agents)
+
+        pause_subquery = (
+            CustomStatus.objects.filter(
+                user_id=OuterRef("email"),
+                project=project,
+                is_active=True,
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .order_by("-created_on")
+            .values("status_type__name")[:1]
+        )
+        online_subquery = ProjectPermission.objects.filter(
+            user_id=OuterRef("email"),
+            project=project,
+            status="ONLINE",
+            is_deleted=False,
+        )
+
+        agents = agents.annotate(
+            _pause_name=Subquery(pause_subquery, output_field=CharField()),
+            _is_online=Exists(online_subquery),
+        ).annotate(
+            _order=Case(
+                When(_pause_name__isnull=False, then=Value(1)),
+                When(_is_online=True, then=Value(0)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by("_order", "first_name", "last_name")
 
         serializer = QueueAgentsSerializer(
             agents, many=True, context={"project": project}

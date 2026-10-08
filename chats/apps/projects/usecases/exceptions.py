@@ -32,3 +32,15 @@ class FlowTemplateNotFound(Exception):
 
 class FlowTemplateChannelsNotFound(Exception):
     pass
+
+
+class StartFlowPermissionError(Exception):
+    pass
+
+
+class ActiveFlowStartError(Exception):
+    pass
+
+
+class NoContactsToStartFlowError(Exception):
+    pass

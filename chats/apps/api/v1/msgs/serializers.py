@@ -1,27 +1,257 @@
 import io
 import logging
+from typing import Optional
 
 import magic
 from django.conf import settings
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
-from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.api.v1.contacts.serializers import ContactSerializer
-from chats.apps.msgs.models import ChatMessageReplyIndex
-from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageStatusChoices,
     ImprovedUserMessageTypeChoices,
 )
-from chats.apps.rooms.models import RoomNote
 from chats.apps.ai_features.improve_user_message.tasks import (
     register_message_improvement_task,
 )
+from chats.apps.api.core.serializers import CommaSeparatedListField
+from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.msgs.choices import BulkMessageSendRoomStatus
+from chats.apps.msgs.models import (
+    BulkMessageSend,
+    BulkMessageSendMessage,
+    BulkMessageSendMessageStatus,
+    ChatMessageReplyIndex,
+)
+from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import MessageCatalog, MessageMedia
+from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
+from chats.apps.rooms.models import RoomNote
 
 LOGGER = logging.getLogger(__name__)
+
+BULK_SEND_ROOM_STATUS_CHOICES = ("waiting", "ongoing")
+
+
+def process_uploaded_media_file(validated_data: dict) -> dict:
+    """Detect MIME type and convert unsupported audio formats in place."""
+    media = validated_data["media_file"]
+    file_bytes = media.file.read()
+    file_type = magic.from_buffer(file_bytes, mime=True)
+    if file_type in settings.FILE_CHECK_CONTENT_TYPE:
+        file_type = media.name[-3:]
+    if (
+        file_type.startswith("audio")
+        or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
+    ):
+        export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
+        if settings.AUDIO_CODEC_TO_CONVERT != "":
+            export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
+
+        converted_bytes = io.BytesIO()
+        AudioSegment.from_file(io.BytesIO(file_bytes)).export(
+            converted_bytes, **export_conf
+        )
+        converted_bytes.seek(0)
+        file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+        converted_bytes.seek(0)
+        media.file = converted_bytes
+        media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
+
+    validated_data["content_type"] = file_type
+    return validated_data
+
+
+class BulkSendRoomsCountQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    status = CommaSeparatedListField(
+        child=serializers.ChoiceField(choices=BULK_SEND_ROOM_STATUS_CHOICES),
+        required=True,
+        allow_empty=False,
+    )
+    queues = CommaSeparatedListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    agents = CommaSeparatedListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+
+
+def get_message_catalog_data(message: ChatMessage) -> Optional[dict]:
+    """Product catalog/carousel payload for a message, or ``None`` when absent.
+
+    Shared by v1 and v2 message serializers so both list/retrieve endpoints
+    (and the mailroom webhook, via ``MessageWSSerializer``) stay in sync.
+    Read-only: catalog messages are only created through the agent
+    WebSocket flow, which writes the related ``MessageCatalog`` row directly.
+    """
+
+    try:
+        return message.catalog.data
+    except MessageCatalog.DoesNotExist:
+        return None
+    except AttributeError:
+        return None
+
+
+def get_message_bulk_message_data(message: ChatMessage) -> Optional[dict]:
+    """
+    Build the ``bulk_message`` payload for a message, if it was sent via bulk send.
+
+    Returns ``{"sent_by": {"email": ..., "name": ...}}`` for the bulk requester,
+    or ``None`` when the message was not part of a bulk send.
+    """
+    try:
+        link = message.bulk_message_send_message
+    except BulkMessageSendMessage.DoesNotExist:
+        return None
+
+    if link is None:
+        return None
+
+    user = link.bulk_message_send.user
+    return {
+        "sent_by": {
+            "email": user.email,
+            "name": user.full_name,
+        }
+    }
+
+
+class BulkSendMessagesSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    status = serializers.ListField(
+        child=serializers.ChoiceField(choices=BulkMessageSendRoomStatus.choices),
+        required=True,
+        allow_empty=False,
+    )
+    project = serializers.UUIDField(required=True)
+    queues = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
+    agents = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=list,
+    )
+
+
+class BulkSendQuickMessageSerializer(serializers.Serializer):
+    text = serializers.CharField(required=True, allow_blank=False)
+    project = serializers.UUIDField(required=True)
+    contacts = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+        default=None,
+    )
+
+
+class BulkSendRecentHistorySerializer(serializers.ModelSerializer):
+    sent_at = serializers.DateTimeField(source="created_on", read_only=True)
+
+    class Meta:
+        model = BulkMessageSend
+        fields = ["uuid", "text", "sent_at"]
+
+
+class BulkSendHistoryQueryParamsSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    sender = serializers.EmailField(required=False)
+    status = serializers.ChoiceField(
+        choices=BulkMessageSendMessageStatus.choices,
+        required=False,
+    )
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError(
+                "start_date must be before or equal to end_date"
+            )
+
+        return attrs
+
+
+class BulkSendHistorySerializer(serializers.ModelSerializer):
+    contact = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
+    sent_by = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(source="created_on", read_only=True)
+    message = serializers.CharField(source="bulk_message_send.text", read_only=True)
+
+    class Meta:
+        model = BulkMessageSendMessage
+        fields = ["contact", "queue", "sent_by", "date", "status", "message"]
+
+    def get_contact(self, obj: BulkMessageSendMessage) -> dict:
+        contact = obj.room.contact
+        return {"name": contact.name if contact else None}
+
+    def get_queue(self, obj: BulkMessageSendMessage) -> dict:
+        queue = obj.room.queue
+        return {"name": queue.name if queue else None}
+
+    def get_sent_by(self, obj: BulkMessageSendMessage) -> dict:
+        return {"name": obj.bulk_message_send.user.name}
+
+
+def _resolve_reply_index(message: ChatMessage, replied_id: str):
+    """Resolve a :class:`ChatMessageReplyIndex` for a replied-to WAMID.
+
+    Performs an exact ``external_id`` lookup first. When the feature flag is
+    active for the message's project, falls back to matching the stable
+    WAMID core (``external_id_core``) so replies still mount when Meta sends
+    a different envelope (``HBgM`` vs ``HBgT``) inside ``context.id``.
+
+    The fallback is scoped to ``message.room_id`` to prevent a core
+    collision between rooms/projects from surfacing a foreign message.
+    """
+
+    exact_match = ChatMessageReplyIndex.objects.filter(external_id=replied_id).first()
+    if exact_match is not None:
+        return exact_match
+
+    core = extract_wamid_core(replied_id)
+    if not core:
+        return None
+
+    try:
+        project_uuid = str(message.room.project_uuid or "") or str(message.project.uuid)
+    except Exception:
+        project_uuid = ""
+
+    if not is_reply_core_fallback_active(project_uuid):
+        return None
+
+    return (
+        ChatMessageReplyIndex.objects.filter(
+            external_id_core=core,
+            message__room_id=message.room_id,
+        )
+        .order_by("-created_on")
+        .first()
+    )
+
 
 """
 TODO: Refactor these serializers into less classes
@@ -105,6 +335,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
+            "message": {"required": True},
         }
 
     def get_url(self, media: MessageMedia):
@@ -145,31 +376,8 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return result
 
     def create(self, validated_data):
-        media = validated_data["media_file"]
-        file_bytes = media.file.read()
-        file_type = magic.from_buffer(file_bytes, mime=True)
-        if file_type in settings.FILE_CHECK_CONTENT_TYPE:
-            file_type = media.name[-3:]
-        if (
-            file_type.startswith("audio")
-            or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
-        ):
-            export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
-            if settings.AUDIO_CODEC_TO_CONVERT != "":
-                export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
-
-            converted_bytes = io.BytesIO()
-            AudioSegment.from_file(io.BytesIO(file_bytes)).export(
-                converted_bytes, **export_conf
-            )
-
-            media.file = converted_bytes
-            media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
-            file_type = magic.from_buffer(converted_bytes.read(), mime=True)
-
-        validated_data["content_type"] = file_type
-        msg = super().create(validated_data)
-        return msg
+        validated_data = process_uploaded_media_file(validated_data)
+        return super().create(validated_data)
 
 
 class BaseMessageSerializer(serializers.ModelSerializer):
@@ -269,9 +477,16 @@ class AITextImprovementSerializer(serializers.Serializer):
 class MessageSerializer(BaseMessageSerializer):
     """Serializer for the messages endpoint"""
 
-    media = MessageMediaSimpleSerializer(many=True, required=False)
+    media = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+        allow_empty=False,
+    )
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
+    bulk_message = serializers.SerializerMethodField(read_only=True)
+    catalog = serializers.SerializerMethodField(read_only=True)
     ai_text_improvement = AITextImprovementSerializer(
         write_only=True, required=False, allow_null=True
     )
@@ -294,33 +509,98 @@ class MessageSerializer(BaseMessageSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "automatic_message_type",
             "ai_text_improvement",
+            "bulk_message",
+            "catalog",
         ]
         read_only_fields = [
             "uuid",
             "user",
             "created_on",
             "contact",
+            "bulk_message",
         ]
+
+    def validate_media(self, media_uuids):
+        max_attachments = settings.MESSAGE_MEDIA_MAX_ATTACHMENTS
+        if len(media_uuids) > max_attachments:
+            raise serializers.ValidationError(
+                _(
+                    "At most {max_attachments} media files are allowed"
+                ).format(max_attachments=max_attachments)
+            )
+        return media_uuids
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        media_uuids = attrs.pop("media", None)
+        if media_uuids is None:
+            return attrs
+
+        medias = list(MessageMedia.objects.filter(uuid__in=media_uuids))
+        medias_by_uuid = {media.uuid: media for media in medias}
+
+        missing = [
+            str(media_uuid)
+            for media_uuid in media_uuids
+            if media_uuid not in medias_by_uuid
+        ]
+        if missing:
+            raise serializers.ValidationError(
+                {"media": _("One or more media items were not found")}
+            )
+
+        ordered_medias = []
+        for media_uuid in media_uuids:
+            media = medias_by_uuid[media_uuid]
+            if media.message_id is not None:
+                raise serializers.ValidationError(
+                    {"media": _("Media is already attached to a message")}
+                )
+            ordered_medias.append(media)
+
+        attrs["_media_to_attach"] = ordered_medias
+        return attrs
 
     def create(self, validated_data):
         ai_text_improvement = validated_data.pop("ai_text_improvement", None)
-        msg = super().create(validated_data)
+        medias_to_attach = validated_data.pop("_media_to_attach", [])
 
-        if ai_text_improvement:
-            transaction.on_commit(
-                lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
-                    "type"
-                ], status=ai_text_improvement["status"]: (
-                    register_message_improvement_task.delay(
-                        message_uuid=message_uuid,
-                        improvement_type=improvement_type,
-                        status=status,
+        with transaction.atomic():
+            msg = super().create(validated_data)
+
+            if medias_to_attach:
+                media_ids = [media.pk for media in medias_to_attach]
+                updated = MessageMedia.objects.filter(
+                    pk__in=media_ids, message__isnull=True
+                ).update(message=msg)
+                if updated != len(media_ids):
+                    raise serializers.ValidationError(
+                        {"media": _("Media is already attached to a message")}
+                    )
+
+            if ai_text_improvement:
+                transaction.on_commit(
+                    lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
+                        "type"
+                    ], status=ai_text_improvement["status"]: (
+                        register_message_improvement_task.delay(
+                            message_uuid=message_uuid,
+                            improvement_type=improvement_type,
+                            status=status,
+                        )
                     )
                 )
-            )
 
         return msg
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["media"] = MessageMediaSimpleSerializer(
+            instance.medias.all(), many=True, context=self.context
+        ).data
+        return data
 
     def get_replied_message(self, obj):
         if obj.metadata is None or obj.metadata == {}:
@@ -332,7 +612,9 @@ class MessageSerializer(BaseMessageSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            replied_msg = _resolve_reply_index(obj, replied_id)
+            if replied_msg is None:
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
@@ -392,6 +674,12 @@ class MessageSerializer(BaseMessageSerializer):
                 for media in note.medias.all()
             ],
         }
+
+    def get_bulk_message(self, obj):
+        return get_message_bulk_message_data(obj)
+
+    def get_catalog(self, obj):
+        return get_message_catalog_data(obj)
 
 
 class MessageWSSerializer(MessageSerializer):

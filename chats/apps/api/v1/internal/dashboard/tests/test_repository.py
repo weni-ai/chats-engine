@@ -1,28 +1,27 @@
-import pytz
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+import pytz
 from django.test import TestCase
 from django.utils import timezone
 
-
-from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
-from datetime import datetime
-
-from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.rooms.models import Room
-from chats.apps.csat.models import CSATSurvey
-from chats.apps.queues.models import Queue
-from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
-from chats.apps.sectors.models import SectorAuthorization, Sector, SectorTag
-from chats.apps.queues.models import QueueAuthorization
+from chats.apps.api.v1.internal.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.repository import (
+    AgentRepository,
+    CSATRepository,
+)
+from chats.apps.contacts.models import Contact
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
     Project,
     ProjectPermission,
 )
-from chats.apps.api.v1.internal.dashboard.repository import CSATRepository
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class CSATRepositoryTest(TestCase):
@@ -556,6 +555,50 @@ class CSATRepositoryTest(TestCase):
         self.assertEqual(rating_dict.get(2, 0), 0)  # Old date excluded
         self.assertEqual(rating_dict.get(4, 0), 0)  # No tag excluded
 
+    def test_get_csat_ratings_filter_by_whatsapp_channel(self):
+        wa_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="whatsapp:5511999999999",
+        )
+        ig_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="instagram:user",
+        )
+        CSATSurvey.objects.create(room=wa_room, rating=5, answered_on=timezone.now())
+        CSATSurvey.objects.create(room=ig_room, rating=1, answered_on=timezone.now())
+
+        ratings = self.repository.get_csat_ratings(
+            Filters(project=self.project, channels=["whatsapp"]),
+            self.project,
+        )
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
+        self.assertEqual(rating_dict.get(5, 0), 1)
+        self.assertEqual(rating_dict.get(1, 0), 0)
+
+    def test_get_csat_ratings_filter_by_others_channel(self):
+        other_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="telegram:1",
+        )
+        wa_room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=self.project.uuid,
+            urn="whatsapp:5511",
+        )
+        CSATSurvey.objects.create(room=other_room, rating=3, answered_on=timezone.now())
+        CSATSurvey.objects.create(room=wa_room, rating=5, answered_on=timezone.now())
+
+        ratings = self.repository.get_csat_ratings(
+            Filters(project=self.project, channels=["others"]),
+            self.project,
+        )
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
+        self.assertEqual(rating_dict.get(3, 0), 1)
+        self.assertEqual(rating_dict.get(5, 0), 0)
+
     def test_get_csat_ratings_no_surveys_matching_filters(self):
         tag = SectorTag.objects.create(name="Tag 1", sector=self.sector)
         agent = User.objects.create(
@@ -896,6 +939,7 @@ class AgentRepositoryTestCase(TestCase):
 
         # Create room with specific end date within the filter range
         from datetime import datetime
+
         import pytz
 
         utc_tz = pytz.timezone("UTC")
@@ -1015,6 +1059,33 @@ class AgentRepositoryTestCase(TestCase):
         self.assertGreaterEqual(general_csat_metrics.avg_rating, 3.0)
         self.assertLessEqual(general_csat_metrics.avg_rating, 5.0)
 
+    def test_get_csat_general_filter_by_channel(self):
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            urn="whatsapp:5511",
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            urn="telegram:1",
+        )
+        metrics = self.repository._get_csat_general(
+            Filters(channels=["whatsapp"]), self.project
+        )
+        self.assertEqual(metrics.rooms, 1)
+
+        others = self.repository._get_csat_general(
+            Filters(channels=["others"]), self.project
+        )
+        self.assertEqual(others.rooms, 1)
+
     def test_get_csat_agents_basic(self):
         from chats.apps.accounts.models import User
         from chats.apps.projects.models import ProjectPermission
@@ -1118,9 +1189,9 @@ class AgentRepositoryTestCase(TestCase):
 
     def test_get_csat_agents_combined_filters(self):
         from chats.apps.accounts.models import User
-        from chats.apps.sectors.models import SectorAuthorization
-        from chats.apps.queues.models import QueueAuthorization
         from chats.apps.projects.models import ProjectPermission
+        from chats.apps.queues.models import QueueAuthorization
+        from chats.apps.sectors.models import SectorAuthorization
 
         user1 = User.objects.create(
             email="agent1@test.com", first_name="Agent", last_name="One"
@@ -1152,6 +1223,171 @@ class AgentRepositoryTestCase(TestCase):
 
         self.assertEqual(agents.count(), 1)
         self.assertEqual(agents.first().email, "agent1@test.com")
+
+    def test_get_csat_agents_filters_by_queue_authorization(self):
+        sector2 = Sector.objects.create(
+            name="Other Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        queue2 = Queue.objects.create(name="Other Queue", sector=sector2)
+
+        user_in_queue = User.objects.create(
+            email="in_queue@test.com", first_name="In", last_name="Queue"
+        )
+        user_other_queue = User.objects.create(
+            email="other_queue@test.com", first_name="Other", last_name="Queue"
+        )
+
+        permission_in = ProjectPermission.objects.create(
+            user=user_in_queue, project=self.project, role=2
+        )
+        permission_other = ProjectPermission.objects.create(
+            user=user_other_queue, project=self.project, role=2
+        )
+
+        QueueAuthorization.objects.create(permission=permission_in, queue=self.queue)
+        QueueAuthorization.objects.create(permission=permission_other, queue=queue2)
+
+        filters = Filters(queues=[self.queue.uuid])
+        agents = self.repository._get_csat_agents(filters, self.project)
+
+        agent_emails = list(agents.values_list("email", flat=True))
+        self.assertIn("in_queue@test.com", agent_emails)
+        self.assertNotIn("other_queue@test.com", agent_emails)
+
+    def test_get_csat_agents_filters_by_sector_authorization(self):
+        sector2 = Sector.objects.create(
+            name="Other Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+
+        user_in_sector = User.objects.create(
+            email="in_sector@test.com", first_name="In", last_name="Sector"
+        )
+        user_other_sector = User.objects.create(
+            email="other_sector@test.com", first_name="Other", last_name="Sector"
+        )
+
+        permission_in = ProjectPermission.objects.create(
+            user=user_in_sector, project=self.project, role=2
+        )
+        permission_other = ProjectPermission.objects.create(
+            user=user_other_sector, project=self.project, role=2
+        )
+
+        SectorAuthorization.objects.create(
+            permission=permission_in, sector=self.sector, role=1
+        )
+        SectorAuthorization.objects.create(
+            permission=permission_other, sector=sector2, role=1
+        )
+
+        filters = Filters(sector=[self.sector.uuid])
+        agents = self.repository._get_csat_agents(filters, self.project)
+
+        agent_emails = list(agents.values_list("email", flat=True))
+        self.assertIn("in_sector@test.com", agent_emails)
+        self.assertNotIn("other_sector@test.com", agent_emails)
+
+    def test_get_csat_agents_normalizes_queue_and_sectors_aliases(self):
+        user_queue = User.objects.create(
+            email="by_queue@test.com", first_name="By", last_name="Queue"
+        )
+        user_sector = User.objects.create(
+            email="by_sector@test.com", first_name="By", last_name="Sector"
+        )
+        user_other = User.objects.create(
+            email="other@test.com", first_name="Other", last_name="Agent"
+        )
+
+        permission_queue = ProjectPermission.objects.create(
+            user=user_queue, project=self.project, role=2
+        )
+        permission_sector = ProjectPermission.objects.create(
+            user=user_sector, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(user=user_other, project=self.project, role=2)
+
+        QueueAuthorization.objects.create(permission=permission_queue, queue=self.queue)
+        SectorAuthorization.objects.create(
+            permission=permission_sector, sector=self.sector, role=1
+        )
+
+        agents_by_queue = self.repository._get_csat_agents(
+            Filters(queue=self.queue.uuid), self.project
+        )
+        self.assertEqual(
+            list(agents_by_queue.values_list("email", flat=True)),
+            ["by_queue@test.com"],
+        )
+
+        agents_by_sectors = self.repository._get_csat_agents(
+            Filters(sectors=[self.sector.uuid]), self.project
+        )
+        agent_emails = list(agents_by_sectors.values_list("email", flat=True))
+        self.assertIn("by_sector@test.com", agent_emails)
+        self.assertIn("by_queue@test.com", agent_emails)
+        self.assertNotIn("other@test.com", agent_emails)
+
+    def test_get_csat_agents_includes_agent_with_rooms_in_period_without_auth(self):
+        utc_tz = pytz.timezone("UTC")
+        in_period = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))
+        out_of_period = utc_tz.localize(datetime(2023, 6, 1, 12, 0, 0))
+
+        user_with_room = User.objects.create(
+            email="had_room@test.com", first_name="Had", last_name="Room"
+        )
+        user_out_of_period = User.objects.create(
+            email="old_room@test.com", first_name="Old", last_name="Room"
+        )
+        user_no_link = User.objects.create(
+            email="no_link@test.com", first_name="No", last_name="Link"
+        )
+
+        ProjectPermission.objects.create(
+            user=user_with_room, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(
+            user=user_out_of_period, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(
+            user=user_no_link, project=self.project, role=2
+        )
+
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=in_period,
+            user=user_with_room,
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=out_of_period,
+            user=user_out_of_period,
+        )
+
+        filters = Filters(
+            queues=[self.queue.uuid],
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+        agents = self.repository._get_csat_agents(filters, self.project)
+
+        agent_emails = list(agents.values_list("email", flat=True))
+        self.assertIn("had_room@test.com", agent_emails)
+        self.assertNotIn("old_room@test.com", agent_emails)
+        self.assertNotIn("no_link@test.com", agent_emails)
 
     def test_get_csat_rooms_query_basic(self):
         filters = Filters()
@@ -1315,6 +1551,7 @@ class AgentRepositoryTestCase(TestCase):
 
         # Create rooms with different end dates
         from datetime import datetime
+
         import pytz
 
         utc_tz = pytz.timezone("UTC")
@@ -1492,6 +1729,140 @@ class AgentRepositoryTestCase(TestCase):
         self.assertIn("active_nr@test.com", agents_by_email)
         self.assertIn("removed_wr@test.com", agents_by_email)
         self.assertNotIn("removed_nr@test.com", agents_by_email)
+
+    def test_get_agents_csat_score_filters_agents_by_queue(self):
+        sector2 = Sector.objects.create(
+            name="Other Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        queue2 = Queue.objects.create(name="Other Queue", sector=sector2)
+
+        utc_tz = pytz.timezone("UTC")
+        in_period = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))
+        out_of_period = utc_tz.localize(datetime(2023, 6, 1, 12, 0, 0))
+
+        user_authorized = User.objects.create(
+            email="authorized@test.com", first_name="Auth", last_name="Agent"
+        )
+        user_had_room = User.objects.create(
+            email="had_room@test.com", first_name="Had", last_name="Room"
+        )
+        user_unrelated = User.objects.create(
+            email="unrelated@test.com", first_name="Unrelated", last_name="Agent"
+        )
+        user_old_room = User.objects.create(
+            email="old_room@test.com", first_name="Old", last_name="Room"
+        )
+
+        permission_authorized = ProjectPermission.objects.create(
+            user=user_authorized, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(
+            user=user_had_room, project=self.project, role=2
+        )
+        permission_unrelated = ProjectPermission.objects.create(
+            user=user_unrelated, project=self.project, role=2
+        )
+        ProjectPermission.objects.create(
+            user=user_old_room, project=self.project, role=2
+        )
+
+        QueueAuthorization.objects.create(
+            permission=permission_authorized, queue=self.queue
+        )
+        QueueAuthorization.objects.create(permission=permission_unrelated, queue=queue2)
+
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=in_period,
+            user=user_had_room,
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=out_of_period,
+            user=user_old_room,
+        )
+
+        filters = Filters(
+            queues=[self.queue.uuid],
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+        _, agents_csat = self.repository.get_agents_csat_score(filters, self.project)
+
+        agents_by_email = {a.email: a for a in agents_csat}
+        self.assertIn("authorized@test.com", agents_by_email)
+        self.assertIn("had_room@test.com", agents_by_email)
+        self.assertNotIn("unrelated@test.com", agents_by_email)
+        self.assertNotIn("old_room@test.com", agents_by_email)
+
+        self.assertEqual(agents_by_email["authorized@test.com"].rooms_count, 0)
+        self.assertEqual(agents_by_email["had_room@test.com"].rooms_count, 1)
+
+    def test_get_agents_csat_score_reviews_not_inflated_by_multi_queue_auth(self):
+        """JOIN on multiple queue auths must not inflate reviews/rooms_count."""
+        queue2 = Queue.objects.create(name="Second Queue", sector=self.sector)
+
+        utc_tz = pytz.timezone("UTC")
+        in_period = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))
+
+        user = User.objects.create(
+            email="multi_auth@test.com", first_name="Multi", last_name="Auth"
+        )
+        permission = ProjectPermission.objects.create(
+            user=user, project=self.project, role=2
+        )
+        QueueAuthorization.objects.create(permission=permission, queue=self.queue)
+        QueueAuthorization.objects.create(permission=permission, queue=queue2)
+
+        room = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=in_period,
+            user=user,
+        )
+        CSATSurvey.objects.create(room=room, rating=5, answered_on=in_period)
+
+        filters = Filters(
+            queues=[self.queue.uuid, queue2.uuid],
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+        _, agents_csat = self.repository.get_agents_csat_score(filters, self.project)
+
+        agent = next(a for a in agents_csat if a.email == "multi_auth@test.com")
+        self.assertEqual(agent.rooms_count, 1)
+        self.assertEqual(agent.reviews, 1)
+        self.assertEqual(agent.avg_rating, 5.0)
+
+    def test_get_agents_csat_score_without_sector_queue_keeps_all_agents(self):
+        user1 = User.objects.create(
+            email="agent_a@test.com", first_name="Agent", last_name="A"
+        )
+        user2 = User.objects.create(
+            email="agent_b@test.com", first_name="Agent", last_name="B"
+        )
+
+        ProjectPermission.objects.create(user=user1, project=self.project, role=2)
+        ProjectPermission.objects.create(user=user2, project=self.project, role=2)
+
+        filters = Filters()
+        _, agents_csat = self.repository.get_agents_csat_score(filters, self.project)
+
+        agent_emails = {a.email for a in agents_csat}
+        self.assertIn("agent_a@test.com", agent_emails)
+        self.assertIn("agent_b@test.com", agent_emails)
 
 
 class TestAgentRepository(TestCase):

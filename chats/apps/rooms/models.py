@@ -102,25 +102,25 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     is_active = models.BooleanField(_("is active?"), default=True)
-    is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
+    is_waiting = models.BooleanField(_("is waiting for an answer?"), default=False)
 
     # Legacy, only stores the last transfer
-    transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    transfer_history = models.JSONField(_("Transfer history"), null=True, blank=True)
     # New, stores the full transfer history
     full_transfer_history = models.JSONField(
-        _("Full Transfer History"), null=True, blank=True, default=list
+        _("Full transfer history"), null=True, blank=True, default=list
     )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
         related_name="rooms",
-        verbose_name=_("tags"),
+        verbose_name=_("Tags"),
         blank=True,
     )
-    protocol = models.TextField(_("protocol"), null=True, blank=True, default="")
+    protocol = models.TextField(_("Protocol"), null=True, blank=True, default="")
 
     service_chat = models.TextField(
-        _("service chat"), null=True, blank=True, default=""
+        _("Service chat"), null=True, blank=True, default=""
     )
 
     first_user_assigned_at = models.DateTimeField(
@@ -171,9 +171,33 @@ class Room(BaseModel, BaseConfigurableModel):
         default=list,
         blank=True,
     )
+    last_message_metadata = models.JSONField(
+        _("Last message metadata"),
+        null=True,
+        blank=True,
+    )
 
     automatic_message_sent_at = models.DateTimeField(
         _("Automatic message sent at"), null=True, blank=True
+    )
+
+    is_inactive = models.BooleanField(_("is inactive?"), default=False)
+    automatic_closed = models.BooleanField(
+        _("automatic closed?"),
+        default=False,
+        help_text=_(
+            "True when the room was closed automatically by the system "
+            "(e.g. inactivity timeout) rather than by a human agent."
+        ),
+    )
+    channel_uuid = models.UUIDField(
+        _("WWC channel UUID"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Weni Web Chat channel UUID used in the room, snapshotted from "
+            "the copilot integration on close."
+        ),
     )
 
     tracker = FieldTracker(fields=["user_id", "queue_id"])
@@ -181,9 +205,12 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
         if self.automatic_message_sent_at:
             return self.automatic_message_sent_at
-        from chats.apps.msgs.models import AutomaticMessage
+        from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType
 
-        auto_msg = AutomaticMessage.objects.filter(room=self).first()
+        auto_msg = AutomaticMessage.objects.filter(
+            room=self,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        ).first()
         if auto_msg:
             return auto_msg.message.created_on
         return None
@@ -191,9 +218,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_time_to_send_automatic_message(self) -> Optional[int]:
         sent_at = self.get_automatic_message_sent_at()
         if sent_at and self.first_user_assigned_at:
-            return max(
-                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
-            )
+            return max(int((sent_at - self.first_user_assigned_at).total_seconds()), 0)
         return None
 
     @property
@@ -278,6 +303,44 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
         indexes = [
             models.Index(fields=["project_uuid"]),
+            models.Index(
+                fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
+                name="rooms_inactivity_idx",
+            ),
+            models.Index(
+                fields=["project_uuid", "added_to_queue_at"],
+                name="rooms_waiting_violation_idx",
+                condition=Q(
+                    is_active=True,
+                    user__isnull=True,
+                    added_to_queue_at__isnull=False,
+                ),
+            ),
+            models.Index(
+                fields=["project_uuid", "first_user_assigned_at"],
+                name="rooms_frt_violation_idx",
+                condition=Q(
+                    is_active=True,
+                    user__isnull=False,
+                    first_user_assigned_at__isnull=False,
+                ),
+            ),
+            # Partial index used by `InactivityService.warn_inactive_rooms`.
+            # Pre-filters rows that match every `rooms_room`-local predicate
+            # of the warn queryset so the planner picks this index directly
+            # instead of doing a BitmapAnd with `rooms_room_last_message_user_id_*`,
+            # which scans hundreds of thousands of historical rows.
+            models.Index(
+                fields=["last_interaction"],
+                name="rooms_inactivity_warn_idx",
+                condition=models.Q(
+                    is_active=True,
+                    is_inactive=False,
+                    is_waiting=False,
+                    user__isnull=False,
+                    last_message_user__isnull=False,
+                ),
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -286,7 +349,7 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
         if self._state.adding is False and current_is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
+            raise ValidationError({"detail": _("Closed rooms can't receive updates")})
 
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
@@ -479,6 +542,16 @@ class Room(BaseModel, BaseConfigurableModel):
             self.clear_pins()
 
             self.save()
+            from chats.apps.assisted_sales.feature_flags import (
+                is_assisted_sales_copilot_enabled,
+            )
+            from chats.apps.assisted_sales.tasks import enqueue_set_room_copilot_channel
+
+            project_uuid = None
+            if self.queue_id and self.queue.sector_id:
+                project_uuid = self.queue.sector.project_id
+            if is_assisted_sales_copilot_enabled(project_uuid):
+                enqueue_set_room_copilot_channel(str(self.pk))
 
         if self.user:
             project = None
@@ -606,6 +679,23 @@ class Room(BaseModel, BaseConfigurableModel):
             action=f"rooms.{action}",
         )
 
+    def notify_inactivity(self):
+        """
+        Notifies the frontend that the inactivity flag of this room has
+        changed. Sends a lightweight payload (`room_uuid` + `is_inactive`)
+        with a dedicated `rooms.inactivity` event so the client can update
+        the visual alert without re-rendering the whole room.
+
+        Routes to the assigned agent's permission group when the room has a
+        user; falls back to the queue group otherwise (defensive — rooms
+        eligible for inactivity always have a user).
+        """
+        content = {
+            "room_uuid": str(self.uuid),
+            "is_inactive": self.is_inactive,
+        }
+        self.base_notification(content=content, action="rooms.inactivity")
+
     def user_connection(self, action: str, user=None):
         user = user if user else self.user
         permission = self.get_permission(user)
@@ -703,10 +793,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
+        project = self.queue.sector.project
+
         if (
             RoomPin.objects.filter(
                 user=user,
-                room__queue__sector__project=self.queue.sector.project,
+                project=project,
                 room__is_active=True,
             ).count()
             >= settings.MAX_ROOM_PINS_LIMIT
@@ -719,7 +811,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if not self.is_active:
             raise RoomIsNotActiveError
 
-        return RoomPin.objects.create(room=self, user=user)
+        return RoomPin.objects.create(room=self, user=user, project=project)
 
     def unpin(self, user: User):
         """
@@ -768,22 +860,32 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message, user=None):
+    def update_last_message(
+        self, message, user=None, update_last_interaction=True, metadata=None
+    ):
         """
         Updates last message fields. Used for agent/system messages.
+
+        When ``update_last_interaction`` is False the interaction timestamp
+        is preserved — useful for automatic messages (e.g. inactivity
+        warnings) that must not reset timers.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-            last_message_media=media_data,
-        )
+        fields = {
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+            "last_message_media": media_data,
+            "last_message_metadata": metadata,
+        }
+        if update_last_interaction:
+            fields["last_interaction"] = message.created_on
+
+        Room.objects.filter(pk=self.pk).update(**fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
@@ -802,6 +904,7 @@ class Room(BaseModel, BaseConfigurableModel):
             "last_message_user": None,
             "last_message_contact": contact,
             "last_message_media": media_data,
+            "last_message_metadata": None,
         }
 
         if increment_unread > 0:
@@ -817,6 +920,11 @@ class Room(BaseModel, BaseConfigurableModel):
             ),
         ).update(**update_fields)
 
+        if self.is_inactive and contact is not None:
+            from chats.apps.rooms.usecases.inactivity import InactivityService
+
+            InactivityService().reset_inactivity(self)
+
     def start_csat_flow(self):
         """
         Starts the CSAT flow for a room.
@@ -827,16 +935,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
     @property
     def is_archived(self) -> bool:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         return RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
         ).exists()
 
     def get_archived_conversation_file_url(self) -> Optional[str]:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         archive = RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
@@ -865,11 +973,17 @@ class RoomPin(BaseModel):
         verbose_name=_("user"),
         on_delete=models.CASCADE,
     )
-    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
+    created_on = models.DateTimeField(_("Created on"), auto_now_add=True)
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="room_pins",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
 
     class Meta:
-        verbose_name = _("Room Pin")
-        verbose_name_plural = _("Room Pins")
+        verbose_name = _("Room pin")
+        verbose_name_plural = _("Room pins")
         constraints = [
             models.UniqueConstraint(
                 fields=["room", "user"],
@@ -900,15 +1014,15 @@ class RoomNote(BaseModel):
     message = models.OneToOneField(
         "msgs.Message",
         related_name="internal_note",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
 
     class Meta:
-        verbose_name = _("Room Note")
-        verbose_name_plural = _("Room Notes")
+        verbose_name = _("Room note")
+        verbose_name_plural = _("Room notes")
         ordering = ["-created_on"]
 
     @property
@@ -1033,9 +1147,7 @@ class RoomNoteMedia(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.note.room.is_active is False:
-            raise ValidationError(
-                {"detail": _("Closed rooms cannot receive notes")}
-            )
+            raise ValidationError({"detail": _("Closed rooms cannot receive notes")})
         is_new = self._state.adding
         if is_new and self.note.medias.count() >= 10:
             raise ValidationError(

@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -28,7 +29,8 @@ from chats.apps.sectors.utils import working_hours_validator
 logger = logging.getLogger(__name__)
 
 
-def get_active_room_flow_start(contact, flow_uuid, project):
+def get_active_room_flow_start(contact, flow_uuid, project, config_project=None):
+    config_project = config_project or project
     query_filters = {
         "references__external_id": contact.external_id,
         "flow": flow_uuid,
@@ -44,7 +46,7 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
-        config = project.config or {}
+        config = config_project.config or {}
 
         if config.get("ignore_close_rooms_on_flow_start", False):
             return None
@@ -421,7 +423,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact, created = self.update_or_create_contact(validated_data)
 
-        room = get_active_room_flow_start(contact, flow_uuid, project)
+        flow_start_project = self._get_flow_start_project(sector, project)
+
+        room = get_active_room_flow_start(
+            contact, flow_uuid, flow_start_project, config_project=project
+        )
 
         if room is not None:
             update_fields = []
@@ -453,7 +459,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         user = validated_data.get("user")
 
-        last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
+        last_flow_start = get_last_flow_start(
+            contact, groups, flow_start_project, flow_uuid
+        )
 
         validated_data["user"] = ResolveRoomUserUseCase(queue, project).execute(
             contact, user, created, last_flow_start
@@ -499,6 +507,38 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             self.process_message_history(room, history_data)
         return room
 
+    def _get_flow_start_project(self, sector, project):
+        """
+        Flow starts for a sector tied to another project live on that project.
+        The room itself stays on ``project``.
+        """
+        secondary_project = sector.secondary_project
+        if isinstance(secondary_project, dict):
+            secondary_project_uuid = secondary_project.get("uuid")
+        else:
+            secondary_project_uuid = secondary_project
+
+        if not secondary_project_uuid:
+            return project
+
+        try:
+            return Project.objects.get(uuid=secondary_project_uuid)
+        except (
+            Project.DoesNotExist,
+            DjangoValidationError,
+            ValueError,
+            TypeError,
+        ) as e:
+            logger.error(
+                "Could not resolve secondary_project_uuid=%s for project=%s. Error: %s",
+                secondary_project_uuid,
+                project.pk,
+                e,
+            )
+            raise ValidationError(
+                {"detail": _("Sector secondary project could not be resolved")}
+            ) from e
+
     def validate_unique_active_project(self, contact, project):
         queryset = Room.objects.filter(
             is_active=True, contact=contact, queue__sector__project=project
@@ -518,7 +558,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 return room
 
             raise ValidationError(
-                {"detail": _("The contact already have an open room in the project")}
+                {"detail": _("The contact already has an open room in the project")}
             )
 
     def get_queue_and_sector(self, validated_data):
@@ -532,7 +572,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if queue is None and provided_sector_uuid is None:
             raise ValidationError(
-                {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
+                {"detail": _("Can't create a room without queue_uuid or sector_uuid")}
             )
 
         if queue is None:
@@ -541,13 +581,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             ).first()
             if queue is None:
                 raise ValidationError(
-                    {"detail": _("No active queue found for provided sector_uuid")}
+                    {"detail": _("No active queue found for the provided sector_uuid")}
                 )
 
         sector = queue.sector
         if provided_sector_uuid and str(provided_sector_uuid) != str(sector.uuid):
             raise ValidationError(
-                {"detail": _("queue_uuid does not belong to provided sector_uuid")}
+                {"detail": _("queue_uuid doesn't belong to the provided sector_uuid")}
             )
 
         return queue, sector
@@ -577,7 +617,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         # Agent status validation unchanged
         if sector.validate_agent_status() is False:
             raise ValidationError(
-                {"detail": _("Contact cannot be done when agents are offline")}
+                {"detail": _("No chat can start while representatives are offline")}
             )
 
     def check_work_time_weekend(self, sector, created_on):

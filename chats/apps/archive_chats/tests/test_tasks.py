@@ -316,21 +316,95 @@ class TestCreatePendingRecords(TestCase):
         assert RoomArchivedConversation.objects.filter(room=existing_room).count() == 1
 
     @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
-    def test_does_not_create_records_when_all_rooms_already_archived(self):
-        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+    def test_repoints_existing_non_finished_rows_to_current_job(self):
+        old_job = ArchiveConversationsJob.objects.create(
+            started_at=timezone.now() - rdelta(days=3)
+        )
+        new_job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
         room = Room.objects.create(
             is_active=False,
             ended_at=timezone.now() - rdelta(years=1),
         )
-        RoomArchivedConversation.objects.create(
+        existing = RoomArchivedConversation.objects.create(
             room=room,
-            job=job,
+            job=old_job,
             status=ArchiveConversationsJobStatus.PENDING,
         )
 
-        _create_pending_records([room.uuid], job)
+        _create_pending_records([room.uuid], new_job)
 
+        existing.refresh_from_db()
         assert RoomArchivedConversation.objects.count() == 1
+        assert existing.job_id == new_job.uuid
+        assert existing.status == ArchiveConversationsJobStatus.PENDING
+
+    @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
+    def test_does_not_repoint_finished_rows(self):
+        old_job = ArchiveConversationsJob.objects.create(
+            started_at=timezone.now() - rdelta(days=3)
+        )
+        new_job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        finished = RoomArchivedConversation.objects.create(
+            room=room,
+            job=old_job,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        _create_pending_records([room.uuid], new_job)
+
+        finished.refresh_from_db()
+        assert finished.job_id == old_job.uuid
+        assert finished.status == ArchiveConversationsJobStatus.FINISHED
+
+    @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
+    def test_mixed_create_and_repoint(self):
+        old_job = ArchiveConversationsJob.objects.create(
+            started_at=timezone.now() - rdelta(days=3)
+        )
+        new_job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        new_room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        stale_room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        stale_existing = RoomArchivedConversation.objects.create(
+            room=stale_room,
+            job=old_job,
+            status=ArchiveConversationsJobStatus.FAILED,
+        )
+        finished_room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        finished_existing = RoomArchivedConversation.objects.create(
+            room=finished_room,
+            job=old_job,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        _create_pending_records(
+            [new_room.uuid, stale_room.uuid, finished_room.uuid], new_job
+        )
+
+        new_record = RoomArchivedConversation.objects.get(room=new_room)
+        assert new_record.job_id == new_job.uuid
+        assert new_record.status == ArchiveConversationsJobStatus.PENDING
+
+        stale_existing.refresh_from_db()
+        assert stale_existing.job_id == new_job.uuid
+        assert stale_existing.status == ArchiveConversationsJobStatus.FAILED
+
+        finished_existing.refresh_from_db()
+        assert finished_existing.job_id == old_job.uuid
+        assert finished_existing.status == ArchiveConversationsJobStatus.FINISHED
 
 
 class TestArchiveRoomMessages(TestCase):

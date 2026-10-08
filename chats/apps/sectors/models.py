@@ -14,7 +14,12 @@ from model_utils import FieldTracker
 from chats.apps.csat.flows.definitions.flow import CSAT_FLOW_VERSION
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.queues.utils import start_queue_priority_routing
-from chats.core.models import AuditableMixin, BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    AuditableMixin,
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+)
 from chats.utils.websockets import send_channels_group
 
 from .sector_managers import SectorAuthorizationManager, SectorManager, SectorTagManager
@@ -25,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
-    name = models.CharField(_("name"), max_length=120)
+    name = models.CharField(_("Name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
         verbose_name=_("Project"),
@@ -33,12 +38,12 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         on_delete=models.CASCADE,
     )
     secondary_project = models.JSONField(
-        _("Secondary Project"),
+        _("Secondary project"),
         null=True,
         blank=True,
         help_text=_("Secondary project configuration for integrated ticketers"),
     )
-    rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
+    rooms_limit = models.PositiveIntegerField(_("Room limit per employee"))
     work_start = models.TimeField(
         _("work start"), auto_now=False, auto_now_add=False, null=True, blank=True
     )
@@ -48,14 +53,14 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     can_trigger_flows = models.BooleanField(
         _("Can trigger flows?"),
         help_text=_(
-            "Is it possible to trigger flows(weni flows integration) from this sector?"
+            "Can I trigger flows (VTEX CX Platform flows integration) from this department?"
         ),
         default=False,
     )
     sign_messages = models.BooleanField(_("Sign messages?"), default=False)
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
     open_offline = models.BooleanField(
-        _("Open room when all agents are offline?"), default=True
+        _("Can a room be opened when all representatives are offline?"), default=True
     )
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
@@ -84,14 +89,25 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     )
     required_tags = models.BooleanField(_("required tags?"), default=False)
 
+    inactivity_timeout = models.JSONField(
+        _("inactivity timeout"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Configuration for inactivity warning message and automatic room "
+            "closure. See `chats.apps.sectors.constants.get_default_inactivity_timeout`."
+        ),
+    )
+
     tracker = FieldTracker(fields=["rooms_limit", "is_csat_enabled"])
 
     objects = SectorManager()
     all_objects = SectorManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector")
-        verbose_name_plural = _("Sectors")
+        verbose_name = _("Department")
+        verbose_name_plural = _("Departments")
 
         constraints = [
             models.UniqueConstraint(
@@ -195,6 +211,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     def managers(self):
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
@@ -203,6 +220,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
             project_permissions__status="ONLINE",
+            project_permissions__sector_authorizations__is_deleted=False,
             project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
@@ -358,13 +376,13 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         )
 
 
-class SectorAuthorization(AuditableMixin, BaseModel):
+class SectorAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_MANAGER = 1
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_MANAGER, _("manager")),
+        (ROLE_MANAGER, _("Manager")),
     ]
     # TODO: CONSTRAINT >  A user can only have one auth per sector
     permission = models.ForeignKey(
@@ -377,7 +395,7 @@ class SectorAuthorization(AuditableMixin, BaseModel):
     sector = models.ForeignKey(
         Sector,
         related_name="authorizations",
-        verbose_name=_("Sector"),
+        verbose_name=_("Department"),
         on_delete=models.CASCADE,
     )
     role = models.PositiveIntegerField(
@@ -388,11 +406,13 @@ class SectorAuthorization(AuditableMixin, BaseModel):
     all_objects = SectorAuthorizationManager(include_deleted=True)
 
     class Meta:
-        verbose_name = _("Sector Authorization")
-        verbose_name_plural = _("Sector Authorizations")
+        verbose_name = _("Department authorization")
+        verbose_name_plural = _("Department authorizations")
         constraints = [
             models.UniqueConstraint(
-                fields=["sector", "permission"], name="unique_sector_auth"
+                fields=["sector", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_sector_auth",
             )
         ]
 
@@ -440,7 +460,7 @@ class SectorTag(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",
-        verbose_name=_("Sector"),
+        verbose_name=_("Department"),
         related_name="tags",
         on_delete=models.CASCADE,
     )
@@ -455,8 +475,8 @@ class SectorTag(AuditableMixin, BaseSoftDeleteModel, BaseModel):
             return None
 
     class Meta:
-        verbose_name = _("Sector Tag")
-        verbose_name_plural = _("Sector Tags")
+        verbose_name = _("Department tag")
+        verbose_name_plural = _("Department tags")
         ordering = ["name"]
 
         constraints = [
@@ -494,8 +514,8 @@ class SectorGroupSector(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Sector Group Sector")
-        verbose_name_plural = _("Sector Group Sectors")
+        verbose_name = _("Department group")
+        verbose_name_plural = _("Department groups")
         constraints = [
             models.UniqueConstraint(
                 fields=["sector_group", "sector"],
@@ -521,11 +541,11 @@ class GroupSector(AuditableMixin, BaseModel, BaseSoftDeleteModel):
         related_name="group_sectors",
         blank=True,
     )
-    rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
+    rooms_limit = models.PositiveIntegerField(_("Room limit per employee"))
 
     class Meta:
-        verbose_name = _("Group Sector")
-        verbose_name_plural = _("Group Sectors")
+        verbose_name = _("Department group")
+        verbose_name_plural = _("Department groups")
 
     def __str__(self):
         return self.name
@@ -547,8 +567,8 @@ class GroupSectorAuthorization(BaseModel):
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_MANAGER, _("manager")),
-        (ROLE_AGENT, _("agent")),
+        (ROLE_MANAGER, _("Manager")),
+        (ROLE_AGENT, _("Representative")),
     ]
     group_sector = models.ForeignKey(
         "GroupSector",
@@ -565,8 +585,8 @@ class GroupSectorAuthorization(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Group Sector Authorization")
-        verbose_name_plural = _("Group Sector Authorizations")
+        verbose_name = _("Department group authorization")
+        verbose_name_plural = _("Department group authorizations")
         constraints = [
             models.UniqueConstraint(
                 fields=["group_sector", "permission", "role"],
@@ -603,49 +623,49 @@ class SectorHoliday(AuditableMixin, BaseSoftDeleteModel, BaseModel):
 
     DAY_TYPE_CHOICES = [
         (CLOSED, _("Closed")),
-        (CUSTOM_HOURS, _("Custom Hours")),
+        (CUSTOM_HOURS, _("Custom hours")),
     ]
 
     sector = models.ForeignKey(
         Sector,
-        verbose_name=_("Sector"),
+        verbose_name=_("Department"),
         related_name="holidays",
         on_delete=models.CASCADE,
     )
     date = models.DateField(_("Date"))
     date_end = models.DateField(
-        _("End Date"),
+        _("End date"),
         null=True,
         blank=True,
         help_text=_("End date for holiday range"),
     )
     day_type = models.CharField(
-        _("Day Type"), max_length=20, choices=DAY_TYPE_CHOICES, default=CLOSED
+        _("Day type"), max_length=20, choices=DAY_TYPE_CHOICES, default=CLOSED
     )
     start_time = models.TimeField(
-        _("Start Time"),
+        _("Start time"),
         null=True,
         blank=True,
-        help_text=_("Leave empty if day is closed"),
+        help_text=_("Leave empty if there are no working hours"),
     )
     end_time = models.TimeField(
-        _("End Time"),
+        _("End time"),
         null=True,
         blank=True,
-        help_text=_("Leave empty if day is closed"),
+        help_text=_("Leave empty if there are no working hours"),
     )
     description = models.CharField(
         _("Description"),
         max_length=255,
         blank=True,
-        help_text=_("Holiday name or reason for special hours"),
+        help_text=_("Holiday name or special hours reason"),
     )
-    its_custom = models.BooleanField(_("Is Custom"), default=False)
-    repeat = models.BooleanField(_("Repeat Annually"), default=False)
+    its_custom = models.BooleanField(_("Is custom"), default=False)
+    repeat = models.BooleanField(_("Repeat annually"), default=False)
 
     class Meta:
-        verbose_name = _("Sector Holiday")
-        verbose_name_plural = _("Sector Holidays")
+        verbose_name = _("Department holiday")
+        verbose_name_plural = _("Department holidays")
         indexes = [
             models.Index(fields=["sector", "date"], name="idx_sector_holiday"),
         ]

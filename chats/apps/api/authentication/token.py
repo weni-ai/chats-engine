@@ -5,12 +5,12 @@ from django.conf import settings
 from django.utils import timezone
 
 
-class JWTTokenGenerator:
+class CSATJWTTokenGenerator:
     """
-    A class for generating JWT tokens with configurable options.
+    JWT token generator for CSAT flow and webhook authentication.
 
-    This class provides methods to generate JWT tokens with custom payloads,
-    expiration times, and signing algorithms.
+    Uses HS256 with Django's SECRET_KEY to sign tokens passed to the flows
+    service and validated by CSATJWTAuthentication.
     """
 
     def __init__(self, secret_key: Optional[str] = None, algorithm: str = "HS256"):
@@ -70,36 +70,6 @@ class JWTTokenGenerator:
             return token
         except Exception as e:
             raise jwt.InvalidTokenError(f"Failed to generate token: {str(e)}")
-
-    def generate_api_token(
-        self,
-        service_name: str,
-        permissions: Optional[list] = None,
-        expires_in_hours: int = 2,
-        additional_claims: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """
-        Generate a JWT token for API service authentication.
-
-        Args:
-            service_name: Name of the service using the token.
-            permissions: List of permissions granted to the service.
-            expires_in_hours: Token expiration time in hours (default: 2).
-            additional_claims: Additional claims to include in the token.
-
-        Returns:
-            str: The encoded JWT token.
-        """
-        payload = {
-            "service": service_name,
-            "type": "api_auth",
-            "permissions": permissions or [],
-        }
-
-        if additional_claims:
-            payload.update(additional_claims)
-
-        return self.generate_token(payload, expires_in_hours)
 
     def verify_token(self, token: str) -> Dict[str, Any]:
         """

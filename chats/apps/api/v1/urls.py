@@ -17,11 +17,13 @@ from chats.apps.api.v1.ai_features.views import (
     HistorySummaryFeedbackTagsView,
 )
 from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
+from chats.apps.api.v1.contacts.views import OutOffWhatsappResponseWindowContactsView
 from chats.apps.api.v1.dashboard.viewsets import (
     ModelFieldsViewSet,
     ReportFieldsValidatorViewSet,
 )
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
+from chats.apps.api.v1.multi_agents.views import MultiAgentsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.rooms.viewsets import (
@@ -31,6 +33,17 @@ from chats.apps.api.v1.rooms.viewsets import (
     RoomsReportViewSet,
 )
 from chats.apps.api.v1.routers import router
+from chats.apps.assisted_sales.views import (
+    CopilotCreatePermissionView,
+    CopilotExistingProjectsView,
+    CopilotLinkedProjectView,
+    CopilotListConnectionsView,
+    CopilotMessageFeedbackView,
+    CopilotProjectCreateView,
+    CopilotProjectRemoveView,
+    CopilotProjectUpdateView,
+    CopilotRoomMessagesView,
+)
 
 urlpatterns = [
     path(
@@ -98,6 +111,56 @@ urlpatterns = [
         name="human_support_nexus_settings",
     ),
     path(
+        "multi-agents/<str:project_uuid>/",
+        MultiAgentsView.as_view(),
+        name="multi_agents_nexus",
+    ),
+    path(
+        "project/copilot/create",
+        CopilotProjectCreateView.as_view(),
+        name="copilot_project_create",
+    ),
+    path(
+        "project/copilot/can_create/<uuid:project_uuid>",
+        CopilotCreatePermissionView.as_view(),
+        name="copilot_create_permission",
+    ),
+    path(
+        "project/copilot/update/<uuid:uuid>",
+        CopilotProjectUpdateView.as_view(),
+        name="copilot_project_update",
+    ),
+    path(
+        "project/copilot/remove/<uuid:uuid>",
+        CopilotProjectRemoveView.as_view(),
+        name="copilot_project_remove",
+    ),
+    path(
+        "project/copilot/linked_project/<uuid:project_uuid>",
+        CopilotLinkedProjectView.as_view(),
+        name="copilot_linked_project",
+    ),
+    path(
+        "project/copilot/list_existing_projects/<uuid:org_uuid>",
+        CopilotExistingProjectsView.as_view(),
+        name="copilot_list_existing_projects",
+    ),
+    path(
+        "room/<uuid:room_uuid>/copilot/messages/",
+        CopilotRoomMessagesView.as_view(),
+        name="copilot_room_messages",
+    ),
+    path(
+        "room/<uuid:room_uuid>/copilot/feedback/",
+        CopilotMessageFeedbackView.as_view(),
+        name="copilot_message_feedback",
+    ),
+    path(
+        "project/<uuid:project_uuid>/copilot/list_connections",
+        CopilotListConnectionsView.as_view(),
+        name="copilot_list_connections",
+    ),
+    path(
         "project/<uuid:project_uuid>/all_agents/",
         AllAgentsView.as_view(),
         name="all_agents",
@@ -116,6 +179,11 @@ urlpatterns = [
         "agent/update_queue_permissions/",
         UpdateQueuePermissionsView.as_view(),
         name="update_queue_permissions",
+    ),
+    path(
+        "contacts/out_off_whatsapp_response_window/",
+        OutOffWhatsappResponseWindowContactsView.as_view(),
+        name="contacts-out-off-whatsapp-response-window",
     ),
     path("", include(router.urls)),
 ]

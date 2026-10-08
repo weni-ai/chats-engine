@@ -1,22 +1,26 @@
 import uuid
+from unittest.mock import MagicMock, patch
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
-from django.test import override_settings
 from rest_framework.response import Response
-from unittest.mock import patch, MagicMock
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
 from chats.apps.projects.models import Project
-from chats.apps.projects.models.models import ProjectPermission
+from chats.apps.projects.models.models import (
+    CustomStatus,
+    CustomStatusType,
+    ProjectPermission,
+)
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-
-from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class QueueTests(APITestCase):
@@ -315,6 +319,190 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(self.queue.queue_limit, None)
         self.assertEqual(self.queue.is_queue_limit_active, False)
 
+    @with_project_permission()
+    def test_create_queue_with_queue_purpose(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "queue_purpose": "Atendimento comercial",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("queue_purpose"), "Atendimento comercial")
+
+    @with_project_permission()
+    def test_update_queue_with_queue_purpose(self):
+        response = self.update_queue(
+            self.queue.pk,
+            {"queue_purpose": "Suporte técnico"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.queue_purpose, "Suporte técnico")
+
+    @with_project_permission()
+    def test_create_queue_with_bond_flows_queue(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertTrue(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_create_queue_without_bond_flows_queue_defaults_to_false(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertFalse(queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_update_queue_with_bond_flows_queue(self):
+        self.assertFalse(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": True},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), True)
+
+        self.queue.refresh_from_db()
+        self.assertTrue(self.queue.bond_flows_queue)
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("bond_flows_queue"), False)
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+
+    @with_project_permission()
+    def test_create_queue_with_selected_flows(self):
+        flow_uuids = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": True,
+                "selected_flows": flow_uuids,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), flow_uuids)
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, flow_uuids)
+
+    @with_project_permission()
+    def test_create_queue_with_bond_flows_queue_false_clears_selected_flows(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "bond_flows_queue": False,
+                "selected_flows": ["11111111-1111-1111-1111-111111111111"],
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_create_queue_without_selected_flows_defaults_to_empty_list(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        queue = Queue.objects.get(uuid=response.data.get("uuid"))
+        self.assertEqual(queue.selected_flows, [])
+
+    @with_project_permission()
+    def test_update_queue_replaces_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+            "33333333-3333-3333-3333-333333333333",
+        ]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        updated_flows = [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "bond_flows_queue": True,
+                "selected_flows": updated_flows,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), updated_flows)
+
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.selected_flows, updated_flows)
+
+    @with_project_permission()
+    def test_update_queue_disabling_bond_flows_queue_clears_selected_flows(self):
+        self.queue.bond_flows_queue = True
+        self.queue.selected_flows = ["11111111-1111-1111-1111-111111111111"]
+        self.queue.save(
+            update_fields=["bond_flows_queue", "selected_flows", "modified_on"]
+        )
+
+        response = self.update_queue(
+            self.queue.pk,
+            {"bond_flows_queue": False},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("selected_flows"), [])
+
+        self.queue.refresh_from_db()
+        self.assertFalse(self.queue.bond_flows_queue)
+        self.assertEqual(self.queue.selected_flows, [])
+
 
 class QueueTransferAgentsTests(APITestCase):
     def setUp(self):
@@ -466,6 +654,118 @@ class QueueTransferAgentsTests(APITestCase):
         self.assertNotIn(offline_agent.email, returned_emails)
         self.assertNotIn(offline_admin.email, returned_emails)
 
+    @with_project_permission()
+    def test_transfer_agents_filter_moderators_hides_project_admins(self):
+        self.project.config = {"filter_moderators": True}
+        self.project.save(update_fields=["config"])
+
+        agent = User.objects.create(email="agent-filter-mod@test.com")
+        agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        manager = User.objects.create(email="manager-filter-mod@test.com")
+        manager_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=manager,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        SectorAuthorization.objects.create(
+            sector=self.sector,
+            permission=manager_perm,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+        admin = User.objects.create(email="admin-filter-mod@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=admin,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_emails = [user_data.get("email") for user_data in response.data]
+
+        self.assertIn(agent.email, returned_emails)
+        self.assertIn(manager.email, returned_emails)
+        self.assertNotIn(admin.email, returned_emails)
+
+    @with_project_permission()
+    def test_transfer_agents_filter_moderators_and_offline_agents(self):
+        self.project.config = {
+            "filter_moderators": True,
+            "filter_offline_agents": True,
+        }
+        self.project.save(update_fields=["config"])
+
+        online_agent = User.objects.create(email="online-agent-both@test.com")
+        online_agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=online_agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        offline_agent = User.objects.create(email="offline-agent-both@test.com")
+        offline_agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=offline_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_OFFLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=offline_agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        online_manager = User.objects.create(email="online-manager-both@test.com")
+        online_manager_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_manager,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        SectorAuthorization.objects.create(
+            sector=self.sector,
+            permission=online_manager_perm,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+
+        online_admin = User.objects.create(email="online-admin-both@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=online_admin,
+            role=ProjectPermission.ROLE_ADMIN,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_emails = [user_data.get("email") for user_data in response.data]
+
+        self.assertIn(online_agent.email, returned_emails)
+        self.assertIn(online_manager.email, returned_emails)
+        self.assertNotIn(offline_agent.email, returned_emails)
+        self.assertNotIn(online_admin.email, returned_emails)
+
     @override_settings(VTEX_INTERNAL_DOMAINS=["vtex.com", "weni.ai"])
     def test_transfer_agents_with_when_user_is_internal(self):
         domains = get_vtex_internal_domains_with_at_symbol()
@@ -532,9 +832,274 @@ class QueueTransferAgentsTests(APITestCase):
         for domain in get_vtex_internal_domains_with_at_symbol():
             self.assertIn("internal" + domain, returned_emails)
 
+    @with_project_permission()
+    def test_transfer_agents_returns_online_status_for_online_agent(self):
+        online_agent = User.objects.create(
+            email="online@test.com", first_name="Online", last_name="Agent"
+        )
+        online_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=online_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[online_agent.email]["status"], "online")
+
+    @with_project_permission()
+    def test_transfer_agents_returns_offline_status_for_offline_agent(self):
+        offline_agent = User.objects.create(
+            email="offline@test.com", first_name="Offline", last_name="Agent"
+        )
+        offline_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=offline_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_OFFLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=offline_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[offline_agent.email]["status"], "offline")
+
+    @with_project_permission()
+    def test_transfer_agents_returns_pause_name_when_agent_has_active_custom_status(
+        self,
+    ):
+        paused_agent = User.objects.create(
+            email="paused@test.com", first_name="Paused", last_name="Agent"
+        )
+        paused_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=paused_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=paused_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        pause_type = CustomStatusType.objects.create(
+            name="Almoço", project=self.project
+        )
+        CustomStatus.objects.create(
+            user=paused_agent,
+            status_type=pause_type,
+            project=self.project,
+            is_active=True,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[paused_agent.email]["status"], "Almoço")
+
+    @with_project_permission()
+    def test_transfer_agents_ignores_in_service_custom_status(self):
+        agent = User.objects.create(
+            email="in-service@test.com", first_name="InService", last_name="Agent"
+        )
+        agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        in_service_type = CustomStatusType.objects.create(
+            name="In-Service", project=self.project
+        )
+        CustomStatus.objects.create(
+            user=agent,
+            status_type=in_service_type,
+            project=self.project,
+            is_active=True,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[agent.email]["status"], "online")
+
+    @with_project_permission()
+    def test_transfer_agents_ignores_inactive_custom_status(self):
+        agent = User.objects.create(
+            email="inactive-pause@test.com",
+            first_name="InactivePause",
+            last_name="Agent",
+        )
+        agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_OFFLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        pause_type = CustomStatusType.objects.create(
+            name="Reunião", project=self.project
+        )
+        pause = CustomStatus(
+            user=agent,
+            status_type=pause_type,
+            project=self.project,
+            is_active=True,
+        )
+        pause.save()
+        # Deactivate without triggering the auto-deactivation logic on save.
+        CustomStatus.objects.filter(pk=pause.pk).update(is_active=False)
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[agent.email]["status"], "offline")
+
+    @with_project_permission()
+    def test_transfer_agents_orders_online_then_pause_then_offline(self):
+        online_agent = User.objects.create(
+            email="a-online@test.com", first_name="AOnline", last_name="Z"
+        )
+        online_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=online_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=online_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        paused_agent = User.objects.create(
+            email="b-paused@test.com", first_name="BPaused", last_name="Z"
+        )
+        paused_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=paused_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=paused_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        pause_type = CustomStatusType.objects.create(
+            name="Almoço", project=self.project
+        )
+        CustomStatus.objects.create(
+            user=paused_agent,
+            status_type=pause_type,
+            project=self.project,
+            is_active=True,
+        )
+
+        offline_agent = User.objects.create(
+            email="c-offline@test.com", first_name="COffline", last_name="Z"
+        )
+        offline_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=offline_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_OFFLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=offline_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        target_emails = {online_agent.email, paused_agent.email, offline_agent.email}
+        filtered = [item for item in response.data if item["email"] in target_emails]
+        ordered_emails = [item["email"] for item in filtered]
+
+        self.assertEqual(
+            ordered_emails,
+            [online_agent.email, paused_agent.email, offline_agent.email],
+        )
+
+        statuses = [item["status"] for item in filtered]
+        self.assertEqual(statuses, ["online", "Almoço", "offline"])
+
+    @with_project_permission()
+    def test_transfer_agents_pause_takes_priority_over_online(self):
+        agent = User.objects.create(
+            email="online-but-paused@test.com",
+            first_name="Online",
+            last_name="ButPaused",
+        )
+        agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        pause_type = CustomStatusType.objects.create(
+            name="Reunião", project=self.project
+        )
+        CustomStatus.objects.create(
+            user=agent,
+            status_type=pause_type,
+            project=self.project,
+            is_active=True,
+        )
+
+        url = reverse("queue-transfer-agents", args=[self.queue.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_email = {item["email"]: item for item in response.data}
+        self.assertEqual(data_by_email[agent.email]["status"], "Reunião")
+
 
 class QueueEndAllChatsTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -649,7 +1214,6 @@ class QueueEndAllChatsTests(APITestCase):
 
 
 class QueueTransferOnDeleteTests(APITestCase):
-
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
