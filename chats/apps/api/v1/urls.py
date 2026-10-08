@@ -23,11 +23,12 @@ from chats.apps.api.v1.dashboard.viewsets import (
     ReportFieldsValidatorViewSet,
 )
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
-from chats.apps.api.v1.multi_agents.views import MultiAgentsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
+from chats.apps.api.v1.multi_agents.views import MultiAgentsView
 from chats.apps.api.v1.rooms.viewsets import (
     RoomReportViewSet,
+    RoomsCountByAgentView,
     RoomsCountByQueueView,
     RoomsCountView,
     RoomsReportViewSet,
@@ -77,6 +78,11 @@ urlpatterns = [
         "rooms_count/by_queue/",
         RoomsCountByQueueView.as_view(),
         name="rooms-count-by-queue",
+    ),
+    path(
+        "rooms_count/by_agent/",
+        RoomsCountByAgentView.as_view(),
+        name="rooms-count-by-agent",
     ),
     path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
     path("chats/report/", ReportFieldsValidatorViewSet.as_view(), name="chats-report"),
