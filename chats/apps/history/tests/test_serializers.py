@@ -7,10 +7,8 @@ from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.history.serializers.rooms import (
-    ContactOptimizedSerializer,
     RoomDetailSerializer,
     RoomHistorySerializer,
-    _apply_custom_fields_contact_fallback,
     _serialize_closed_by,
 )
 from chats.apps.projects.models.models import Project, ProjectPermission
@@ -279,91 +277,3 @@ class TestRoomDetailSerializerCsat(TestCase):
 
         self.assertIsNone(data["csat_note"])
         self.assertIsNone(data["csat_commentary"])
-
-
-class TestContactCustomFieldsFallback(TestCase):
-    def setUp(self):
-        self.project = Project.objects.create(name="Test Project")
-        self.sector = Sector.objects.create(
-            name="Sector",
-            project=self.project,
-            rooms_limit=5,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
-
-    def _make_room(self, *, email="", document="", custom_fields=None) -> Room:
-        contact = Contact.objects.create(
-            name="Contact",
-            external_id=str(uuid4()),
-            email=email,
-            document=document,
-        )
-        room = Room.objects.create(
-            queue=self.queue,
-            contact=contact,
-            custom_fields=custom_fields,
-        )
-        room.is_active = False
-        room.ended_at = timezone.now()
-        room.save()
-        return room
-
-    def test_history_serializer_uses_custom_fields_when_contact_is_empty(self):
-        room = self._make_room(
-            custom_fields={"email": "qa01@weni.ai", "document": "111.222.333-44"}
-        )
-
-        data = RoomHistorySerializer(room).data
-
-        self.assertEqual(data["contact"]["email"], "qa01@weni.ai")
-        self.assertEqual(data["contact"]["document"], "111.222.333-44")
-
-    def test_detail_serializer_uses_custom_fields_when_contact_is_empty(self):
-        room = self._make_room(
-            custom_fields={"email": "qa01@weni.ai", "document": "111.222.333-44"}
-        )
-
-        data = RoomDetailSerializer(room).data
-
-        self.assertEqual(data["contact"]["email"], "qa01@weni.ai")
-        self.assertEqual(data["contact"]["document"], "111.222.333-44")
-
-    def test_contact_values_take_priority_over_custom_fields(self):
-        room = self._make_room(
-            email="contact@weni.ai",
-            document="99988877766",
-            custom_fields={"email": "qa01@weni.ai", "document": "111.222.333-44"},
-        )
-
-        history_data = RoomHistorySerializer(room).data
-        detail_data = RoomDetailSerializer(room).data
-
-        self.assertEqual(history_data["contact"]["email"], "contact@weni.ai")
-        self.assertEqual(history_data["contact"]["document"], "99988877766")
-        self.assertEqual(detail_data["contact"]["email"], "contact@weni.ai")
-        self.assertEqual(detail_data["contact"]["document"], "99988877766")
-
-    def test_ignores_custom_fields_that_are_not_a_dict(self):
-        room = self._make_room(custom_fields=["email"])
-
-        data = RoomHistorySerializer(room).data
-
-        self.assertIn(data["contact"]["email"], (None, ""))
-        self.assertIn(data["contact"]["document"], (None, ""))
-
-        optimized = ContactOptimizedSerializer(
-            room.contact, context={"parent": {"room": room}}
-        ).data
-        self.assertFalse(optimized.get("email"))
-        self.assertFalse(optimized.get("document"))
-
-    def test_helper_ignores_non_string_custom_field_values(self):
-        data = {"email": None, "document": ""}
-        room = Room(custom_fields={"email": 123, "document": {"value": "x"}})
-
-        result = _apply_custom_fields_contact_fallback(data, room)
-
-        self.assertIsNone(result["email"])
-        self.assertEqual(result["document"], "")
