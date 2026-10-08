@@ -7,8 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -16,15 +15,17 @@ from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
+from chats.apps.contacts.usecases.fill_contact_from_custom_fields import (
+    get_contact_updates_from_custom_fields,
+)
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
-
 
 logger = logging.getLogger(__name__)
 
@@ -422,6 +423,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         groups, flow_uuid = self.extract_flow_start_data(validated_data)
 
         contact, created = self.update_or_create_contact(validated_data)
+
+        updates = get_contact_updates_from_custom_fields(
+            contact, validated_data.get("custom_fields")
+        )
+        if updates:
+            for field, value in updates.items():
+                setattr(contact, field, value)
+            contact.save(update_fields=[*updates.keys(), "modified_on"])
 
         flow_start_project = self._get_flow_start_project(sector, project)
 
