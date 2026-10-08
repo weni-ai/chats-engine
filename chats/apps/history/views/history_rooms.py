@@ -1,4 +1,4 @@
-from django.db.models import Func, Value
+from django.db.models import CharField, Func, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django_filters.rest_framework import DjangoFilterBackend
@@ -71,6 +71,7 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
                         Value(""),
                         Value("g"),
                         function="REGEXP_REPLACE",
+                        output_field=CharField(),
                     )
                 )
             )
