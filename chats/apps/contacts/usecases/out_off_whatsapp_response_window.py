@@ -1,11 +1,13 @@
 import uuid
 from datetime import timedelta
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 
 WHATSAPP_RESPONSE_WINDOW_DAYS = 1
@@ -13,6 +15,19 @@ WHATSAPP_RESPONSE_WINDOW_DAYS = 1
 
 class InvalidOutOffWindowFilter(Exception):
     pass
+
+
+class ProjectNotFound(Exception):
+    pass
+
+
+def get_project_for_user(project_uuid, user):
+    try:
+        project = Project.objects.get(uuid=project_uuid)
+        project.permissions.get(user=user)
+        return project
+    except (Project.DoesNotExist, ObjectDoesNotExist, ValidationError, ValueError):
+        raise ProjectNotFound()
 
 
 def parse_csv(value):

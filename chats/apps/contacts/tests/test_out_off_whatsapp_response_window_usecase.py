@@ -17,6 +17,9 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+DEFAULT_ROOMS_LIMIT = 5
+WHATSAPP_WINDOW_EXPIRED_DAYS = 2
+
 
 class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
     def setUp(self):
@@ -30,7 +33,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         self.sector = Sector.objects.create(
             name="Sector",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -39,7 +42,9 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
     def _contact(self, name, external_id, email=""):
         return Contact.objects.create(name=name, external_id=external_id, email=email)
 
-    def _room(self, contact, urn, queue=None, days_old=2, user=None):
+    def _room(
+        self, contact, urn, queue=None, days_old=WHATSAPP_WINDOW_EXPIRED_DAYS, user=None
+    ):
         room = Room.objects.create(
             queue=queue or self.queue,
             contact=contact,
@@ -95,7 +100,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         room = self._room(contact, "whatsapp:5500000000001", days_old=0)
         Message.objects.create(room=room, contact=contact, text="oi")
         Room.objects.filter(pk=room.pk).update(
-            created_on=timezone.now() - timedelta(days=2)
+            created_on=timezone.now() - timedelta(days=WHATSAPP_WINDOW_EXPIRED_DAYS)
         )
 
         contacts, _ = out_off_whatsapp_response_window(self.project)
@@ -106,7 +111,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         room = self._room(contact, "whatsapp:5500000000001", days_old=0, user=self.user)
         Message.objects.create(room=room, user=self.user, text="oi")
         Room.objects.filter(pk=room.pk).update(
-            created_on=timezone.now() - timedelta(days=2)
+            created_on=timezone.now() - timedelta(days=WHATSAPP_WINDOW_EXPIRED_DAYS)
         )
 
         contacts, _ = out_off_whatsapp_response_window(self.project)
@@ -119,7 +124,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         other_sector = Sector.objects.create(
             name="Other",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -157,7 +162,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         other_sector = Sector.objects.create(
             name="Other",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
@@ -165,7 +170,7 @@ class OutOffWhatsappResponseWindowUseCaseTests(TestCase):
         third_sector = Sector.objects.create(
             name="Third",
             project=self.project,
-            rooms_limit=5,
+            rooms_limit=DEFAULT_ROOMS_LIMIT,
             work_start="09:00",
             work_end="18:00",
         )
