@@ -1,3 +1,6 @@
+from django.db.models import CharField, Func, Value
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Upper
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
@@ -39,6 +42,8 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         "contact__name",
         "contact__email",
         "contact__document",
+        "custom_fields__email",
+        "custom_fields_normalized_document",
         "urn",
         "user__first_name",
         "user__last_name",
@@ -55,7 +60,22 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         if self.request.GET.get("basic", None):
             return Room.objects.values("uuid", "ended_at")
 
-        return super().get_queryset()
+        return (
+            super()
+            .get_queryset()
+            .annotate(
+                custom_fields_normalized_document=Upper(
+                    Func(
+                        KeyTextTransform("document", "custom_fields"),
+                        Value("[^A-Za-z0-9]"),
+                        Value(""),
+                        Value("g"),
+                        function="REGEXP_REPLACE",
+                        output_field=CharField(),
+                    )
+                )
+            )
+        )
 
     def get_permissions(self):
         permission_classes = self.permission_classes

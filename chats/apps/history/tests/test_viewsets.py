@@ -1,14 +1,18 @@
+from unittest.mock import patch
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
+from chats.apps.contacts.models import Contact
 from chats.apps.csat.models import CSATSurvey
+from chats.apps.rooms.models import Room
 from chats.core.tests.test_base import BaseAPIChatsTestCase
 
 
@@ -230,6 +234,12 @@ class TestHistoryRoomSearchFields(BaseAPIChatsTestCase):
     def setUp(self):
         super().setUp()
         self.deactivate_rooms()
+        ninth_digit_patcher = patch(
+            "chats.core.filters.ninth_digit_search_enabled_from_request",
+            return_value=False,
+        )
+        ninth_digit_patcher.start()
+        self.addCleanup(ninth_digit_patcher.stop)
 
         self.contact.email = "john.doe@tokstok.com"
         self.contact.document = "123.456.789-00"
@@ -238,6 +248,36 @@ class TestHistoryRoomSearchFields(BaseAPIChatsTestCase):
         self.contact_2.email = "mary@example.com"
         self.contact_2.document = "98765432100"
         self.contact_2.save()
+
+        self.custom_fields_contact = Contact.objects.create(
+            name="Custom Fields Contact",
+            external_id="cf-001",
+            email="",
+            document="",
+        )
+        self.custom_fields_room = Room.objects.create(
+            contact=self.custom_fields_contact,
+            queue=self.queue_1,
+            user=self.agent,
+            custom_fields={
+                "email": "qa01@weni.ai",
+                "document": "111.222.333-44",
+            },
+            is_active=False,
+            ended_at=timezone.now(),
+        )
+        self.empty_custom_fields_room = Room.objects.create(
+            contact=Contact.objects.create(
+                name="No Custom Fields Contact",
+                external_id="cf-002",
+                email="",
+                document="",
+            ),
+            queue=self.queue_1,
+            custom_fields=None,
+            is_active=False,
+            ended_at=timezone.now(),
+        )
 
     def test_search_by_contact_email(self):
         response = self._search("john.doe@tokstok.com")
@@ -276,6 +316,35 @@ class TestHistoryRoomSearchFields(BaseAPIChatsTestCase):
         response = self._search("notfound-xyz-9999")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 0)
+
+    def test_search_by_custom_fields_email(self):
+        response = self._search("qa01@weni.ai")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.custom_fields_room.uuid), uuids)
+        self.assertNotIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.empty_custom_fields_room.uuid), uuids)
+
+    def test_search_by_custom_fields_document_without_formatting(self):
+        response = self._search("11122233344")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.custom_fields_room.uuid), uuids)
+        self.assertNotIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.empty_custom_fields_room.uuid), uuids)
+
+    def test_search_by_custom_fields_document_with_dashes(self):
+        response = self._search("111.222.333-44")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.custom_fields_room.uuid), uuids)
+        self.assertNotIn(str(self.room_1.uuid), uuids)
+
+    def test_search_does_not_break_when_custom_fields_is_null(self):
+        response = self._search("qa01@weni.ai")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertNotIn(str(self.empty_custom_fields_room.uuid), uuids)
 
 
 class TestHistoryRoomContactFilterUnification(BaseAPIChatsTestCase):
