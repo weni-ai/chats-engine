@@ -106,6 +106,21 @@ class RoomsCountBySectorResponseSerializer(serializers.Serializer):
     sectors = SectorCountSerializer(many=True)
 
 
+class RoomsCountByAgentQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class AgentRoomsCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    uuid = serializers.CharField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class RoomsCountByAgentResponseSerializer(serializers.Serializer):
+    agents = AgentRoomsCountSerializer(many=True)
+
+
 class LastMessageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField(allow_null=True)
     text = serializers.CharField(allow_blank=True)

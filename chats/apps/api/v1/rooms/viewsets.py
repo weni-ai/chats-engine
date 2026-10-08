@@ -58,6 +58,8 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
     RoomNoteMediaSerializer,
     RoomNoteSerializer,
+    RoomsCountByAgentQueryParamsSerializer,
+    RoomsCountByAgentResponseSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
     RoomsCountBySectorQueryParamsSerializer,
@@ -71,6 +73,9 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+from chats.apps.api.v1.rooms.services.rooms_count_by_agent_service import (
+    RoomsCountByAgentService,
+)
 from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
     RoomsCountByQueueService,
 )
@@ -1695,5 +1700,47 @@ class RoomsCountBySectorView(APIView):
 
         return Response(
             RoomsCountBySectorResponseSerializer(result).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class RoomsCountByAgentView(APIView):
+    """
+    Return active room counts grouped by agent for a project.
+
+    Query params:
+        - project: Project UUID (required)
+
+    `uuid` is the agent email. Agents are ordered by rooms_in_progress
+    descending, then by name.
+    """
+
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountByAgentQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
+        )
+
+        result = RoomsCountByAgentService().get_counts(
+            project_uuid=project_uuid,
+            requesting_permission=requesting_permission,
+        )
+
+        return Response(
+            RoomsCountByAgentResponseSerializer(result).data,
             status=status.HTTP_200_OK,
         )
