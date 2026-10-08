@@ -17,8 +17,12 @@ from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.authentication.classes import JWTAuthentication
-from chats.apps.api.authentication.permissions import IsAuthenticatedOrHasInternalJWT
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+    IsAuthenticatedOrHasInternalJWT,
+)
 from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -72,6 +76,12 @@ from chats.apps.projects.usecases.get_latest_unified_sac_migration import (
     GetLatestUnifiedSacMigrationUseCase,
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.resolve_project_for_unified_sac_migration import (
+    MissingProjectUUIDError,
+    ProjectMismatchError,
+    ProjectNotFoundError,
+    ResolveProjectForUnifiedSacMigrationUseCase,
+)
 from chats.apps.projects.usecases.start_flow import (
     StartFlowUseCase,
     StartOutOffWhatsappFlowUseCase,
@@ -107,6 +117,27 @@ class ProjectViewset(
         ProjectAnyPermission,
     ]
     lookup_field = "uuid"
+
+    def initialize_request(self, request, *args, **kwargs):
+        if hasattr(self, "action_map"):
+            self.action = self.action_map.get(request.method.lower())
+        return super().initialize_request(request, *args, **kwargs)
+
+    @property
+    def authentication_classes(self):
+        if getattr(self, "action", None) == "start_unified_sac_migration":
+            classes = list(super().authentication_classes)
+            if JWTAuthentication not in classes:
+                classes.insert(0, JWTAuthentication)
+            return classes
+        return super().authentication_classes
+
+    def get_permissions(self):
+        if self.action == "start_unified_sac_migration":
+            if getattr(self.request, "jwt_payload", None):
+                return [HasInternalAuthenticationPermission()]
+            return [IsAuthenticated(), ModuleHasPermission()]
+        return super().get_permissions()
 
     def get_queryset(self):
         # Allow all projects for internal communication users
@@ -579,17 +610,41 @@ class ProjectViewset(
         )
 
     @action(
-        detail=True,
+        detail=False,
         methods=["post"],
         url_path="start-unified-sac-migration",
     )
     def start_unified_sac_migration(self, request, *args, **kwargs):
-        """Start the Unified SAC migration for this project's organization."""
-        project = self.get_object()
+        """Start the Unified SAC migration for the organization of the given project."""
+        jwt_project = (
+            getattr(request, "project", None)
+            if getattr(request, "jwt_payload", None)
+            else None
+        )
         try:
-            migration = StartUnifiedSacMigrationUseCase().execute(
-                project, user=request.user
+            project = ResolveProjectForUnifiedSacMigrationUseCase().execute(
+                request.data.get("project_uuid"),
+                jwt_project=jwt_project,
             )
+        except MissingProjectUUIDError:
+            return Response(
+                {"project_uuid": ["This field is required"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ProjectMismatchError:
+            return Response(
+                {"detail": "Project does not match the authenticated token."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ProjectNotFoundError:
+            return Response(
+                {"detail": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user = request.user if request.user and request.user.is_authenticated else None
+        try:
+            migration = StartUnifiedSacMigrationUseCase().execute(project, user=user)
         except UnifiedSacMigrationInProgressError as error:
             return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
         except StartUnifiedSacMigrationError as error:
