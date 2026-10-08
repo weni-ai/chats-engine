@@ -26,6 +26,24 @@ class RoomFilterTests(TestCase):
         self.queue = self.sector.queues.create(name="Q")
         ProjectPermission.objects.create(project=self.project, user=self.user, role=1)
 
+    def _filter(self, params):
+        request = self.factory.get("/x", params)
+        request.user = self.user
+        return RoomFilter(data=params, queryset=Room.objects.all(), request=request)
+
+    def _room(self, **overrides):
+        contact = overrides.pop("contact", None) or Contact.objects.create(
+            name="Contact"
+        )
+        defaults = {
+            "queue": self.queue,
+            "user": self.user,
+            "is_active": True,
+            "contact": contact,
+        }
+        defaults.update(overrides)
+        return Room.objects.create(**defaults)
+
     @patch(
         "chats.apps.api.v1.rooms.filters.get_user_id_by_email_cached", return_value=None
     )
@@ -37,6 +55,87 @@ class RoomFilterTests(TestCase):
             data={"project": str(self.project.pk)}, queryset=qs, request=request
         )
         self.assertFalse(f.qs.exists())
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_chats_true_keeps_rooms_waiting_on_the_agent(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "true"}
+        )
+
+        self.assertEqual(list(result.qs), [unanswered])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_chats_false_does_not_filter(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        replied = self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "false"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unanswered, replied])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=False)
+    def test_unanswered_chats_is_ignored_when_feature_flag_is_off(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        replied = self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "true"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unanswered, replied])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unread_messages_true_keeps_rooms_with_unread_count(self, _):
+        unread = self._room(unread_messages_count=2)
+        self._room(unread_messages_count=0)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unread_messages": "true"}
+        )
+
+        self.assertEqual(list(result.qs), [unread])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unread_messages_false_does_not_filter(self, _):
+        unread = self._room(unread_messages_count=2)
+        read = self._room(unread_messages_count=0)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unread_messages": "false"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unread, read])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_and_unread_filters_apply_together(self, _):
+        contact = Contact.objects.create(name="Both")
+        both = self._room(
+            contact=contact,
+            last_message_contact=contact,
+            unread_messages_count=1,
+        )
+        self._room(
+            contact=contact, last_message_contact=contact, unread_messages_count=0
+        )
+        self._room(unread_messages_count=3, last_message_user=self.user)
+
+        result = self._filter(
+            {
+                "project": str(self.project.pk),
+                "unanswered_chats": "true",
+                "unread_messages": "true",
+            }
+        )
+
+        self.assertEqual(list(result.qs), [both])
 
 
 class TransferRoomSerializerTests(TestCase):
@@ -557,7 +656,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         force_authenticate(
             req, user=self.admin
         )  # Admin doesn't have permission on other_project
-        resp = view(req)
+        _ = view(req)
 
     def test_bulk_close_ignores_already_closed_rooms(self):
         """Test that only active rooms are processed by the service."""

@@ -56,6 +56,18 @@ class RoomFilter(filters.FilterSet):
         help_text=_("Filter by multiple sector UUIDs (comma-separated)"),
     )
 
+    unanswered_chats = filters.BooleanFilter(
+        required=False,
+        method="filter_unanswered_chats",
+        help_text=_("When true, only rooms whose latest message is from the contact"),
+    )
+
+    unread_messages = filters.BooleanFilter(
+        required=False,
+        method="filter_unread_messages",
+        help_text=_("When true, only rooms with unread messages"),
+    )
+
     def _multi_filter_enabled(self) -> bool:
         # Cache the flag check on the request so both `queues` and `sectors`
         # share a single call per request.
@@ -93,6 +105,16 @@ class RoomFilter(filters.FilterSet):
         if not self._multi_filter_enabled():
             return queryset
         return queryset.filter(queue__sector__uuid__in=value)
+
+    def filter_unanswered_chats(self, queryset, name, value):
+        if not value or not self._multi_filter_enabled():
+            return queryset
+        return queryset.filter(last_message_contact__isnull=False)
+
+    def filter_unread_messages(self, queryset, name, value):
+        if not value or not self._multi_filter_enabled():
+            return queryset
+        return queryset.filter(unread_messages_count__gt=0)
 
     def filter_room_status(self, queryset, name, value):
         if value == "ongoing":
