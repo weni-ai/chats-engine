@@ -28,6 +28,7 @@ from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsSectorManager,
     ProjectAnyPermission,
+    UnifiedSacInternalOrProjectPermission,
 )
 from chats.apps.api.v1.projects.filters import (
     CustomStatusTypeFilterSet,
@@ -104,7 +105,7 @@ class ProjectViewset(
     serializer_class = ProjectSerializer
     permission_classes = [
         IsAuthenticated,
-        ProjectAnyPermission,
+        UnifiedSacInternalOrProjectPermission,
     ]
     lookup_field = "uuid"
 
