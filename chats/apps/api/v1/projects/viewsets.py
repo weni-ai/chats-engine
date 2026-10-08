@@ -76,6 +76,12 @@ from chats.apps.projects.usecases.get_latest_unified_sac_migration import (
     GetLatestUnifiedSacMigrationUseCase,
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.resolve_project_for_unified_sac_migration import (
+    MissingProjectUUIDError,
+    ProjectMismatchError,
+    ProjectNotFoundError,
+    ResolveProjectForUnifiedSacMigrationUseCase,
+)
 from chats.apps.projects.usecases.start_flow import (
     StartFlowUseCase,
     StartOutOffWhatsappFlowUseCase,
@@ -603,33 +609,6 @@ class ProjectViewset(
             status=status.HTTP_200_OK,
         )
 
-    def _project_for_unified_sac_migration(self, request):
-        project_uuid = request.data.get("project_uuid")
-        if not project_uuid:
-            return Response(
-                {"project_uuid": ["This field is required"]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if getattr(request, "jwt_payload", None):
-            if str(request.project_uuid) != str(project_uuid):
-                return Response(
-                    {"detail": "Project does not match the authenticated token."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-            return request.project
-
-        try:
-            project = Project.objects.filter(uuid=project_uuid).first()
-        except ValidationError:
-            project = None
-        if project is None:
-            return Response(
-                {"detail": "Project not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        return project
-
     @action(
         detail=False,
         methods=["post"],
@@ -637,9 +616,31 @@ class ProjectViewset(
     )
     def start_unified_sac_migration(self, request, *args, **kwargs):
         """Start the Unified SAC migration for the organization of the given project."""
-        project = self._project_for_unified_sac_migration(request)
-        if isinstance(project, Response):
-            return project
+        jwt_project = (
+            getattr(request, "project", None)
+            if getattr(request, "jwt_payload", None)
+            else None
+        )
+        try:
+            project = ResolveProjectForUnifiedSacMigrationUseCase().execute(
+                request.data.get("project_uuid"),
+                jwt_project=jwt_project,
+            )
+        except MissingProjectUUIDError:
+            return Response(
+                {"project_uuid": ["This field is required"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ProjectMismatchError:
+            return Response(
+                {"detail": "Project does not match the authenticated token."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ProjectNotFoundError:
+            return Response(
+                {"detail": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         user = request.user if request.user and request.user.is_authenticated else None
         try:
