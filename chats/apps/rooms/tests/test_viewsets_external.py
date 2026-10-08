@@ -1,21 +1,21 @@
+from unittest import mock
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
-from django.test import override_settings
-from rest_framework.test import APITestCase
 from rest_framework.response import Response
+from rest_framework.test import APITestCase
+
+from chats.apps.api.utils import create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue, User
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-from unittest import mock
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import Permission
-
-from chats.apps.api.utils import create_user_and_token
 
 
 class RoomsExternalTests(APITestCase):
@@ -457,7 +457,10 @@ class RoomsQueuePriorityExternalTests(APITestCase):
             self.queue.uuid,
         )
 
-    @patch("chats.apps.rooms.usecases.resolve_room_user.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.rooms.usecases.resolve_room_user.is_feature_active",
+        return_value=True,
+    )
     @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_agent_fails_capacity_recheck(
@@ -707,9 +710,7 @@ class RoomsFlowStartExternalTests(APITestCase):
         self, mock_get_room, mock_is_attending
     ):
         mock_get_room.return_value = None
-        self._assert_unresolved_secondary_leaves_main_flow_start(
-            {"uuid": "not-a-uuid"}
-        )
+        self._assert_unresolved_secondary_leaves_main_flow_start({"uuid": "not-a-uuid"})
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
@@ -1198,3 +1199,87 @@ class RoomsQueueLimitExternalTests(APITestCase):
         response = self.create_room(data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data["error"], "human_support_queue_limit_reached")
+
+
+class RoomsExternalContactCustomFieldsFillTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
+        self.user, self.token = create_user_and_token("test_user")
+
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        self.user.user_permissions.add(permission)
+        self.client.force_authenticate(self.user)
+        self.url = reverse("external_rooms-list")
+
+    def _create_room(self, data: dict):
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+        return client.post(self.url, data=data, format="json")
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    @patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_fills_empty_contact_from_room_custom_fields(
+        self, mock_get_userinfo, mock_get_room
+    ):
+        mock_get_userinfo.return_value = {"sub": "test_user"}
+        mock_get_room.return_value = None
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {"external_id": "cf-fill-001", "name": "QA"},
+            "custom_fields": {
+                "email": "qa01@weni.ai",
+                "document": "111.222.333-44",
+            },
+        }
+
+        response = self._create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        contact = Contact.objects.get(external_id="cf-fill-001")
+        self.assertEqual(contact.email, "qa01@weni.ai")
+        self.assertEqual(contact.document, "11122233344")
+
+        room = Room.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(room.custom_fields["email"], "qa01@weni.ai")
+        self.assertEqual(room.custom_fields["document"], "111.222.333-44")
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    @patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_does_not_overwrite_existing_contact_email(
+        self, mock_get_userinfo, mock_get_room
+    ):
+        mock_get_userinfo.return_value = {"sub": "test_user"}
+        mock_get_room.return_value = None
+
+        Contact.objects.create(
+            external_id="cf-fill-002",
+            name="Existing",
+            email="contact@weni.ai",
+            document="",
+        )
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {"external_id": "cf-fill-002", "name": "Existing"},
+            "custom_fields": {
+                "email": "qa01@weni.ai",
+                "document": "111.222.333-44",
+            },
+        }
+
+        response = self._create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        contact = Contact.objects.get(external_id="cf-fill-002")
+        self.assertEqual(contact.email, "contact@weni.ai")
+        self.assertEqual(contact.document, "11122233344")
