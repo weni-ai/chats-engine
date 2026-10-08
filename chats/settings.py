@@ -1084,11 +1084,9 @@ ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
 
 
 # Kong API Gateway (weni-commons)
-KONG_ADMIN_URL = env.str(
-    "KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001"
-)
+KONG_ADMIN_URL = env.str("KONG_ADMIN_URL", default="http://localhost:8001")
 KONG_SERVICE = env.str("KONG_SERVICE", default="chats-service")
-KONG_SERVICE_URL = env.str("KONG_SERVICE_URL", default=ENGINE_BASE_URL)
+KONG_SERVICE_URL = env.str("KONG_SERVICE_URL", default="")
 KONG_URL_PREFIX = env.str("KONG_URL_PREFIX", default="/chats")
 
 WENI_SESSION_TOKEN_DYNAMODB_TABLE = env.str(
