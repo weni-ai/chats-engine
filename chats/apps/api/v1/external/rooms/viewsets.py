@@ -31,7 +31,7 @@ from chats.apps.ai_features.history_summary.tasks import (
     generate_history_summary,
 )
 from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
-from chats.apps.api.v1.external.permissions import IsAdminPermission
+from chats.apps.api.v1.external.permissions import HasRequestAuth, IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
     RoomListSerializer,
@@ -653,6 +653,8 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class.default_limit = 10
     pagination_class.max_limit = 100
 
+    permission_classes = [HasRequestAuth]
+
     @property
     def authentication_classes(self):
         return [SessionTokenAuthentication, ProjectAdminAuthentication]
@@ -664,12 +666,12 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .filter(queue__sector__project=self.request.auth.project)
         )
 
-    @api_gateway_expose(alias="rooms")
+    @api_gateway_expose(alias="rooms", service="chats-service")
     def list(self, request, *args, **kwargs):
         """List rooms with limit/offset pagination (default=10, max=100)."""
         return super().list(request, *args, **kwargs)
 
-    @api_gateway_expose(alias="rooms/{uuid}")
+    @api_gateway_expose(alias="rooms/{uuid}", service="chats-service")
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)

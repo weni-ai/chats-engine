@@ -86,7 +86,7 @@ class MessageFlowViewset(
             return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
-    @api_gateway_expose(alias="room-messages")
+    @api_gateway_expose(alias="room-messages", service="chats-service")
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List messages filtered by room or other criteria."""
@@ -95,6 +95,7 @@ class MessageFlowViewset(
     @api_gateway_expose(
         alias="room-messages",
         methods=["POST"],
+        service="chats-service",
     )
     @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
