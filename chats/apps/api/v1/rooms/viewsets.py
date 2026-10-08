@@ -58,6 +58,8 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
     RoomNoteMediaSerializer,
     RoomNoteSerializer,
+    RoomsCountByAgentQueryParamsSerializer,
+    RoomsCountByAgentResponseSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
     RoomsCountQueryParamsSerializer,
@@ -69,6 +71,9 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+from chats.apps.api.v1.rooms.services.rooms_count_by_agent_service import (
+    RoomsCountByAgentService,
+)
 from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
     RoomsCountByQueueService,
 )
@@ -209,7 +214,9 @@ class RoomViewset(
     @staticmethod
     def _compute_page_slices(pinned_ids, offset, limit):
         pin_count = len(pinned_ids)
+        # fmt: off
         page_pin_ids = pinned_ids[offset:offset + limit]
+        # fmt: on
         remaining = limit - len(page_pin_ids)
         unpinned_offset = max(0, offset - pin_count)
         return page_pin_ids, remaining, unpinned_offset
@@ -279,9 +286,7 @@ class RoomViewset(
             pinned_data = self.get_serializer(pinned_rooms, many=True).data
 
         results_data = self.get_serializer(unpinned_page, many=True).data
-        return paginator.get_paginated_response(
-            results_data, pinned_rooms=pinned_data
-        )
+        return paginator.get_paginated_response(results_data, pinned_rooms=pinned_data)
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
@@ -1646,5 +1651,47 @@ class RoomsCountByQueueView(APIView):
 
         return Response(
             RoomsCountByQueueResponseSerializer(result).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class RoomsCountByAgentView(APIView):
+    """
+    Return active room counts grouped by agent for a project.
+
+    Query params:
+        - project: Project UUID (required)
+
+    `uuid` is the agent email. Agents are ordered by rooms_in_progress
+    descending, then by name.
+    """
+
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountByAgentQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
+        )
+
+        result = RoomsCountByAgentService().get_counts(
+            project_uuid=project_uuid,
+            requesting_permission=requesting_permission,
+        )
+
+        return Response(
+            RoomsCountByAgentResponseSerializer(result).data,
             status=status.HTTP_200_OK,
         )
