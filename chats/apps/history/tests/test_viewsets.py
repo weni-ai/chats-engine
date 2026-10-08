@@ -1,8 +1,10 @@
+from unittest.mock import patch
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
@@ -232,6 +234,12 @@ class TestHistoryRoomSearchFields(BaseAPIChatsTestCase):
     def setUp(self):
         super().setUp()
         self.deactivate_rooms()
+        ninth_digit_patcher = patch(
+            "chats.core.filters.ninth_digit_search_enabled_from_request",
+            return_value=False,
+        )
+        ninth_digit_patcher.start()
+        self.addCleanup(ninth_digit_patcher.stop)
 
         self.contact.email = "john.doe@tokstok.com"
         self.contact.document = "123.456.789-00"
