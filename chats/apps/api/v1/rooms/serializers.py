@@ -91,6 +91,36 @@ class RoomsCountByQueueResponseSerializer(serializers.Serializer):
     sectors = SectorRoomsCountSerializer(many=True)
 
 
+class RoomsCountBySectorQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class SectorCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    uuid = serializers.UUIDField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class RoomsCountBySectorResponseSerializer(serializers.Serializer):
+    sectors = SectorCountSerializer(many=True)
+
+
+class RoomsCountByAgentQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class AgentRoomsCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    uuid = serializers.CharField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class RoomsCountByAgentResponseSerializer(serializers.Serializer):
+    agents = AgentRoomsCountSerializer(many=True)
+
+
 class LastMessageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField(allow_null=True)
     text = serializers.CharField(allow_blank=True)
@@ -707,27 +737,6 @@ class PinRoomSerializer(serializers.Serializer):
     status = serializers.BooleanField(required=True)
 
 
-class RoomNoteSerializer(serializers.ModelSerializer):
-    """
-    Serializer for room notes
-    """
-
-    user = serializers.SerializerMethodField()
-    is_deletable = serializers.ReadOnlyField()
-
-    class Meta:
-        model = RoomNote
-        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
-        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
-
-    def get_user(self, obj):
-        return {
-            "uuid": str(obj.user.pk),
-            "name": obj.user.full_name,
-            "email": obj.user.email,
-        }
-
-
 class RoomTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
@@ -948,7 +957,9 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in the queue"))
+            raise serializers.ValidationError(
+                _("No available rooms found in the queue")
+            )
         attrs["rooms"] = rooms
         return super().validate(attrs)
 
