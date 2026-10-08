@@ -17,6 +17,7 @@ name = "weni-chats"
 version = "0.1.0"
 description = ""
 authors = ["helllllllder <heldergsds@gmail.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -69,7 +70,7 @@ workalendar = "^17.0.0"
 xlsxwriter = "^3.2.5"
 daphne = "^3.0.0"
 pyjwt = "2.9.0"
-weni-commons = "^1.3.1"
+weni-commons = "1.6.0"
 weasyprint = "^60.2"
 pydyf = ">=0.5.0,<0.9.0"
 

@@ -4,6 +4,11 @@ from rest_framework import permissions
 from chats.apps.projects.models import ProjectPermission
 
 
+class HasRequestAuth(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return getattr(request, "auth", None) is not None
+
+
 class IsAdminPermission(permissions.BasePermission):
     def has_permission(self, request, view):  # pragma: no cover
         if view.action == "list":
