@@ -90,6 +90,21 @@ class RoomsCountByQueueResponseSerializer(serializers.Serializer):
     sectors = SectorRoomsCountSerializer(many=True)
 
 
+class RoomsCountBySectorQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class SectorCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    uuid = serializers.UUIDField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class RoomsCountBySectorResponseSerializer(serializers.Serializer):
+    sectors = SectorCountSerializer(many=True)
+
+
 class LastMessageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField(allow_null=True)
     text = serializers.CharField(allow_blank=True)
@@ -906,7 +921,9 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(_("No available rooms found in the queue"))
+            raise serializers.ValidationError(
+                _("No available rooms found in the queue")
+            )
         attrs["rooms"] = rooms
         return super().validate(attrs)
 
