@@ -47,6 +47,28 @@ def _serialize_closed_by(room: Room) -> Optional[dict]:
     return ClosedBySerializer(room).data
 
 
+def _apply_custom_fields_contact_fallback(data: dict, room: Optional[Room]) -> dict:
+    """
+    Fills empty contact email/document from room.custom_fields when those
+    values were stored as custom fields instead of contact attributes.
+    """
+    if room is None:
+        return data
+
+    custom_fields = room.custom_fields
+    if not isinstance(custom_fields, dict):
+        return data
+
+    for field in ("email", "document"):
+        if data.get(field):
+            continue
+        value = custom_fields.get(field)
+        if isinstance(value, str) and value.strip():
+            data[field] = value
+
+    return data
+
+
 class ContactOptimizedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
@@ -62,7 +84,7 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
             else:
                 data["name"] = f"{data['name']} | {room.protocol}"
 
-        return data
+        return _apply_custom_fields_contact_fallback(data, room)
 
 
 class RoomHistorySerializer(serializers.ModelSerializer):
@@ -147,7 +169,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
         contact_data = ContactSimpleSerializer(obj.contact).data
         if obj.protocol:
             contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
-        return contact_data
+        return _apply_custom_fields_contact_fallback(contact_data, obj)
 
     def get_tags(self, obj):
         return TagSimpleSerializer(
