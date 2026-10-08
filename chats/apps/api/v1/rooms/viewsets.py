@@ -60,6 +60,8 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomNoteSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
+    RoomsCountBySectorQueryParamsSerializer,
+    RoomsCountBySectorResponseSerializer,
     RoomsCountQueryParamsSerializer,
     RoomSerializer,
     RoomsReportSerializer,
@@ -71,6 +73,9 @@ from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
     RoomsCountByQueueService,
+)
+from chats.apps.api.v1.rooms.services.rooms_count_by_sector_service import (
+    RoomsCountBySectorService,
 )
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
@@ -207,7 +212,9 @@ class RoomViewset(
     @staticmethod
     def _compute_page_slices(pinned_ids, offset, limit):
         pin_count = len(pinned_ids)
-        page_pin_ids = pinned_ids[offset : offset + limit]
+        # fmt: off
+        page_pin_ids = pinned_ids[offset:offset + limit]
+        # fmt: on
         remaining = limit - len(page_pin_ids)
         unpinned_offset = max(0, offset - pin_count)
         return page_pin_ids, remaining, unpinned_offset
@@ -1154,53 +1161,6 @@ class RoomViewset(
 
     @action(
         detail=True,
-        methods=["post"],
-        url_path="room_note",
-        serializer_class=RoomNoteSerializer,
-    )
-    def create_note(self, request, pk=None):
-        """
-        Create a note for the room
-        """
-        room = self.get_object()
-
-        # Verify user has access to the room
-        if not verify_user_room(room, request.user):
-            raise PermissionDenied(
-                "You don't have permission to add notes to this room"
-            )
-
-        # Room must be active
-        if not room.is_active:
-            raise ValidationError({"detail": "Cannot add notes to closed rooms"})
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Create a blank message to attach the internal note
-        msg = Message.objects.create(
-            room=room,
-            user=request.user,
-            contact=None,
-            text="",
-        )
-
-        # Create the note attached to the message
-        note = RoomNote.objects.create(
-            room=room,
-            user=request.user,
-            text=serializer.validated_data["text"],
-            message=msg,
-        )
-
-        # Notify message creation for clients listening to messages
-        msg.notify_room("create", True)
-
-        # Return serialized note
-        return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
-
-    @action(
-        detail=True,
         methods=["get"],
         url_path="tags",
         serializer_class=RoomTagSerializer,
@@ -1694,5 +1654,46 @@ class RoomsCountByQueueView(APIView):
 
         return Response(
             RoomsCountByQueueResponseSerializer(result).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class RoomsCountBySectorView(APIView):
+    """
+    Return active room counts grouped by sector for a project.
+
+    Query params:
+        - project: Project UUID (required)
+
+    Sectors are ordered by rooms_in_progress descending, then by name.
+    """
+
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountBySectorQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
+        )
+
+        result = RoomsCountBySectorService().get_counts(
+            project_uuid=project_uuid,
+            requesting_permission=requesting_permission,
+        )
+
+        return Response(
+            RoomsCountBySectorResponseSerializer(result).data,
             status=status.HTTP_200_OK,
         )
