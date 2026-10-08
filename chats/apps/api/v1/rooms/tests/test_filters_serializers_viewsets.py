@@ -26,6 +26,24 @@ class RoomFilterTests(TestCase):
         self.queue = self.sector.queues.create(name="Q")
         ProjectPermission.objects.create(project=self.project, user=self.user, role=1)
 
+    def _filter(self, params):
+        request = self.factory.get("/x", params)
+        request.user = self.user
+        return RoomFilter(data=params, queryset=Room.objects.all(), request=request)
+
+    def _room(self, **overrides):
+        contact = overrides.pop("contact", None) or Contact.objects.create(
+            name="Contact"
+        )
+        defaults = {
+            "queue": self.queue,
+            "user": self.user,
+            "is_active": True,
+            "contact": contact,
+        }
+        defaults.update(overrides)
+        return Room.objects.create(**defaults)
+
     @patch(
         "chats.apps.api.v1.rooms.filters.get_user_id_by_email_cached", return_value=None
     )
@@ -37,6 +55,87 @@ class RoomFilterTests(TestCase):
             data={"project": str(self.project.pk)}, queryset=qs, request=request
         )
         self.assertFalse(f.qs.exists())
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_chats_true_keeps_rooms_waiting_on_the_agent(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "true"}
+        )
+
+        self.assertEqual(list(result.qs), [unanswered])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_chats_false_does_not_filter(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        replied = self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "false"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unanswered, replied])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=False)
+    def test_unanswered_chats_is_ignored_when_feature_flag_is_off(self, _):
+        contact = Contact.objects.create(name="Waiting")
+        unanswered = self._room(contact=contact, last_message_contact=contact)
+        replied = self._room(last_message_user=self.user)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unanswered_chats": "true"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unanswered, replied])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unread_messages_true_keeps_rooms_with_unread_count(self, _):
+        unread = self._room(unread_messages_count=2)
+        self._room(unread_messages_count=0)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unread_messages": "true"}
+        )
+
+        self.assertEqual(list(result.qs), [unread])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unread_messages_false_does_not_filter(self, _):
+        unread = self._room(unread_messages_count=2)
+        read = self._room(unread_messages_count=0)
+
+        result = self._filter(
+            {"project": str(self.project.pk), "unread_messages": "false"}
+        )
+
+        self.assertCountEqual(list(result.qs), [unread, read])
+
+    @patch("chats.apps.api.v1.rooms.filters.is_feature_active", return_value=True)
+    def test_unanswered_and_unread_filters_apply_together(self, _):
+        contact = Contact.objects.create(name="Both")
+        both = self._room(
+            contact=contact,
+            last_message_contact=contact,
+            unread_messages_count=1,
+        )
+        self._room(
+            contact=contact, last_message_contact=contact, unread_messages_count=0
+        )
+        self._room(unread_messages_count=3, last_message_user=self.user)
+
+        result = self._filter(
+            {
+                "project": str(self.project.pk),
+                "unanswered_chats": "true",
+                "unread_messages": "true",
+            }
+        )
+
+        self.assertEqual(list(result.qs), [both])
 
 
 class TransferRoomSerializerTests(TestCase):
@@ -191,8 +290,12 @@ class RoomViewsetListTests(TestCase):
         pinned_room = self._create_room("PINNED", user=self.other_user)
         regular_room = self._create_room("REGULAR", user=self.other_user)
 
-        RoomPin.objects.create(room=pinned_room, user=self.other_user, project=self.project)
-        RoomPin.objects.create(room=regular_room, user=self.request_user, project=self.project)
+        RoomPin.objects.create(
+            room=pinned_room, user=self.other_user, project=self.project
+        )
+        RoomPin.objects.create(
+            room=regular_room, user=self.request_user, project=self.project
+        )
 
         response = self._list({"email": self.other_user.email, "limit": 10})
 
@@ -213,7 +316,10 @@ class RoomViewsetListTests(TestCase):
             if i < 3:
                 pinned_rooms.append(room)
         RoomPin.objects.bulk_create(
-            [RoomPin(room=room, user=self.request_user, project=self.project) for room in pinned_rooms]
+            [
+                RoomPin(room=room, user=self.request_user, project=self.project)
+                for room in pinned_rooms
+            ]
         )
 
         params = {"project": str(self.project.pk), "limit": 50}
@@ -227,8 +333,9 @@ class RoomViewsetListTests(TestCase):
         self.assertEqual(len(pinned) + len(results), 50)
         # With the pin page-budget list, query count should stay bounded
         self.assertLessEqual(
-            len(ctx), 50,
-            f"Query count too high: {len(ctx)}. The pin list should stay under 50 queries."
+            len(ctx),
+            50,
+            f"Query count too high: {len(ctx)}. The pin list should stay under 50 queries.",
         )
 
     def test_list_supports_common_filters(self):
@@ -250,7 +357,10 @@ class RoomViewsetListTests(TestCase):
             {"project": str(self.project.pk), "search": "PROTO-123"}
         )
         self.assertTrue(
-            any(item["uuid"] == str(room_a.uuid) for item in search_response.data["results"])
+            any(
+                item["uuid"] == str(room_a.uuid)
+                for item in search_response.data["results"]
+            )
         )
 
     def test_pin_order_filters_before_serializing(self):
@@ -264,15 +374,15 @@ class RoomViewsetListTests(TestCase):
         inactive_pinned = self._create_room("INACTIVE-PINNED", is_active=False)
 
         # Pin both pinned rooms
-        RoomPin.objects.create(room=active_pinned, user=self.request_user, project=self.project)
-        RoomPin.objects.create(room=inactive_pinned, user=self.request_user, project=self.project)
+        RoomPin.objects.create(
+            room=active_pinned, user=self.request_user, project=self.project
+        )
+        RoomPin.objects.create(
+            room=inactive_pinned, user=self.request_user, project=self.project
+        )
 
         # Request only active rooms
-        params = {
-            "project": str(self.project.pk),
-            "is_active": "true",
-            "limit": 50
-        }
+        params = {"project": str(self.project.pk), "is_active": "true", "limit": 50}
 
         with CaptureQueriesContext(connection) as ctx:
             response = self._list(params)
@@ -290,10 +400,7 @@ class RoomViewsetListTests(TestCase):
         self.assertNotIn(str(inactive_pinned.uuid), result_uuids)
         self.assertNotIn(str(inactive_pinned.uuid), pinned_uuids)
 
-        self.assertLessEqual(
-            len(ctx), 50,
-            f"Too many queries with filters: {len(ctx)}"
-        )
+        self.assertLessEqual(len(ctx), 50, f"Too many queries with filters: {len(ctx)}")
 
 
 class RoomViewsetBulkCloseTests(TestCase):
@@ -307,7 +414,7 @@ class RoomViewsetBulkCloseTests(TestCase):
             rooms_limit=5,
             work_start="08:00",
             work_end="18:00",
-            is_csat_enabled=False
+            is_csat_enabled=False,
         )
         self.queue = self.sector.queues.create(name="Q")
         self.perm_admin = ProjectPermission.objects.create(
@@ -320,9 +427,7 @@ class RoomViewsetBulkCloseTests(TestCase):
     def test_bulk_close_single_room(self):
         """Test closing a single room via API"""
         room = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -347,9 +452,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         """Test closing multiple rooms via API"""
         rooms = [
             Room.objects.create(
-                queue=self.queue,
-                project_uuid=str(self.project.pk),
-                is_active=True
+                queue=self.queue, project_uuid=str(self.project.pk), is_active=True
             )
             for _ in range(5)
         ]
@@ -378,23 +481,14 @@ class RoomViewsetBulkCloseTests(TestCase):
         from chats.apps.sectors.models import SectorTag
 
         room = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
         tag = SectorTag.objects.create(name="TestTag", sector=self.sector)
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={
-                "rooms": [
-                    {
-                        "uuid": str(room.uuid),
-                        "tags": [str(tag.uuid)]
-                    }
-                ]
-            },
+            data={"rooms": [{"uuid": str(room.uuid), "tags": [str(tag.uuid)]}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -407,18 +501,13 @@ class RoomViewsetBulkCloseTests(TestCase):
     def test_bulk_close_with_end_by(self):
         """Test closing rooms with end_by parameter"""
         room = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={
-                "rooms": [{"uuid": str(room.uuid)}],
-                "end_by": "system"
-            },
+            data={"rooms": [{"uuid": str(room.uuid)}], "end_by": "system"},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -431,9 +520,7 @@ class RoomViewsetBulkCloseTests(TestCase):
     def test_bulk_close_with_closed_by(self):
         """Test closing rooms with closed_by parameter"""
         room = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -441,7 +528,7 @@ class RoomViewsetBulkCloseTests(TestCase):
             "/x",
             data={
                 "rooms": [{"uuid": str(room.uuid)}],
-                "closed_by_email": self.agent.email
+                "closed_by_email": self.agent.email,
             },
             content_type="application/json",
         )
@@ -457,7 +544,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         room = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Already closed
+            is_active=False,  # Already closed
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -475,16 +562,11 @@ class RoomViewsetBulkCloseTests(TestCase):
         """Test that user must have permissions on project"""
         other_project = Project.objects.create(name="Other Project", timezone="UTC")
         other_sector = other_project.sectors.create(
-            name="Other Sector",
-            rooms_limit=5,
-            work_start="08:00",
-            work_end="18:00"
+            name="Other Sector", rooms_limit=5, work_start="08:00", work_end="18:00"
         )
         other_queue = other_sector.queues.create(name="Other Queue")
         other_room = Room.objects.create(
-            queue=other_queue,
-            project_uuid=str(other_project.pk),
-            is_active=True
+            queue=other_queue, project_uuid=str(other_project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -493,7 +575,9 @@ class RoomViewsetBulkCloseTests(TestCase):
             data={"rooms": [{"uuid": str(other_room.uuid)}]},
             content_type="application/json",
         )
-        force_authenticate(req, user=self.admin)  # Admin doesn't have permission on other_project
+        force_authenticate(
+            req, user=self.admin
+        )  # Admin doesn't have permission on other_project
         resp = view(req)
 
         # Should fail validation
@@ -503,23 +587,18 @@ class RoomViewsetBulkCloseTests(TestCase):
         """Test that already closed rooms are filtered out by serializer,
         only active rooms are processed by the service."""
         room1 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
         room2 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Already closed - filtered out by serializer
+            is_active=False,  # Already closed - filtered out by serializer
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room1.uuid)},
-                {"uuid": str(room2.uuid)}
-            ]},
+            data={"rooms": [{"uuid": str(room1.uuid)}, {"uuid": str(room2.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -535,22 +614,19 @@ class RoomViewsetBulkCloseTests(TestCase):
             queue=self.queue,
             project_uuid=str(self.project.pk),
             user=None,  # In queue
-            is_active=True
+            is_active=True,
         )
         room2 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
             user=None,  # In queue
-            is_active=True
+            is_active=True,
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room1.uuid)},
-                {"uuid": str(room2.uuid)}
-            ]},
+            data={"rooms": [{"uuid": str(room1.uuid)}, {"uuid": str(room2.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -566,22 +642,19 @@ class RoomViewsetBulkCloseTests(TestCase):
             queue=self.queue,
             project_uuid=str(self.project.pk),
             user=self.agent,  # Assigned
-            is_active=True
+            is_active=True,
         )
         room2 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
             user=self.agent,  # Assigned
-            is_active=True
+            is_active=True,
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room1.uuid)},
-                {"uuid": str(room2.uuid)}
-            ]},
+            data={"rooms": [{"uuid": str(room1.uuid)}, {"uuid": str(room2.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -594,6 +667,7 @@ class RoomViewsetBulkCloseTests(TestCase):
     def test_bulk_close_validates_max_rooms_limit(self):
         """Test that serializer validates max rooms limit of 200"""
         import uuid
+
         rooms_data = [{"uuid": str(uuid.uuid4())} for _ in range(201)]
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -613,21 +687,18 @@ class RoomViewsetBulkCloseTests(TestCase):
         room1 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Already closed
+            is_active=False,  # Already closed
         )
         room2 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Already closed
+            is_active=False,  # Already closed
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room1.uuid)},
-                {"uuid": str(room2.uuid)}
-            ]},
+            data={"rooms": [{"uuid": str(room1.uuid)}, {"uuid": str(room2.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -639,29 +710,27 @@ class RoomViewsetBulkCloseTests(TestCase):
     def test_bulk_close_mixed_active_and_closed_rooms(self):
         """Test that inactive rooms are filtered by serializer, active ones are closed"""
         room1 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
         room2 = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Filtered out by serializer
+            is_active=False,  # Filtered out by serializer
         )
         room3 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room1.uuid)},
-                {"uuid": str(room2.uuid)},
-                {"uuid": str(room3.uuid)}
-            ]},
+            data={
+                "rooms": [
+                    {"uuid": str(room1.uuid)},
+                    {"uuid": str(room2.uuid)},
+                    {"uuid": str(room3.uuid)},
+                ]
+            },
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -677,7 +746,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         room = Room.objects.create(
             queue=self.queue,
             project_uuid=str(self.project.pk),
-            is_active=False  # Already closed
+            is_active=False,  # Already closed
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
@@ -697,19 +766,13 @@ class RoomViewsetBulkCloseTests(TestCase):
         from chats.apps.sectors.models import SectorTag
 
         room1 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
         room2 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
         room3 = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
@@ -723,7 +786,7 @@ class RoomViewsetBulkCloseTests(TestCase):
                 "rooms": [
                     {"uuid": str(room1.uuid), "tags": [str(tag1.uuid)]},
                     {"uuid": str(room2.uuid), "tags": [str(tag2.uuid), str(tag3.uuid)]},
-                    {"uuid": str(room3.uuid)}  # No tags
+                    {"uuid": str(room3.uuid)},  # No tags
                 ]
             },
             content_type="application/json",
@@ -753,17 +816,13 @@ class RoomViewsetBulkCloseTests(TestCase):
         import uuid
 
         room = Room.objects.create(
-            queue=self.queue,
-            project_uuid=str(self.project.pk),
-            is_active=True
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [
-                {"uuid": str(room.uuid), "tags": [str(uuid.uuid4())]}
-            ]},
+            data={"rooms": [{"uuid": str(room.uuid), "tags": [str(uuid.uuid4())]}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -948,8 +1007,9 @@ class RoomViewsetBulkTakeTests(TestCase):
 
     def test_bulk_take_validates_max_rooms_limit(self):
         """Cannot take more than BULK_TAKE_MAX_ROOMS at once"""
-        from django.test import override_settings
         import uuid as uuid_mod
+
+        from django.test import override_settings
 
         uuids = [str(uuid_mod.uuid4()) for _ in range(5)]
 
