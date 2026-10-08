@@ -1,6 +1,10 @@
+import logging
+
 from django.core.exceptions import ValidationError
 
 from chats.apps.projects.models import Project
+
+logger = logging.getLogger(__name__)
 
 
 class MissingProjectUUIDError(Exception):
@@ -30,6 +34,7 @@ class ResolveProjectForUnifiedSacMigrationUseCase:
         try:
             project = Project.objects.filter(uuid=project_uuid).first()
         except ValidationError:
+            logger.warning("Invalid project_uuid format received: %s", project_uuid)
             project = None
         if project is None:
             raise ProjectNotFoundError()
