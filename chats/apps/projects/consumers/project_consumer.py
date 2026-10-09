@@ -12,6 +12,9 @@ from chats.apps.projects.usecases.project_creation import (
 from chats.apps.projects.usecases.sector_setup_handler import SectorSetupHandlerUseCase
 
 
+EVENT_TYPE_PROJECT_CREATED = "project.created"
+
+
 def _build_project_dto(body: dict) -> ProjectCreationDTO:
     return ProjectCreationDTO(
         uuid=body.get("uuid"),
@@ -61,12 +64,19 @@ class WeniEDAProjectConsumer(WeniEDAConsumer):
         Process an incoming project creation message.
         """
         print(f"[WeniEDAProjectConsumer] - Consuming a message. Body: {message.body}")
-        body = JSONParser.parse(message.body)
+        event = message.event()
+        data = event.data or {}
 
-        project_dto = _build_project_dto(body)
+        if event.event_type == EVENT_TYPE_PROJECT_CREATED:
+            self._handle_project_created(data)
+        else:
+            raise ValueError(f"Unsupported event_type: {event.event_type}")
+
+        self.ack()
+
+    def _handle_project_created(self, data: dict):
+        project_dto = _build_project_dto(data)
 
         sector_setup_handler = SectorSetupHandlerUseCase()
         project_creation = ProjectCreationUseCase(sector_setup_handler)
         project_creation.create_project(project_dto)
-
-        self.ack()
